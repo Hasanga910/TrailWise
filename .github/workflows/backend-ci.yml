@@ -1,0 +1,36 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore TrailWise.sln
+        working-directory: backend
+
+      - name: Build
+        run: dotnet build TrailWise.sln --no-restore --configuration Release
+        working-directory: backend
+
+      - name: Test
+        run: dotnet test TrailWise.sln --no-build --configuration Release --verbosity normal
+        working-directory: backend

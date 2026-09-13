@@ -1,0 +1,37 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# .NET
+backend/**/bin/
+backend/**/obj/
+*.user
+
+# Node / React
+frontend-web/node_modules/
+frontend-web/dist/
+frontend-web/.vite/
+npm-debug.log*
+
+# Flutter / Dart
+frontend-mobile/.dart_tool/
+frontend-mobile/.flutter-plugins
+frontend-mobile/.flutter-plugins-dependencies
+frontend-mobile/.packages
+frontend-mobile/build/
+frontend-mobile/**/ios/Pods/
+frontend-mobile/**/ios/.symlinks/
+frontend-mobile/**/ios/Flutter/Flutter.framework
+frontend-mobile/**/android/.gradle/
+frontend-mobile/**/android/local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp

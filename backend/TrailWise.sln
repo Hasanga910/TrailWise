@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{10BAC8D9-E452-46A0-A2B1-1D27618D9DBB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TrailWise.Domain", "src\TrailWise.Domain\TrailWise.Domain.csproj", "{539FEF8A-3A77-4DB4-B6BA-0629F78B4DCD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TrailWise.Infrastructure", "src\TrailWise.Infrastructure\TrailWise.Infrastructure.csproj", "{0820AC99-3B57-4595-A07D-E8C0BBD7ED41}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TrailWise.Api", "src\TrailWise.Api\TrailWise.Api.csproj", "{1288B04C-A7B7-42FB-AA05-97A6CB38FC70}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{813D97A1-6B93-41F8-B62B-395E8C7B964A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TrailWise.Api.Tests", "tests\TrailWise.Api.Tests\TrailWise.Api.Tests.csproj", "{251845C0-10FD-48CE-8185-375C8F388D0A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{539FEF8A-3A77-4DB4-B6BA-0629F78B4DCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{539FEF8A-3A77-4DB4-B6BA-0629F78B4DCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{539FEF8A-3A77-4DB4-B6BA-0629F78B4DCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{539FEF8A-3A77-4DB4-B6BA-0629F78B4DCD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0820AC99-3B57-4595-A07D-E8C0BBD7ED41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0820AC99-3B57-4595-A07D-E8C0BBD7ED41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0820AC99-3B57-4595-A07D-E8C0BBD7ED41}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0820AC99-3B57-4595-A07D-E8C0BBD7ED41}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1288B04C-A7B7-42FB-AA05-97A6CB38FC70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1288B04C-A7B7-42FB-AA05-97A6CB38FC70}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1288B04C-A7B7-42FB-AA05-97A6CB38FC70}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1288B04C-A7B7-42FB-AA05-97A6CB38FC70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{251845C0-10FD-48CE-8185-375C8F388D0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{251845C0-10FD-48CE-8185-375C8F388D0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{251845C0-10FD-48CE-8185-375C8F388D0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{251845C0-10FD-48CE-8185-375C8F388D0A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{539FEF8A-3A77-4DB4-B6BA-0629F78B4DCD} = {10BAC8D9-E452-46A0-A2B1-1D27618D9DBB}
+		{0820AC99-3B57-4595-A07D-E8C0BBD7ED41} = {10BAC8D9-E452-46A0-A2B1-1D27618D9DBB}
+		{1288B04C-A7B7-42FB-AA05-97A6CB38FC70} = {10BAC8D9-E452-46A0-A2B1-1D27618D9DBB}
+		{251845C0-10FD-48CE-8185-375C8F388D0A} = {813D97A1-6B93-41F8-B62B-395E8C7B964A}
+	EndGlobalSection
+EndGlobal
