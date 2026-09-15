@@ -1,35 +1,19 @@
 import { useEffect, useState } from 'react';
-import { apiClient, extractErrorMessage } from '../api/apiClient';
+import { Link } from 'react-router-dom';
+import { extractErrorMessage } from '../api/apiClient';
+import { getPackages, type TourPackage } from '../api/packages';
 import { useAuth } from '../auth/AuthContext';
 import { Logo } from '../components/Logo';
-
-interface PackageTier {
-  id: string;
-  classType: string;
-  includesFood: boolean;
-  basePricePerPerson: number;
-  requiresAC: boolean;
-}
-
-interface TourPackage {
-  id: string;
-  name: string;
-  theme: string;
-  durationDays: number;
-  basePricePerPerson: number;
-  maxGroupSize: number;
-  tiers: PackageTier[];
-}
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const [packages, setPackages] = useState<TourPackage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const canManagePackages = user?.role === 'OperationsManager' || user?.role === 'Admin';
 
   useEffect(() => {
-    apiClient
-      .get<TourPackage[]>('/api/packages')
-      .then((response) => setPackages(response.data))
+    getPackages()
+      .then(setPackages)
       .catch((err) => setError(extractErrorMessage(err, 'Could not load tour packages.')));
   }, []);
 
@@ -49,12 +33,22 @@ export function DashboardPage() {
               </p>
             </div>
           </div>
-          <button
-            onClick={logout}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-          >
-            Log out
-          </button>
+          <div className="flex items-center gap-3">
+            {canManagePackages && (
+              <Link
+                to="/manage/packages"
+                className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:border-brand-300 hover:bg-brand-100"
+              >
+                Manage Packages
+              </Link>
+            )}
+            <button
+              onClick={logout}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </header>
 
