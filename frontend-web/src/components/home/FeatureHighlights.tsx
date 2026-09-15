@@ -12,20 +12,6 @@ const features = [
     ),
   },
   {
-    title: 'Role-based operations',
-    description: 'Operations Managers, Fleet Coordinators, Tour Guides, and Admins each get the right view.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <circle cx="9" cy="8" r="3" strokeLinecap="round" strokeLinejoin="round" />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 8a3 3 0 1 1 3 3M16.5 14.2c2 .5 3.5 2.6 3.5 5.3"
-        />
-      </svg>
-    ),
-  },
-  {
     title: 'Traveler self-service',
     description: 'Travelers register and browse tour packages directly, no back-and-forth required.',
     icon: (
@@ -39,13 +25,38 @@ const features = [
       </svg>
     ),
   },
+  {
+    title: 'AI-powered matching & pricing',
+    description:
+      'An agentic AI workflow matches the right guide and vehicle and calculates tier-aware pricing automatically, only pausing for approval on large-group, budget, or refund exceptions.',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"
+        />
+        <circle cx="12" cy="12" r="3.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Real-time availability & tracking',
+    description:
+      'Guide and vehicle availability, pending proposals, and booking status all update live, from the moment a trip is requested through confirmation.',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 12h3l2.5-7 4 14 2.5-7H20" />
+      </svg>
+    ),
+  },
 ];
 
 export function FeatureHighlights() {
   const { ref, inView } = useInView<HTMLDivElement>();
 
   return (
-    <section className="mx-auto max-w-6xl px-6 py-20">
+    <section id="features" className="mx-auto max-w-6xl px-6 py-20 scroll-mt-20">
       <div className="mx-auto max-w-2xl text-center">
         <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl">
           Everything your tour operation needs

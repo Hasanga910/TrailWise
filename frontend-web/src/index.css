@@ -29,20 +29,6 @@
   --font-heading: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
-@keyframes drift {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(12px, -10px);
-  }
-}
-
-@utility animate-drift {
-  animation: drift 8s ease-in-out infinite;
-}
-
 html {
   color-scheme: light;
 }

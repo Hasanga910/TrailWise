@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { AboutSection } from '../components/home/AboutSection';
 import { FeatureHighlights } from '../components/home/FeatureHighlights';
 import { HeroSlideshow } from '../components/home/HeroSlideshow';
 import { HomeFooter } from '../components/home/HomeFooter';
@@ -13,10 +14,10 @@ export function HomePage() {
     <div className="min-h-svh bg-white">
       <HomeNav />
 
-      <section className="relative flex min-h-[640px] items-center justify-center overflow-hidden sm:min-h-[720px]">
+      <section className="relative flex h-[80vh] min-h-[560px] max-h-[900px] items-center justify-center overflow-hidden">
         <HeroSlideshow />
 
-        <div className="relative z-10 mx-auto max-w-2xl px-6 text-center text-white">
+        <div className="relative z-10 mx-auto max-w-2xl px-6 text-center text-white [text-shadow:0_2px_16px_rgba(0,0,0,0.45)]">
           <h1 className="font-heading text-4xl font-bold leading-tight sm:text-5xl">
             The operations console for modern tour operators.
           </h1>
@@ -53,6 +54,7 @@ export function HomePage() {
       </section>
 
       <FeatureHighlights />
+      <AboutSection />
       <HomeFooter />
     </div>
   );

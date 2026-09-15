@@ -1,70 +1,40 @@
 import { useEffect, useState } from 'react';
+import mountainRidgeHikers from '../../assets/hero/mountain-ridge-hikers.jpg';
+import lisbonStreetCouple from '../../assets/hero/lisbon-street-couple.jpg';
+import sigiriyaRockFortress from '../../assets/hero/sigiriya-rock-fortress.jpg';
+import tropicalBeachPalm from '../../assets/hero/tropical-beach-palm.jpg';
 
 interface Slide {
-  label: string;
-  gradient: string;
-  circles: string[];
-  icon: React.ReactNode;
+  image: string;
+  alt: string;
+  caption: string;
+  objectPosition: string;
 }
 
 const slides: Slide[] = [
   {
-    label: 'Mountain trekking',
-    gradient: 'from-brand-700 via-brand-600 to-brand-900',
-    circles: ['-right-16 -top-16 h-72 w-72 bg-white/10', '-bottom-24 -left-10 h-80 w-80 bg-accent-500/20'],
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="m3 19 5.5-9 4 6.2L15.5 11 21 19H3Z"
-        />
-      </svg>
-    ),
+    image: mountainRidgeHikers,
+    alt: 'Two hikers silhouetted on a mountain ridge at golden hour',
+    caption: 'Mountain trekking',
+    objectPosition: 'center 65%',
   },
   {
-    label: 'Coastal tours',
-    gradient: 'from-brand-500 via-brand-600 to-brand-800',
-    circles: ['-left-16 -top-10 h-72 w-72 bg-white/10', '-bottom-20 -right-16 h-80 w-80 bg-accent-500/20'],
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M2 17c1.5 1.3 3 1.3 4.5 0s3-1.3 4.5 0 3 1.3 4.5 0 3-1.3 4.5 0M2 12c1.5 1.3 3 1.3 4.5 0s3-1.3 4.5 0 3 1.3 4.5 0 3-1.3 4.5 0"
-        />
-      </svg>
-    ),
+    image: lisbonStreetCouple,
+    alt: 'A couple exploring a cobblestone European street with a map',
+    caption: 'Guided city tours',
+    objectPosition: '40% 25%',
   },
   {
-    label: 'Cultural heritage',
-    gradient: 'from-accent-600 via-brand-700 to-brand-900',
-    circles: ['-right-10 -bottom-16 h-72 w-72 bg-white/10', '-top-16 -left-16 h-80 w-80 bg-accent-500/20'],
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="m14.5 9.5-1.8 4.7a1 1 0 0 1-.5.5l-4.7 1.8 1.8-4.7a1 1 0 0 1 .5-.5l4.7-1.8Z"
-        />
-      </svg>
-    ),
+    image: sigiriyaRockFortress,
+    alt: 'Aerial view of Sigiriya Rock Fortress rising above the jungle',
+    caption: 'Ancient wonders',
+    objectPosition: 'center 40%',
   },
   {
-    label: 'Wildlife & nature',
-    gradient: 'from-brand-600 via-brand-800 to-brand-950',
-    circles: ['-left-10 -top-16 h-72 w-72 bg-white/10', '-bottom-16 -right-10 h-80 w-80 bg-accent-500/20'],
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 21c-4-4.5-7-8.2-7-11.5A7 7 0 0 1 19 9.5C19 12.8 16 16.5 12 21Z"
-        />
-        <circle cx="12" cy="9.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
+    image: tropicalBeachPalm,
+    alt: 'A leaning coconut palm over a tropical beach',
+    caption: 'Coastal escapes',
+    objectPosition: 'center 70%',
   },
 ];
 
@@ -81,34 +51,70 @@ export function HeroSlideshow() {
     return () => clearInterval(interval);
   }, []);
 
+  const goToPrevious = () => {
+    setActiveIndex((i) => (i - 1 + slides.length) % slides.length);
+  };
+
+  const goToNext = () => {
+    setActiveIndex((i) => (i + 1) % slides.length);
+  };
+
   return (
     <div className="absolute inset-0 overflow-hidden bg-brand-900">
       {slides.map((slide, index) => (
         <div
-          key={slide.label}
+          key={slide.caption}
           aria-hidden={index !== activeIndex}
-          className={`absolute inset-0 bg-gradient-to-br ${slide.gradient} transition-opacity duration-1000 ease-in-out motion-reduce:transition-none ${
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out motion-reduce:transition-none ${
             index === activeIndex ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          {slide.circles.map((circle, i) => (
-            <div
-              key={i}
-              className={`animate-drift absolute rounded-full blur-3xl motion-reduce:animate-none ${circle}`}
-            />
-          ))}
-          <div className="absolute inset-0 flex items-center justify-center text-white/20">
-            <div className="h-64 w-64">{slide.icon}</div>
-          </div>
+          <img
+            src={slide.image}
+            alt={slide.alt}
+            className="h-full w-full object-cover"
+            style={{ objectPosition: slide.objectPosition }}
+            loading="eager"
+            fetchPriority={index === 0 ? 'high' : 'auto'}
+          />
+          <div className="absolute inset-0 bg-brand-950/40" />
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-950/70 via-transparent to-transparent" />
         </div>
       ))}
+
+      <div className="absolute inset-x-0 bottom-20 z-10 px-6 text-center sm:bottom-24">
+        <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur">
+          {slides[activeIndex].caption}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        aria-label="Previous slide"
+        onClick={goToPrevious}
+        className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white backdrop-blur transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m15 18-6-6 6-6" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        aria-label="Next slide"
+        onClick={goToNext}
+        className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white backdrop-blur transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+        </svg>
+      </button>
 
       <div className="absolute inset-x-0 bottom-8 z-10 flex justify-center gap-2">
         {slides.map((slide, index) => (
           <button
-            key={slide.label}
+            key={slide.caption}
             type="button"
-            aria-label={slide.label}
+            aria-label={slide.caption}
             onClick={() => setActiveIndex(index)}
             className={`h-2 rounded-full transition-all ${
               index === activeIndex ? 'w-6 bg-white' : 'w-2 bg-white/40 hover:bg-white/60'
