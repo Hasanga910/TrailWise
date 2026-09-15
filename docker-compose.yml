@@ -31,9 +31,9 @@ services:
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
       Jwt__ExpiryMinutes: ${JWT_EXPIRY_MINUTES}
-      AdminSeed__Name: ${ADMIN_SEED_NAME}
-      AdminSeed__Email: ${ADMIN_SEED_EMAIL}
-      AdminSeed__Password: ${ADMIN_SEED_PASSWORD}
+      AdminSeed__Name: ${ADMIN_SEED_NAME:-System Admin}
+      AdminSeed__Email: ${ADMIN_SEED_EMAIL:-admin@trailwise.local}
+      AdminSeed__Password: ${ADMIN_SEED_PASSWORD:-ChangeMe123!}
       Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN}
     ports:
       - "${BACKEND_PORT:-5080}:8080"

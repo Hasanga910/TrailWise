@@ -1,8 +1,10 @@
 import { Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './auth/ProtectedRoute';
+import { RequireRole } from './auth/RequireRole';
 import { DashboardPage } from './pages/DashboardPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { ManagePackagesPage } from './pages/ManagePackagesPage';
 import { RegisterPage } from './pages/RegisterPage';
 
 function App() {
@@ -17,6 +19,14 @@ function App() {
           <ProtectedRoute>
             <DashboardPage />
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manage/packages"
+        element={
+          <RequireRole allowedRoles={['OperationsManager', 'Admin']}>
+            <ManagePackagesPage />
+          </RequireRole>
         }
       />
     </Routes>

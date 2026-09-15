@@ -65,7 +65,60 @@ public static class DbSeeder
                 RequiresAC = true
             });
 
-            db.TourPackages.Add(culturalPackage);
+            var hillCountryPackage = new TourPackage
+            {
+                Name = "Hill Country Adventure",
+                Theme = "Adventure",
+                DurationDays = 5,
+                BasePricePerPerson = 300m,
+                MaxGroupSize = 15
+            };
+            hillCountryPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.Normal,
+                IncludesFood = false,
+                BasePricePerPerson = 300m,
+                RequiresAC = false
+            });
+            hillCountryPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.Second,
+                IncludesFood = true,
+                BasePricePerPerson = 380m,
+                RequiresAC = false
+            });
+            hillCountryPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.First,
+                IncludesFood = true,
+                BasePricePerPerson = 520m,
+                RequiresAC = true
+            });
+
+            var coastalPackage = new TourPackage
+            {
+                Name = "Coastal Getaway",
+                Theme = "Beach",
+                DurationDays = 3,
+                BasePricePerPerson = 220m,
+                MaxGroupSize = 20
+            };
+            coastalPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.Normal,
+                IncludesFood = false,
+                BasePricePerPerson = 220m,
+                RequiresAC = false
+            });
+            coastalPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.First,
+                IncludesFood = true,
+                BasePricePerPerson = 360m,
+                RequiresAC = true
+            });
+
+            db.TourPackages.AddRange(culturalPackage, hillCountryPackage, coastalPackage);
             await db.SaveChangesAsync(ct);
         }
     }
