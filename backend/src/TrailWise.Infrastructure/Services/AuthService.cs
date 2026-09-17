@@ -71,4 +71,78 @@ public class AuthService : IAuthService
     {
         return _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
     }
+
+    public async Task<IReadOnlyList<User>> GetStaffAsync(CancellationToken ct = default)
+    {
+        return await _db.Users
+            .Where(u => u.Role != UserRole.Traveler)
+            .OrderBy(u => u.Name)
+            .ToListAsync(ct);
+    }
+
+    public async Task<AuthResult> DeleteUserAsync(Guid id, Guid requestedById, CancellationToken ct = default)
+    {
+        if (id == requestedById)
+        {
+            return AuthResult.Failure("You cannot delete your own account.");
+        }
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+        if (user is null)
+        {
+            return AuthResult.Failure("User not found.");
+        }
+
+        if (user.Role == UserRole.Traveler)
+        {
+            return AuthResult.Failure("Only staff accounts can be removed here.");
+        }
+
+        _db.Users.Remove(user);
+        await _db.SaveChangesAsync(ct);
+
+        return AuthResult.Ok();
+    }
+
+    public async Task<AuthResult> UpdateProfileAsync(Guid userId, string name, string email, CancellationToken ct = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+        {
+            return AuthResult.Failure("User not found.");
+        }
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var emailTaken = await _db.Users.AnyAsync(u => u.Id != userId && u.Email == normalizedEmail, ct);
+        if (emailTaken)
+        {
+            return AuthResult.Failure("A user with this email already exists.");
+        }
+
+        user.Name = name.Trim();
+        user.Email = normalizedEmail;
+        await _db.SaveChangesAsync(ct);
+
+        return AuthResult.Success(user);
+    }
+
+    public async Task<AuthResult> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+        {
+            return AuthResult.Failure("User not found.");
+        }
+
+        var verification = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword);
+        if (verification == PasswordVerificationResult.Failed)
+        {
+            return AuthResult.Failure("Current password is incorrect.");
+        }
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+        await _db.SaveChangesAsync(ct);
+
+        return AuthResult.Ok();
+    }
 }

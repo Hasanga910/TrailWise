@@ -12,6 +12,7 @@ function renderProtected(status: AuthContextValue['status']) {
     login: async () => true,
     register: async () => true,
     logout: () => {},
+    updateUser: () => {},
   };
 
   render(

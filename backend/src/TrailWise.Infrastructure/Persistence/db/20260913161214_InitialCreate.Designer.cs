@@ -9,7 +9,7 @@ using TrailWise.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace TrailWise.Infrastructure.Persistence.Migrations
+namespace TrailWise.Infrastructure.Persistence.Db
 {
     [DbContext(typeof(TrailWiseDbContext))]
     [Migration("20260913161214_InitialCreate")]

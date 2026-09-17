@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { ProtectedRoute } from './ProtectedRoute';
+import { getHomeRouteForRole } from './roleHome';
 import type { UserRole } from './types';
 
 export function RequireRole({
@@ -15,7 +16,11 @@ export function RequireRole({
 
   return (
     <ProtectedRoute>
-      {user && allowedRoles.includes(user.role) ? <>{children}</> : <Navigate to="/dashboard" replace />}
+      {user && allowedRoles.includes(user.role) ? (
+        <>{children}</>
+      ) : (
+        <Navigate to={user ? getHomeRouteForRole(user.role) : '/login'} replace />
+      )}
     </ProtectedRoute>
   );
 }

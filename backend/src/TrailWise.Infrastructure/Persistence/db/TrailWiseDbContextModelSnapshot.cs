@@ -8,7 +8,7 @@ using TrailWise.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace TrailWise.Infrastructure.Persistence.Migrations
+namespace TrailWise.Infrastructure.Persistence.Db
 {
     [DbContext(typeof(TrailWiseDbContext))]
     partial class TrailWiseDbContextModelSnapshot : ModelSnapshot

@@ -1,18 +1,19 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { getHomeRouteForRole } from '../auth/roleHome';
 import { AuthBrandPanel } from '../components/AuthBrandPanel';
 import { Logo } from '../components/Logo';
 
 export function RegisterPage() {
-  const { register, status, error } = useAuth();
+  const { register, status, error, user } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (status === 'authenticated') {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={user ? getHomeRouteForRole(user.role) : '/login'} replace />;
   }
 
   async function handleSubmit(e: FormEvent) {

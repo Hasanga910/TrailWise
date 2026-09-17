@@ -13,6 +13,7 @@ function renderWithAuth(overrides: Partial<AuthContextValue> = {}) {
     login: vi.fn().mockResolvedValue(true),
     register: vi.fn().mockResolvedValue(true),
     logout: vi.fn(),
+    updateUser: vi.fn(),
     ...overrides,
   };
 
