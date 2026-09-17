@@ -5,29 +5,46 @@ import { AuthContext, type AuthContextValue } from './AuthContext';
 import { RequireRole } from './RequireRole';
 import type { UserRole } from './types';
 
-function renderGuarded(role: UserRole) {
+function renderApp(initialPath: string, role: UserRole) {
   const value: AuthContextValue = {
-    user: { id: '1', name: 'Alice', email: 'a@example.com', role },
+    user: { id: '1', name: 'Alice', email: 'a@example.com', contactNumber: '+14155550100', role },
     status: 'authenticated',
     error: null,
     login: async () => true,
     register: async () => true,
     logout: () => {},
+    updateUser: () => {},
   };
 
   render(
-    <MemoryRouter initialEntries={['/manage/packages']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <AuthContext.Provider value={value}>
         <Routes>
-          <Route path="/dashboard" element={<div>Dashboard Page</div>} />
           <Route
-            path="/manage/packages"
+            path="/traveler"
             element={
-              <RequireRole allowedRoles={['OperationsManager', 'Admin']}>
-                <div>Manage Packages Page</div>
+              <RequireRole allowedRoles={['Traveler']}>
+                <div>Traveler Home</div>
               </RequireRole>
             }
           />
+          <Route
+            path="/ops"
+            element={
+              <RequireRole allowedRoles={['OperationsManager']}>
+                <div>Ops Home</div>
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireRole allowedRoles={['Admin']}>
+                <div>Admin Home</div>
+              </RequireRole>
+            }
+          />
+          <Route path="/portal" element={<div>Portal Fallback</div>} />
         </Routes>
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -35,18 +52,23 @@ function renderGuarded(role: UserRole) {
 }
 
 describe('RequireRole', () => {
-  it('renders children when the user has an allowed role', () => {
-    renderGuarded('OperationsManager');
-    expect(screen.getByText('Manage Packages Page')).toBeInTheDocument();
+  it('renders children when the user has the allowed role', () => {
+    renderApp('/admin', 'Admin');
+    expect(screen.getByText('Admin Home')).toBeInTheDocument();
   });
 
-  it('renders children for Admin, the other allowed role', () => {
-    renderGuarded('Admin');
-    expect(screen.getByText('Manage Packages Page')).toBeInTheDocument();
+  it("redirects an OperationsManager away from the Admin console to their own home", () => {
+    renderApp('/admin', 'OperationsManager');
+    expect(screen.getByText('Ops Home')).toBeInTheDocument();
   });
 
-  it('redirects to /dashboard when the user does not have an allowed role', () => {
-    renderGuarded('Traveler');
-    expect(screen.getByText('Dashboard Page')).toBeInTheDocument();
+  it("redirects a Traveler away from the Ops console to their own home", () => {
+    renderApp('/ops', 'Traveler');
+    expect(screen.getByText('Traveler Home')).toBeInTheDocument();
+  });
+
+  it('redirects a role with no dedicated console (TourGuide) to the portal fallback', () => {
+    renderApp('/admin', 'TourGuide');
+    expect(screen.getByText('Portal Fallback')).toBeInTheDocument();
   });
 });

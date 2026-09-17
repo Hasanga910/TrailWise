@@ -18,4 +18,7 @@ public class UpdatePackageRequest
 
     [Range(1, int.MaxValue)]
     public int MaxGroupSize { get; set; }
+
+    [Required, MinLength(1)]
+    public List<string> LocationNames { get; set; } = new();
 }

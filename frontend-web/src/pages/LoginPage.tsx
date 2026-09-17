@@ -1,18 +1,20 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { getHomeRouteForRole } from '../auth/roleHome';
 import { AuthBrandPanel } from '../components/AuthBrandPanel';
 import { Logo } from '../components/Logo';
 
 export function LoginPage() {
-  const { login, status, error } = useAuth();
+  const { login, status, error, user } = useAuth();
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (status === 'authenticated') {
-    const redirectTo = (location.state as { from?: string } | null)?.from ?? '/dashboard';
+    const defaultRedirect = user ? getHomeRouteForRole(user.role) : '/login';
+    const redirectTo = (location.state as { from?: string } | null)?.from ?? defaultRedirect;
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -31,7 +33,7 @@ export function LoginPage() {
         <form className="w-full min-w-0 max-w-sm space-y-6" onSubmit={handleSubmit}>
           <div>
             <Logo className="mb-4 h-8 w-auto lg:hidden" />
-            <h1 className="font-heading text-2xl font-bold text-slate-900">Operations Console</h1>
+            <h1 className="font-heading text-2xl font-bold text-slate-900">Login</h1>
             <p className="mt-1.5 text-sm text-slate-500">Sign in to manage your tours.</p>
           </div>
 
@@ -73,7 +75,7 @@ export function LoginPage() {
           </button>
 
           <p className="text-sm text-slate-500">
-            Traveler?{' '}
+            Don't have an account?{' '}
             <Link to="/register" className="font-semibold text-brand-600 hover:text-brand-700">
               Create an account
             </Link>

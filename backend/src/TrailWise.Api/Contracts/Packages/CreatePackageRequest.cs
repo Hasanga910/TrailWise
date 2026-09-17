@@ -21,4 +21,7 @@ public class CreatePackageRequest
 
     [Required, MinLength(1)]
     public List<CreatePackageTierRequest> Tiers { get; set; } = new();
+
+    [Required, MinLength(1)]
+    public List<string> LocationNames { get; set; } = new();
 }

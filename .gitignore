@@ -7,6 +7,8 @@
 backend/**/bin/
 backend/**/obj/
 *.user
+backend/src/TrailWise.Api/wwwroot/uploads/packages/*
+!backend/src/TrailWise.Api/wwwroot/uploads/packages/.gitkeep
 
 # Node / React
 frontend-web/node_modules/

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { getHomeRouteForRole } from '../auth/roleHome';
 import { AboutSection } from '../components/home/AboutSection';
 import { FeatureHighlights } from '../components/home/FeatureHighlights';
 import { HeroSlideshow } from '../components/home/HeroSlideshow';
@@ -7,7 +8,7 @@ import { HomeFooter } from '../components/home/HomeFooter';
 import { HomeNav } from '../components/home/HomeNav';
 
 export function HomePage() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const isAuthenticated = status === 'authenticated';
 
   return (
@@ -26,9 +27,9 @@ export function HomePage() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            {isAuthenticated ? (
+            {isAuthenticated && user ? (
               <Link
-                to="/dashboard"
+                to={getHomeRouteForRole(user.role)}
                 className="rounded-lg bg-accent-500 px-6 py-3 font-semibold text-brand-950 shadow-lg shadow-black/20 transition hover:bg-accent-400"
               >
                 Go to Dashboard

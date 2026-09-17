@@ -67,13 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, email: string, password: string, contactNumber: string) => {
       setError(null);
       try {
         const response = await apiClient.post<AuthResponse>('/api/auth/register', {
           name,
           email,
           password,
+          contactNumber,
         });
         applyAuthResponse(response.data);
         return true;
@@ -85,9 +86,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyAuthResponse],
   );
 
+  const updateUser = useCallback((updated: CurrentUser) => {
+    setUser(updated);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, status, error, login, register, logout }),
-    [user, status, error, login, register, logout],
+    () => ({ user, status, error, login, register, logout, updateUser }),
+    [user, status, error, login, register, logout, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

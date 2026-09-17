@@ -10,6 +10,11 @@ export interface PackageTier {
   requiresAC: boolean;
 }
 
+export interface PackageLocation {
+  id: string;
+  name: string;
+}
+
 export interface TourPackage {
   id: string;
   name: string;
@@ -17,7 +22,9 @@ export interface TourPackage {
   durationDays: number;
   basePricePerPerson: number;
   maxGroupSize: number;
+  photoUrl: string | null;
   tiers: PackageTier[];
+  locations: PackageLocation[];
 }
 
 export interface PackageTierInput {
@@ -33,6 +40,7 @@ export interface PackageInput {
   durationDays: number;
   basePricePerPerson: number;
   maxGroupSize: number;
+  locationNames: string[];
 }
 
 export interface CreatePackageInput extends PackageInput {
@@ -65,5 +73,14 @@ export async function deletePackage(id: string): Promise<void> {
 
 export async function addTier(id: string, input: PackageTierInput): Promise<TourPackage> {
   const response = await apiClient.post<TourPackage>(`/api/packages/${id}/tiers`, input);
+  return response.data;
+}
+
+export async function uploadPackagePhoto(id: string, file: File): Promise<TourPackage> {
+  const formData = new FormData();
+  formData.append('photo', file);
+  const response = await apiClient.post<TourPackage>(`/api/packages/${id}/photo`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 }

@@ -2,6 +2,11 @@ using TrailWise.Domain.Entities;
 
 namespace TrailWise.Api.Contracts.Packages;
 
+public record PackageLocationDto(Guid Id, string Name)
+{
+    public static PackageLocationDto FromEntity(PackageLocation location) => new(location.Id, location.Name);
+}
+
 public record TourPackageDto(
     Guid Id,
     string Name,
@@ -9,7 +14,9 @@ public record TourPackageDto(
     int DurationDays,
     decimal BasePricePerPerson,
     int MaxGroupSize,
-    IReadOnlyList<PackageTierDto> Tiers)
+    string? PhotoUrl,
+    IReadOnlyList<PackageTierDto> Tiers,
+    IReadOnlyList<PackageLocationDto> Locations)
 {
     public static TourPackageDto FromEntity(TourPackage package) => new(
         package.Id,
@@ -18,5 +25,7 @@ public record TourPackageDto(
         package.DurationDays,
         package.BasePricePerPerson,
         package.MaxGroupSize,
-        package.PackageTiers.Select(PackageTierDto.FromEntity).ToList());
+        package.PhotoUrl,
+        package.PackageTiers.Select(PackageTierDto.FromEntity).ToList(),
+        package.Locations.Select(PackageLocationDto.FromEntity).ToList());
 }

@@ -32,6 +32,7 @@ public static class DbSeeder
                 {
                     Name = admin.Name,
                     Email = normalizedEmail,
+                    ContactNumber = admin.ContactNumber,
                     Role = UserRole.Admin
                 };
                 adminUser.PasswordHash = hasher.HashPassword(adminUser, admin.Password);
@@ -64,6 +65,9 @@ public static class DbSeeder
                 BasePricePerPerson = 420m,
                 RequiresAC = true
             });
+            culturalPackage.Locations.Add(new PackageLocation { Name = "Sigiriya" });
+            culturalPackage.Locations.Add(new PackageLocation { Name = "Anuradhapura" });
+            culturalPackage.Locations.Add(new PackageLocation { Name = "Dambulla" });
 
             var hillCountryPackage = new TourPackage
             {
@@ -94,6 +98,9 @@ public static class DbSeeder
                 BasePricePerPerson = 520m,
                 RequiresAC = true
             });
+            hillCountryPackage.Locations.Add(new PackageLocation { Name = "Ella" });
+            hillCountryPackage.Locations.Add(new PackageLocation { Name = "Nuwara Eliya" });
+            hillCountryPackage.Locations.Add(new PackageLocation { Name = "Adam's Peak" });
 
             var coastalPackage = new TourPackage
             {
@@ -117,6 +124,9 @@ public static class DbSeeder
                 BasePricePerPerson = 360m,
                 RequiresAC = true
             });
+            coastalPackage.Locations.Add(new PackageLocation { Name = "Mirissa" });
+            coastalPackage.Locations.Add(new PackageLocation { Name = "Galle" });
+            coastalPackage.Locations.Add(new PackageLocation { Name = "Bentota" });
 
             db.TourPackages.AddRange(culturalPackage, hillCountryPackage, coastalPackage);
             await db.SaveChangesAsync(ct);

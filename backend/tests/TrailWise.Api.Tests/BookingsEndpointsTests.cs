@@ -112,7 +112,9 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
     {
         var client = _factory.CreateClient();
         var email = $"traveler-{Guid.NewGuid():N}@example.com";
-        await client.PostAsJsonAsync("/api/auth/register", new { Name = "T", Email = email, Password = "P@ssword123" });
+        await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { Name = "T", Email = email, Password = "P@ssword123", ContactNumber = "+14155550100" });
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "P@ssword123" });
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
 
