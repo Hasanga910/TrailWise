@@ -29,7 +29,9 @@ public class ProfileEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         var (client, _) = await RegisterAndLoginAsync();
         var newEmail = $"updated-{Guid.NewGuid():N}@example.com";
 
-        var response = await client.PutAsJsonAsync("/api/auth/me", new { Name = "Updated Name", Email = newEmail });
+        var response = await client.PutAsJsonAsync(
+            "/api/auth/me",
+            new { Name = "Updated Name", Email = newEmail, ContactNumber = "+14155550100" });
         response.EnsureSuccessStatusCode();
 
         var meResponse = await client.GetAsync("/api/auth/me");
@@ -76,7 +78,9 @@ public class ProfileEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
     {
         var client = _factory.CreateClient();
         var email = $"traveler-{Guid.NewGuid():N}@example.com";
-        await client.PostAsJsonAsync("/api/auth/register", new { Name = "T", Email = email, Password = "P@ssword123" });
+        await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { Name = "T", Email = email, Password = "P@ssword123", ContactNumber = "+14155550100" });
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "P@ssword123" });
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);

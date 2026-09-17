@@ -7,7 +7,7 @@ import type { UserRole } from './types';
 
 function renderApp(initialPath: string, role: UserRole) {
   const value: AuthContextValue = {
-    user: { id: '1', name: 'Alice', email: 'a@example.com', role },
+    user: { id: '1', name: 'Alice', email: 'a@example.com', contactNumber: '+14155550100', role },
     status: 'authenticated',
     error: null,
     login: async () => true,

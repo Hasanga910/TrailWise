@@ -4,20 +4,35 @@ import { extractErrorMessage } from '../../api/apiClient';
 import { getPackages, type TourPackage } from '../../api/packages';
 import { getStaff, type StaffMember } from '../../api/staff';
 import { useAuth } from '../../auth/AuthContext';
-import { GroupSizeIcon, PackagesIcon, TagIcon, UsersIcon } from '../../components/admin/icons';
+import {
+  ArrowRightIcon,
+  GroupSizeIcon,
+  PackagesIcon,
+  ProfileIcon,
+  SparkleIcon,
+  TagIcon,
+  UsersIcon,
+} from '../../components/admin/icons';
 
 const CARDS = [
   {
     to: '/admin/packages',
     title: 'Packages',
     description: 'View all tour packages, or jump into management to create, edit, and remove them.',
+    icon: PackagesIcon,
   },
   {
     to: '/admin/staff',
     title: 'User Management',
     description: 'Manage Tour Guide, Operations Manager, and Fleet Coordinator accounts.',
+    icon: UsersIcon,
   },
-  { to: '/admin/profile', title: 'Profile', description: 'Update your own name, email, and password.' },
+  {
+    to: '/admin/profile',
+    title: 'Profile',
+    description: 'Update your own name, email, and password.',
+    icon: ProfileIcon,
+  },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -38,10 +53,13 @@ function StatTile({
   value: string;
   tone: 'brand' | 'accent';
 }) {
-  const badgeClass = tone === 'brand' ? 'bg-brand-50 text-brand-700' : 'bg-accent-500/15 text-accent-700';
+  const badgeClass =
+    tone === 'brand'
+      ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white'
+      : 'bg-gradient-to-br from-accent-400 to-accent-600 text-white';
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${badgeClass}`}>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg shadow-sm ${badgeClass}`}>
         <Icon className="h-5 w-5" />
       </div>
       <p className="mt-3 text-2xl font-semibold text-slate-900">{value}</p>
@@ -164,10 +182,21 @@ export function AdminOverviewPage() {
 
   return (
     <div>
-      <p className="text-sm text-slate-500">
-        Welcome back, <span className="font-semibold text-slate-700">{user?.name}</span>. Here's how
-        TrailWise looks right now.
-      </p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-950 px-6 py-8 text-white shadow-lg sm:px-8">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-8 h-64 w-64 rounded-full bg-accent-500/20 blur-3xl" />
+        <div className="relative z-10">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-accent-300">
+            <SparkleIcon className="h-3.5 w-3.5" /> Admin Console
+          </span>
+          <h2 className="mt-3 font-heading text-2xl font-bold sm:text-3xl">
+            Welcome back, {user?.name?.split(' ')[0] ?? 'Admin'}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm text-white/75">
+            Here's how TrailWise looks right now — packages, staff, and pricing at a glance.
+          </p>
+        </div>
+      </div>
 
       {error && (
         <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -245,16 +274,26 @@ export function AdminOverviewPage() {
       <div className="mt-8">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Quick links</h2>
         <div className="grid gap-4 sm:grid-cols-3">
-          {CARDS.map((card) => (
-            <Link
-              key={card.to}
-              to={card.to}
-              className="rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <h3 className="font-heading text-lg font-bold text-slate-900">{card.title}</h3>
-              <p className="mt-1 text-sm text-slate-500">{card.description}</p>
-            </Link>
-          ))}
+          {CARDS.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link
+                key={card.to}
+                to={card.to}
+                className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-700 transition group-hover:bg-brand-600 group-hover:text-white">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="mt-4 font-heading text-lg font-bold text-slate-900">{card.title}</h3>
+                <p className="mt-1 text-sm text-slate-500">{card.description}</p>
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+                  Open
+                  <ArrowRightIcon className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </div>

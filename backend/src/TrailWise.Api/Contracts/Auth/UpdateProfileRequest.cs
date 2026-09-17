@@ -9,4 +9,7 @@ public class UpdateProfileRequest
 
     [Required, EmailAddress, MaxLength(320)]
     public string Email { get; set; } = string.Empty;
+
+    [Required, Phone, MaxLength(30)]
+    public string ContactNumber { get; set; } = string.Empty;
 }

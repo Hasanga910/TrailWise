@@ -11,6 +11,7 @@ public class TourPackageConfiguration : IEntityTypeConfiguration<TourPackage>
         builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
         builder.Property(p => p.Theme).IsRequired().HasMaxLength(100);
         builder.Property(p => p.BasePricePerPerson).HasPrecision(10, 2);
+        builder.Property(p => p.PhotoUrl).HasMaxLength(500);
 
         builder.HasMany(p => p.PackageTiers)
             .WithOne(t => t.TourPackage)

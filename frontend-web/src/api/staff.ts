@@ -7,6 +7,7 @@ export interface StaffMember {
   id: string;
   name: string;
   email: string;
+  contactNumber: string;
   role: UserRole;
 }
 
@@ -14,6 +15,7 @@ export interface CreateStaffInput {
   name: string;
   email: string;
   password: string;
+  contactNumber: string;
   role: StaffRole;
 }
 

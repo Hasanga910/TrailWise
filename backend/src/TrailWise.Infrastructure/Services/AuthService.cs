@@ -18,12 +18,12 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
     }
 
-    public async Task<AuthResult> RegisterTravelerAsync(string name, string email, string password, CancellationToken ct = default)
+    public async Task<AuthResult> RegisterTravelerAsync(string name, string email, string password, string contactNumber, CancellationToken ct = default)
     {
-        return await CreateUserAsync(name, email, password, UserRole.Traveler, ct);
+        return await CreateUserAsync(name, email, password, contactNumber, UserRole.Traveler, ct);
     }
 
-    public async Task<AuthResult> CreateUserAsync(string name, string email, string password, UserRole role, CancellationToken ct = default)
+    public async Task<AuthResult> CreateUserAsync(string name, string email, string password, string contactNumber, UserRole role, CancellationToken ct = default)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
 
@@ -37,6 +37,7 @@ public class AuthService : IAuthService
         {
             Name = name.Trim(),
             Email = normalizedEmail,
+            ContactNumber = contactNumber.Trim(),
             Role = role
         };
         user.PasswordHash = _passwordHasher.HashPassword(user, password);
@@ -104,7 +105,7 @@ public class AuthService : IAuthService
         return AuthResult.Ok();
     }
 
-    public async Task<AuthResult> UpdateProfileAsync(Guid userId, string name, string email, CancellationToken ct = default)
+    public async Task<AuthResult> UpdateProfileAsync(Guid userId, string name, string email, string contactNumber, CancellationToken ct = default)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
         if (user is null)
@@ -121,6 +122,7 @@ public class AuthService : IAuthService
 
         user.Name = name.Trim();
         user.Email = normalizedEmail;
+        user.ContactNumber = contactNumber.Trim();
         await _db.SaveChangesAsync(ct);
 
         return AuthResult.Success(user);

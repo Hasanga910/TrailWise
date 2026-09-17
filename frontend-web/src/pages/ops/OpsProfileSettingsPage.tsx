@@ -1,13 +1,18 @@
 import { useState, type FormEvent } from 'react';
-import { extractErrorMessage } from '../api/apiClient';
-import { changePassword, updateProfile } from '../api/profile';
-import { useAuth } from '../auth/AuthContext';
+import { extractErrorMessage } from '../../api/apiClient';
+import { changePassword, updateProfile } from '../../api/profile';
+import { useAuth } from '../../auth/AuthContext';
+import { Avatar } from '../../components/Avatar';
+import { LockIcon, MailIcon } from '../../components/admin/icons';
 
-export function ProfileSettingsPage() {
+const ROLE_LABEL = 'Operations Manager';
+
+export function OpsProfileSettingsPage() {
   const { user, updateUser } = useAuth();
 
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
+  const [contactNumber, setContactNumber] = useState(user?.contactNumber ?? '');
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -29,7 +34,7 @@ export function ProfileSettingsPage() {
     setProfileSuccess(null);
     setSavingProfile(true);
     try {
-      const updated = await updateProfile({ name, email });
+      const updated = await updateProfile({ name, email, contactNumber });
       updateUser(updated);
       setProfileSuccess('Profile updated.');
     } catch (err) {
@@ -65,8 +70,24 @@ export function ProfileSettingsPage() {
 
   return (
     <div>
-      <section className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="font-heading text-lg font-bold text-slate-900">Name &amp; email</h2>
+      <div className="mb-8 flex items-center gap-5 rounded-2xl border border-slate-200 bg-gradient-to-br from-brand-50 to-white p-6">
+        {user && <Avatar name={user.name} size="lg" />}
+        <div>
+          <h2 className="font-heading text-xl font-bold text-slate-900">{user?.name}</h2>
+          <p className="text-sm text-slate-500">{user?.email}</p>
+          {user && (
+            <span className="mt-2 inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-800">
+              {ROLE_LABEL}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <section className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <MailIcon className="h-5 w-5 text-brand-600" />
+          <h2 className="font-heading text-lg font-bold text-slate-900">Profile details</h2>
+        </div>
         <form onSubmit={handleSaveProfile} className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Name</label>
@@ -80,6 +101,16 @@ export function ProfileSettingsPage() {
               className={inputClass}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Contact number</label>
+            <input
+              required
+              type="tel"
+              className={inputClass}
+              value={contactNumber}
+              onChange={(e) => setContactNumber(e.target.value)}
             />
           </div>
 
@@ -106,8 +137,11 @@ export function ProfileSettingsPage() {
         </form>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="font-heading text-lg font-bold text-slate-900">Change password</h2>
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <LockIcon className="h-5 w-5 text-brand-600" />
+          <h2 className="font-heading text-lg font-bold text-slate-900">Change password</h2>
+        </div>
         <form onSubmit={handleChangePassword} className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
             <label className={labelClass}>Current password</label>

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrailWise.Api.Contracts.Packages;
@@ -13,12 +14,21 @@ namespace TrailWise.Api.Controllers;
 public class PackagesController : ControllerBase
 {
     private const string ManagerRoles = "OperationsManager,Admin";
+    private const long MaxPhotoSizeBytes = 5 * 1024 * 1024;
+    private static readonly Dictionary<string, string> AllowedPhotoContentTypes = new()
+    {
+        ["image/jpeg"] = ".jpg",
+        ["image/png"] = ".png",
+        ["image/webp"] = ".webp"
+    };
 
     private readonly TrailWiseDbContext _db;
+    private readonly IWebHostEnvironment _env;
 
-    public PackagesController(TrailWiseDbContext db)
+    public PackagesController(TrailWiseDbContext db, IWebHostEnvironment env)
     {
         _db = db;
+        _env = env;
     }
 
     [HttpGet]
@@ -26,6 +36,7 @@ public class PackagesController : ControllerBase
     {
         var packages = await _db.TourPackages
             .Include(p => p.PackageTiers)
+            .Include(p => p.Locations)
             .AsNoTracking()
             .ToListAsync(ct);
 
@@ -37,6 +48,7 @@ public class PackagesController : ControllerBase
     {
         var package = await _db.TourPackages
             .Include(p => p.PackageTiers)
+            .Include(p => p.Locations)
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id, ct);
 
@@ -72,6 +84,11 @@ public class PackagesController : ControllerBase
             });
         }
 
+        foreach (var locationName in request.LocationNames)
+        {
+            package.Locations.Add(new PackageLocation { Name = locationName.Trim() });
+        }
+
         _db.TourPackages.Add(package);
         await _db.SaveChangesAsync(ct);
 
@@ -84,6 +101,7 @@ public class PackagesController : ControllerBase
     {
         var package = await _db.TourPackages
             .Include(p => p.PackageTiers)
+            .Include(p => p.Locations)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
 
         if (package is null)
@@ -96,6 +114,12 @@ public class PackagesController : ControllerBase
         package.DurationDays = request.DurationDays;
         package.BasePricePerPerson = request.BasePricePerPerson;
         package.MaxGroupSize = request.MaxGroupSize;
+
+        package.Locations.Clear();
+        foreach (var locationName in request.LocationNames)
+        {
+            package.Locations.Add(new PackageLocation { Name = locationName.Trim() });
+        }
 
         await _db.SaveChangesAsync(ct);
 
@@ -123,10 +147,78 @@ public class PackagesController : ControllerBase
                 title: "This package has existing bookings and cannot be deleted.");
         }
 
+        DeletePhotoFile(package.PhotoUrl);
+
         _db.TourPackages.Remove(package);
         await _db.SaveChangesAsync(ct);
 
         return NoContent();
+    }
+
+    [HttpPost("{id:guid}/photo")]
+    [Authorize(Roles = ManagerRoles)]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxPhotoSizeBytes)]
+    public async Task<ActionResult<TourPackageDto>> UploadPhoto(Guid id, IFormFile? photo, CancellationToken ct)
+    {
+        var package = await _db.TourPackages
+            .Include(p => p.PackageTiers)
+            .Include(p => p.Locations)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
+
+        if (package is null)
+        {
+            return NotFound();
+        }
+
+        if (photo is null || photo.Length == 0)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Photo is required.");
+        }
+
+        if (photo.Length > MaxPhotoSizeBytes)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Photo must be 5MB or smaller.");
+        }
+
+        if (!AllowedPhotoContentTypes.TryGetValue(photo.ContentType, out var extension))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Only JPG, PNG, or WEBP images are allowed.");
+        }
+
+        DeletePhotoFile(package.PhotoUrl);
+
+        var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "packages");
+        Directory.CreateDirectory(uploadsDir);
+
+        var fileName = $"{Guid.NewGuid()}{extension}";
+        var filePath = Path.Combine(uploadsDir, fileName);
+
+        await using (var stream = System.IO.File.Create(filePath))
+        {
+            await photo.CopyToAsync(stream, ct);
+        }
+
+        package.PhotoUrl = $"/uploads/packages/{fileName}";
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(TourPackageDto.FromEntity(package));
+    }
+
+    private void DeletePhotoFile(string? photoUrl)
+    {
+        if (string.IsNullOrEmpty(photoUrl))
+        {
+            return;
+        }
+
+        var filePath = Path.Combine(_env.WebRootPath, photoUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+        if (System.IO.File.Exists(filePath))
+        {
+            System.IO.File.Delete(filePath);
+        }
     }
 
     [HttpPost("{id:guid}/tiers")]
@@ -135,6 +227,7 @@ public class PackagesController : ControllerBase
     {
         var package = await _db.TourPackages
             .Include(p => p.PackageTiers)
+            .Include(p => p.Locations)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
 
         if (package is null)

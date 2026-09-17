@@ -4,6 +4,7 @@ import type { CurrentUser } from '../auth/types';
 export interface UpdateProfileInput {
   name: string;
   email: string;
+  contactNumber: string;
 }
 
 export interface ChangePasswordInput {

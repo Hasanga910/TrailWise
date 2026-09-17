@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { extractErrorMessage } from '../../api/apiClient';
+import { API_BASE_URL, extractErrorMessage } from '../../api/apiClient';
 import { getPackages, type TourPackage } from '../../api/packages';
 
 export function TravelerDashboardPage() {
@@ -49,8 +49,21 @@ export function TravelerDashboardPage() {
           {packages.map((pkg) => (
             <article
               key={pkg.id}
-              className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
+              <div className="h-36 bg-slate-100">
+                {pkg.photoUrl ? (
+                  <img
+                    src={`${API_BASE_URL}${pkg.photoUrl}`}
+                    alt={pkg.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">No photo yet</div>
+                )}
+              </div>
+
+              <div className="flex flex-1 flex-col p-5">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-heading text-lg font-bold text-slate-900">{pkg.name}</h3>
                 <span className="whitespace-nowrap rounded-full bg-accent-500/15 px-2.5 py-0.5 text-xs font-semibold text-accent-700">
@@ -62,6 +75,19 @@ export function TravelerDashboardPage() {
                 {pkg.durationDays} {pkg.durationDays === 1 ? 'day' : 'days'} · up to {pkg.maxGroupSize}{' '}
                 travelers
               </p>
+
+              {pkg.locations.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {pkg.locations.map((loc) => (
+                    <span
+                      key={loc.id}
+                      className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                    >
+                      {loc.name}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-3 flex items-baseline gap-1">
                 <span className="text-2xl font-bold text-brand-700">${pkg.basePricePerPerson.toFixed(2)}</span>
@@ -88,6 +114,7 @@ export function TravelerDashboardPage() {
                   </li>
                 ))}
               </ul>
+              </div>
             </article>
           ))}
         </div>

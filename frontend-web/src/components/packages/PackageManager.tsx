@@ -1,11 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { extractErrorMessage } from '../../api/apiClient';
+import { extractErrorMessage, API_BASE_URL } from '../../api/apiClient';
+import { searchLocations, type LocationSuggestion } from '../../api/locations';
 import {
   addTier,
   createPackage,
   deletePackage,
   getPackages,
   updatePackage,
+  uploadPackagePhoto,
   type ClassType,
   type PackageInput,
   type PackageTierInput,
@@ -14,12 +16,122 @@ import {
 
 const CLASS_TYPES: ClassType[] = ['Normal', 'Second', 'First'];
 
+const inputClass =
+  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const labelClass = 'text-xs font-semibold text-slate-600';
+
+function LocationPicker({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      return;
+    }
+    const timeout = setTimeout(() => {
+      searchLocations(trimmed)
+        .then(setSuggestions)
+        .catch(() => setSuggestions([]))
+        .finally(() => setSearching(false));
+    }, 600);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    setSearching(value.trim().length >= 2);
+  }
+
+  function addLocation(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed || selected.includes(trimmed)) {
+      return;
+    }
+    onChange([...selected, trimmed]);
+    setQuery('');
+    setSuggestions([]);
+  }
+
+  function removeLocation(name: string) {
+    onChange(selected.filter((l) => l !== name));
+  }
+
+  const trimmedQuery = query.trim();
+  const visibleSuggestions = trimmedQuery.length >= 2 ? suggestions : [];
+  const hasExactMatch = visibleSuggestions.some((s) => s.name.toLowerCase() === trimmedQuery.toLowerCase());
+
+  return (
+    <div>
+      {selected.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {selected.map((name) => (
+            <span
+              key={name}
+              className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
+            >
+              {name}
+              <button
+                type="button"
+                onClick={() => removeLocation(name)}
+                className="text-brand-500 hover:text-brand-700"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <input
+          className={inputClass}
+          placeholder="Search for a location..."
+          value={query}
+          onChange={(e) => handleQueryChange(e.target.value)}
+        />
+        {trimmedQuery.length >= 2 && (
+          <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+            {searching && <p className="px-3 py-2 text-xs text-slate-400">Searching...</p>}
+            {!searching &&
+              visibleSuggestions.map((s) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => addLocation(s.name)}
+                  className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  {s.name}
+                </button>
+              ))}
+            {!searching && !hasExactMatch && (
+              <button
+                type="button"
+                onClick={() => addLocation(trimmedQuery)}
+                className="block w-full px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
+              >
+                Add &quot;{trimmedQuery}&quot; as typed
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function emptyTier(): PackageTierInput {
   return { classType: 'Normal', includesFood: false, basePricePerPerson: 0, requiresAC: false };
 }
 
 function emptyPackageForm(): PackageInput {
-  return { name: '', theme: '', durationDays: 1, basePricePerPerson: 0, maxGroupSize: 1 };
+  return { name: '', theme: '', durationDays: 1, basePricePerPerson: 0, maxGroupSize: 1, locationNames: [] };
 }
 
 function packageToForm(pkg: TourPackage): PackageInput {
@@ -29,6 +141,7 @@ function packageToForm(pkg: TourPackage): PackageInput {
     durationDays: pkg.durationDays,
     basePricePerPerson: pkg.basePricePerPerson,
     maxGroupSize: pkg.maxGroupSize,
+    locationNames: pkg.locations.map((l) => l.name),
   };
 }
 
@@ -38,7 +151,9 @@ export function PackageManager() {
 
   const [createForm, setCreateForm] = useState<PackageInput>(emptyPackageForm());
   const [createTiers, setCreateTiers] = useState<PackageTierInput[]>([emptyTier()]);
+  const [createPhotoFile, setCreatePhotoFile] = useState<File | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createWarning, setCreateWarning] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -48,6 +163,9 @@ export function PackageManager() {
 
   const [newTierByPackage, setNewTierByPackage] = useState<Record<string, PackageTierInput>>({});
   const [tierErrorByPackage, setTierErrorByPackage] = useState<Record<string, string>>({});
+
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const [photoErrorByPackage, setPhotoErrorByPackage] = useState<Record<string, string>>({});
 
   function loadPackages() {
     getPackages()
@@ -66,11 +184,22 @@ export function PackageManager() {
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     setCreateError(null);
+    setCreateWarning(null);
     setCreating(true);
     try {
-      await createPackage({ ...createForm, tiers: createTiers });
+      const created = await createPackage({ ...createForm, tiers: createTiers });
+      if (createPhotoFile) {
+        try {
+          await uploadPackagePhoto(created.id, createPhotoFile);
+        } catch (photoErr) {
+          setCreateWarning(
+            extractErrorMessage(photoErr, 'Package was created, but the photo could not be uploaded.'),
+          );
+        }
+      }
       setCreateForm(emptyPackageForm());
       setCreateTiers([emptyTier()]);
+      setCreatePhotoFile(null);
       loadPackages();
     } catch (err) {
       setCreateError(extractErrorMessage(err, 'Could not create package.'));
@@ -128,9 +257,21 @@ export function PackageManager() {
     }
   }
 
-  const inputClass =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-  const labelClass = 'text-xs font-semibold text-slate-600';
+  async function handleUploadPhoto(packageId: string, file: File) {
+    setPhotoErrorByPackage((prev) => ({ ...prev, [packageId]: '' }));
+    setUploadingPhotoId(packageId);
+    try {
+      await uploadPackagePhoto(packageId, file);
+      loadPackages();
+    } catch (err) {
+      setPhotoErrorByPackage((prev) => ({
+        ...prev,
+        [packageId]: extractErrorMessage(err, 'Could not upload photo.'),
+      }));
+    } finally {
+      setUploadingPhotoId(null);
+    }
+  }
 
   return (
     <>
@@ -190,6 +331,32 @@ export function PackageManager() {
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, basePricePerPerson: Number(e.target.value) }))
                 }
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Photo</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className={inputClass}
+                onChange={(e) => setCreatePhotoFile(e.target.files?.[0] ?? null)}
+              />
+              {createPhotoFile && (
+                <img
+                  src={URL.createObjectURL(createPhotoFile)}
+                  alt="Preview"
+                  className="mt-2 h-20 w-32 rounded-lg object-cover"
+                />
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Locations visited</label>
+            <div className="mt-2">
+              <LocationPicker
+                selected={createForm.locationNames}
+                onChange={(next) => setCreateForm((f) => ({ ...f, locationNames: next }))}
               />
             </div>
           </div>
@@ -267,6 +434,11 @@ export function PackageManager() {
               {createError}
             </p>
           )}
+          {createWarning && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700">
+              {createWarning}
+            </p>
+          )}
 
           <button
             type="submit"
@@ -300,6 +472,7 @@ export function PackageManager() {
             const isEditing = editingId === pkg.id;
             const newTier = newTierByPackage[pkg.id] ?? emptyTier();
             const tierError = tierErrorByPackage[pkg.id];
+            const photoError = photoErrorByPackage[pkg.id];
 
             return (
               <article key={pkg.id} className="rounded-xl border border-slate-200 bg-white p-5">
@@ -350,6 +523,15 @@ export function PackageManager() {
                         }
                       />
                     </div>
+                    <div>
+                      <label className={labelClass}>Locations visited</label>
+                      <div className="mt-2">
+                        <LocationPicker
+                          selected={editForm.locationNames}
+                          onChange={(next) => setEditForm((f) => ({ ...f, locationNames: next }))}
+                        />
+                      </div>
+                    </div>
                     {editError && (
                       <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                         {editError}
@@ -374,14 +556,39 @@ export function PackageManager() {
                   </form>
                 ) : (
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="font-heading text-lg font-bold text-slate-900">{pkg.name}</h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {pkg.theme} · {pkg.durationDays} days · up to {pkg.maxGroupSize} travelers · $
-                        {pkg.basePricePerPerson.toFixed(2)}/person
-                      </p>
+                    <div className="flex items-start gap-4">
+                      {pkg.photoUrl ? (
+                        <img
+                          src={`${API_BASE_URL}${pkg.photoUrl}`}
+                          alt={pkg.name}
+                          className="h-16 w-24 shrink-0 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] text-slate-400">
+                          No photo
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-heading text-lg font-bold text-slate-900">{pkg.name}</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {pkg.theme} · {pkg.durationDays} days · up to {pkg.maxGroupSize} travelers · $
+                          {pkg.basePricePerPerson.toFixed(2)}/person
+                        </p>
+                        {pkg.locations.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {pkg.locations.map((loc) => (
+                              <span
+                                key={loc.id}
+                                className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                              >
+                                {loc.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex shrink-0 gap-2">
                       <button
                         onClick={() => startEdit(pkg)}
                         className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -486,6 +693,26 @@ export function PackageManager() {
                     + Add tier
                   </button>
                   {tierError && <p className="w-full text-xs font-medium text-red-700">{tierError}</p>}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3">
+                  <label className="cursor-pointer rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100">
+                    {uploadingPhotoId === pkg.id ? 'Uploading...' : pkg.photoUrl ? 'Replace photo' : 'Upload photo'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      disabled={uploadingPhotoId === pkg.id}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleUploadPhoto(pkg.id, file);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {photoError && <p className="w-full text-xs font-medium text-red-700">{photoError}</p>}
                 </div>
               </article>
             );

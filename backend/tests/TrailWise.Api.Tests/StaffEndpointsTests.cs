@@ -28,7 +28,9 @@ public class StaffEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     {
         var client = _factory.CreateClient();
         var email = $"traveler-{Guid.NewGuid():N}@example.com";
-        await client.PostAsJsonAsync("/api/auth/register", new { Name = "T", Email = email, Password = "P@ssword123" });
+        await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { Name = "T", Email = email, Password = "P@ssword123", ContactNumber = "+14155550100" });
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "P@ssword123" });
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
@@ -48,6 +50,7 @@ public class StaffEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
             Name = "New Guide",
             Email = guideEmail,
             Password = "P@ssword123",
+            ContactNumber = "+14155550101",
             Role = "TourGuide"
         });
 
@@ -69,6 +72,7 @@ public class StaffEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
             Name = "Removable Guide",
             Email = guideEmail,
             Password = "P@ssword123",
+            ContactNumber = "+14155550102",
             Role = "TourGuide"
         });
         var created = await createResponse.Content.ReadFromJsonAsync<UserDto>(JsonOptions);

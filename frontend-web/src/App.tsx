@@ -7,16 +7,18 @@ import { RequireRole } from './auth/RequireRole';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { PortalFallbackPage } from './pages/PortalFallbackPage';
-import { ProfileSettingsPage } from './pages/ProfileSettingsPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
+import { AdminProfileSettingsPage } from './pages/admin/AdminProfileSettingsPage';
 import { PackageManagementPage } from './pages/admin/PackageManagementPage';
 import { PackagesOverviewPage } from './pages/admin/PackagesOverviewPage';
 import { StaffRolePage } from './pages/admin/StaffRolePage';
 import { UserManagementIndexPage } from './pages/admin/UserManagementIndexPage';
 import { OpsDashboardPage } from './pages/ops/OpsDashboardPage';
 import { OpsPackagesPage } from './pages/ops/OpsPackagesPage';
+import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
 import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
+import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
 
 function App() {
   return (
@@ -43,7 +45,7 @@ function App() {
         }
       >
         <Route index element={<TravelerDashboardPage />} />
-        <Route path="profile" element={<ProfileSettingsPage />} />
+        <Route path="profile" element={<TravelerProfileSettingsPage />} />
       </Route>
 
       <Route
@@ -56,7 +58,7 @@ function App() {
       >
         <Route index element={<OpsDashboardPage />} />
         <Route path="packages" element={<OpsPackagesPage />} />
-        <Route path="profile" element={<ProfileSettingsPage />} />
+        <Route path="profile" element={<OpsProfileSettingsPage />} />
       </Route>
 
       <Route
@@ -80,7 +82,7 @@ function App() {
           path="staff/fleet-coordinators"
           element={<StaffRolePage role="FleetCoordinator" roleLabel="Fleet Coordinator" />}
         />
-        <Route path="profile" element={<ProfileSettingsPage />} />
+        <Route path="profile" element={<AdminProfileSettingsPage />} />
       </Route>
     </Routes>
   );

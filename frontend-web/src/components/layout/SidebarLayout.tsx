@@ -2,8 +2,17 @@ import { useState, type ComponentType, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import logoIcon from '../../assets/logo-icon.png';
+import { Avatar } from '../Avatar';
 import { Logo } from '../Logo';
 import { ChevronIcon, CloseIcon, LogoutIcon, MenuIcon } from '../admin/icons';
+
+const ROLE_DISPLAY_LABELS: Record<string, string> = {
+  Admin: 'Administrator',
+  OperationsManager: 'Operations Manager',
+  TourGuide: 'Tour Guide',
+  FleetCoordinator: 'Fleet Coordinator',
+  Traveler: 'Traveler',
+};
 
 export interface SidebarNavItem {
   to: string;
@@ -108,15 +117,16 @@ export function SidebarLayout({ navItems, pageTitles }: SidebarLayoutProps) {
   function sidebarChrome(isCollapsed: boolean, showCollapseToggle: boolean): ReactNode {
     return (
       <>
-        <div className={`flex items-center px-4 py-5 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className={`relative flex items-center overflow-hidden px-4 py-5 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-brand-50 via-transparent to-transparent" />
           {isCollapsed ? (
-            <img src={logoIcon} alt="TrailWise" className="h-8 w-8 object-contain" />
+            <img src={logoIcon} alt="TrailWise" className="relative z-10 h-8 w-8 object-contain" />
           ) : (
-            <Logo className="h-7 w-auto" />
+            <Logo className="relative z-10 h-7 w-auto" />
           )}
           <button
             onClick={() => setMobileOpen(false)}
-            className="text-slate-500 hover:text-slate-700 md:hidden"
+            className="relative z-10 text-slate-500 hover:text-slate-700 md:hidden"
             aria-label="Close menu"
           >
             <CloseIcon className="h-5 w-5" />
@@ -176,7 +186,7 @@ export function SidebarLayout({ navItems, pageTitles }: SidebarLayoutProps) {
       )}
 
       <div className="flex-1">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-6 py-4 backdrop-blur">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/90 px-6 py-4 backdrop-blur before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-brand-500 before:via-accent-500 before:to-brand-500">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
@@ -187,9 +197,12 @@ export function SidebarLayout({ navItems, pageTitles }: SidebarLayoutProps) {
             </button>
             <h1 className="font-heading text-lg font-bold text-slate-900">{title}</h1>
           </div>
-          <div className="text-right">
-            <p className="text-sm font-semibold text-slate-700">{user?.name}</p>
-            <p className="text-xs text-slate-500">{user?.role}</p>
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-semibold text-slate-700">{user?.name}</p>
+              <p className="text-xs text-slate-500">{user && (ROLE_DISPLAY_LABELS[user.role] ?? user.role)}</p>
+            </div>
+            {user && <Avatar name={user.name} size="sm" />}
           </div>
         </header>
         <main className="mx-auto max-w-5xl px-6 py-10">

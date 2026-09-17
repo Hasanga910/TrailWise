@@ -21,7 +21,7 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<AuthResponse>> Register(RegisterTravelerRequest request, CancellationToken ct)
     {
-        var result = await _authService.RegisterTravelerAsync(request.Name, request.Email, request.Password, ct);
+        var result = await _authService.RegisterTravelerAsync(request.Name, request.Email, request.Password, request.ContactNumber, ct);
         if (!result.Succeeded)
         {
             return Problem(statusCode: StatusCodes.Status409Conflict, title: result.Error);
@@ -66,7 +66,7 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<UserDto>> CreateUser(CreateUserRequest request, CancellationToken ct)
     {
-        var result = await _authService.CreateUserAsync(request.Name, request.Email, request.Password, request.Role, ct);
+        var result = await _authService.CreateUserAsync(request.Name, request.Email, request.Password, request.ContactNumber, request.Role, ct);
         if (!result.Succeeded)
         {
             return Problem(statusCode: StatusCodes.Status409Conflict, title: result.Error);
@@ -112,7 +112,7 @@ public class AuthController : ControllerBase
             return Unauthorized();
         }
 
-        var result = await _authService.UpdateProfileAsync(userId.Value, request.Name, request.Email, ct);
+        var result = await _authService.UpdateProfileAsync(userId.Value, request.Name, request.Email, request.ContactNumber, ct);
         if (!result.Succeeded)
         {
             return Problem(statusCode: StatusCodes.Status409Conflict, title: result.Error);

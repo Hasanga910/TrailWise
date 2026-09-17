@@ -33,7 +33,8 @@ public class AuthEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         {
             Name = "Full Flow Traveler",
             Email = email,
-            Password = "P@ssword123"
+            Password = "P@ssword123",
+            ContactNumber = "+14155550100"
         });
         registerResponse.EnsureSuccessStatusCode();
 
@@ -64,6 +65,7 @@ public class AuthEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
             Name = "Sneaky User",
             Email = email,
             Password = "P@ssword123",
+            ContactNumber = "+14155550101",
             Role = "Admin"
         });
         response.EnsureSuccessStatusCode();
@@ -82,6 +84,7 @@ public class AuthEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
             Name = "Should Fail",
             Email = "should-fail@example.com",
             Password = "P@ssword123",
+            ContactNumber = "+14155550102",
             Role = "TourGuide"
         });
 
@@ -93,7 +96,9 @@ public class AuthEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     {
         var client = _factory.CreateClient();
         var email = $"traveler-{Guid.NewGuid():N}@example.com";
-        await client.PostAsJsonAsync("/api/auth/register", new { Name = "T", Email = email, Password = "P@ssword123" });
+        await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { Name = "T", Email = email, Password = "P@ssword123", ContactNumber = "+14155550100" });
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "P@ssword123" });
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
 
@@ -103,6 +108,7 @@ public class AuthEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
             Name = "Should Fail",
             Email = "should-fail-2@example.com",
             Password = "P@ssword123",
+            ContactNumber = "+14155550103",
             Role = "TourGuide"
         });
 
@@ -124,6 +130,7 @@ public class AuthEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
             Name = "New Guide",
             Email = email,
             Password = "P@ssword123",
+            ContactNumber = "+14155550104",
             Role = "TourGuide"
         });
 

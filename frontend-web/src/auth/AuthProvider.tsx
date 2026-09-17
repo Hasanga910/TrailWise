@@ -67,13 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (name: string, email: string, password: string, contactNumber: string) => {
       setError(null);
       try {
         const response = await apiClient.post<AuthResponse>('/api/auth/register', {
           name,
           email,
           password,
+          contactNumber,
         });
         applyAuthResponse(response.data);
         return true;
