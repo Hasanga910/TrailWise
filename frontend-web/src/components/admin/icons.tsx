@@ -177,6 +177,16 @@ export function PlusCircleIcon({ className = base }: IconProps) {
   );
 }
 
+export function BookingsIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" strokeLinejoin="round" />
+      <path d="M3.5 9.5h17" strokeLinecap="round" />
+      <path d="M8 3v3M16 3v3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function CheckCircleIcon({ className = base }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
