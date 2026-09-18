@@ -23,6 +23,18 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();
 
+        services.AddHttpClient(NominatimLocationSearchService.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("TrailWise/1.0 (https://trailwise.local)");
+        });
+        services.AddScoped<ILocationSearchService, NominatimLocationSearchService>();
+
+        services.AddScoped<IGuideMatchingAgent, MockGuideMatchingAgent>();
+        services.AddScoped<IFleetCapacityAgent, MockFleetCapacityAgent>();
+        services.AddScoped<IPricingValidationAgent, MockPricingValidationAgent>();
+        services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();
+
         return services;
     }
 }

@@ -2,21 +2,18 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TrailWise.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace TrailWise.Infrastructure.Persistence.Migrations
+namespace TrailWise.Infrastructure.Persistence.Db
 {
     [DbContext(typeof(TrailWiseDbContext))]
-    [Migration("20260913161214_InitialCreate")]
-    partial class InitialCreate
+    partial class TrailWiseDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -168,6 +165,10 @@ namespace TrailWise.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("PackageTierId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("SpecialRequests")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
@@ -367,6 +368,39 @@ namespace TrailWise.Infrastructure.Persistence.Migrations
                     b.ToTable("ItinerarySteps");
                 });
 
+            modelBuilder.Entity("TrailWise.Domain.Entities.PackageLocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TourPackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TourPackageId");
+
+                    b.ToTable("PackageLocations");
+                });
+
             modelBuilder.Entity("TrailWise.Domain.Entities.PackageTier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -499,6 +533,10 @@ namespace TrailWise.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("PhotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Theme")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -517,6 +555,11 @@ namespace TrailWise.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ContactNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -716,6 +759,17 @@ namespace TrailWise.Infrastructure.Persistence.Migrations
                     b.Navigation("Booking");
                 });
 
+            modelBuilder.Entity("TrailWise.Domain.Entities.PackageLocation", b =>
+                {
+                    b.HasOne("TrailWise.Domain.Entities.TourPackage", "TourPackage")
+                        .WithMany("Locations")
+                        .HasForeignKey("TourPackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TourPackage");
+                });
+
             modelBuilder.Entity("TrailWise.Domain.Entities.PackageTier", b =>
                 {
                     b.HasOne("TrailWise.Domain.Entities.TourPackage", "TourPackage")
@@ -816,6 +870,8 @@ namespace TrailWise.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("TrailWise.Domain.Entities.TourPackage", b =>
                 {
                     b.Navigation("Bookings");
+
+                    b.Navigation("Locations");
 
                     b.Navigation("PackageTiers");
                 });

@@ -32,6 +32,7 @@ public static class DbSeeder
                 {
                     Name = admin.Name,
                     Email = normalizedEmail,
+                    ContactNumber = admin.ContactNumber,
                     Role = UserRole.Admin
                 };
                 adminUser.PasswordHash = hasher.HashPassword(adminUser, admin.Password);
@@ -64,8 +65,70 @@ public static class DbSeeder
                 BasePricePerPerson = 420m,
                 RequiresAC = true
             });
+            culturalPackage.Locations.Add(new PackageLocation { Name = "Sigiriya" });
+            culturalPackage.Locations.Add(new PackageLocation { Name = "Anuradhapura" });
+            culturalPackage.Locations.Add(new PackageLocation { Name = "Dambulla" });
 
-            db.TourPackages.Add(culturalPackage);
+            var hillCountryPackage = new TourPackage
+            {
+                Name = "Hill Country Adventure",
+                Theme = "Adventure",
+                DurationDays = 5,
+                BasePricePerPerson = 300m,
+                MaxGroupSize = 15
+            };
+            hillCountryPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.Normal,
+                IncludesFood = false,
+                BasePricePerPerson = 300m,
+                RequiresAC = false
+            });
+            hillCountryPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.Second,
+                IncludesFood = true,
+                BasePricePerPerson = 380m,
+                RequiresAC = false
+            });
+            hillCountryPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.First,
+                IncludesFood = true,
+                BasePricePerPerson = 520m,
+                RequiresAC = true
+            });
+            hillCountryPackage.Locations.Add(new PackageLocation { Name = "Ella" });
+            hillCountryPackage.Locations.Add(new PackageLocation { Name = "Nuwara Eliya" });
+            hillCountryPackage.Locations.Add(new PackageLocation { Name = "Adam's Peak" });
+
+            var coastalPackage = new TourPackage
+            {
+                Name = "Coastal Getaway",
+                Theme = "Beach",
+                DurationDays = 3,
+                BasePricePerPerson = 220m,
+                MaxGroupSize = 20
+            };
+            coastalPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.Normal,
+                IncludesFood = false,
+                BasePricePerPerson = 220m,
+                RequiresAC = false
+            });
+            coastalPackage.PackageTiers.Add(new PackageTier
+            {
+                ClassType = ClassType.First,
+                IncludesFood = true,
+                BasePricePerPerson = 360m,
+                RequiresAC = true
+            });
+            coastalPackage.Locations.Add(new PackageLocation { Name = "Mirissa" });
+            coastalPackage.Locations.Add(new PackageLocation { Name = "Galle" });
+            coastalPackage.Locations.Add(new PackageLocation { Name = "Bentota" });
+
+            db.TourPackages.AddRange(culturalPackage, hillCountryPackage, coastalPackage);
             await db.SaveChangesAsync(ct);
         }
     }

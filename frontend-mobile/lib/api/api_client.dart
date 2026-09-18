@@ -1,11 +1,22 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+class FieldError {
+  final String field;
+  final String message;
+
+  FieldError(this.field, this.message);
+
+  factory FieldError.fromJson(Map<String, dynamic> json) =>
+      FieldError(json['field'] as String, json['message'] as String);
+}
+
 class ApiException implements Exception {
   final int statusCode;
   final String message;
+  final List<FieldError> fieldErrors;
 
-  ApiException(this.statusCode, this.message);
+  ApiException(this.statusCode, this.message, {this.fieldErrors = const []});
 
   @override
   String toString() => message;
@@ -37,9 +48,23 @@ class ApiClient {
     return _decode(response);
   }
 
-  Future<dynamic> get(String path) async {
-    final response = await http.get(Uri.parse('$baseUrl$path'), headers: _headers);
+  Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
+    final response = await http.get(_buildUri(path, query), headers: _headers);
     return _decode(response);
+  }
+
+  Uri _buildUri(String path, [Map<String, dynamic>? query]) {
+    final uri = Uri.parse('$baseUrl$path');
+    if (query == null || query.isEmpty) {
+      return uri;
+    }
+    final stringParams = <String, String>{};
+    query.forEach((key, value) {
+      if (value != null) {
+        stringParams[key] = value.toString();
+      }
+    });
+    return stringParams.isEmpty ? uri : uri.replace(queryParameters: stringParams);
   }
 
   dynamic _decode(http.Response response) {
@@ -48,6 +73,18 @@ class ApiClient {
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded;
+    }
+
+    if (decoded is Map<String, dynamic> && decoded['errors'] is List) {
+      final fieldErrors = (decoded['errors'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(FieldError.fromJson)
+          .toList();
+      throw ApiException(
+        response.statusCode,
+        'Please correct the highlighted fields.',
+        fieldErrors: fieldErrors,
+      );
     }
 
     final message = decoded is Map<String, dynamic>

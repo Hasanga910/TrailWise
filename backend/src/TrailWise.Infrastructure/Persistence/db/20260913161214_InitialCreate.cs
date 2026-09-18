@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace TrailWise.Infrastructure.Persistence.Migrations
+namespace TrailWise.Infrastructure.Persistence.Db
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

@@ -113,6 +113,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors(CorsPolicyName);
 
+Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "uploads", "packages"));
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 

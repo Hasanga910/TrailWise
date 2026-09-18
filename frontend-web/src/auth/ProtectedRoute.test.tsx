@@ -6,12 +6,16 @@ import { ProtectedRoute } from './ProtectedRoute';
 
 function renderProtected(status: AuthContextValue['status']) {
   const value: AuthContextValue = {
-    user: status === 'authenticated' ? { id: '1', name: 'Alice', email: 'a@example.com', role: 'Traveler' } : null,
+    user:
+      status === 'authenticated'
+        ? { id: '1', name: 'Alice', email: 'a@example.com', contactNumber: '+14155550100', role: 'Traveler' }
+        : null,
     status,
     error: null,
     login: async () => true,
     register: async () => true,
     logout: () => {},
+    updateUser: () => {},
   };
 
   render(

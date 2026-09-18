@@ -17,7 +17,7 @@ public class AuthServiceTests
     {
         var sut = CreateSut(out _);
 
-        var registerResult = await sut.RegisterTravelerAsync("Ada Traveler", "ada@example.com", "P@ssword123");
+        var registerResult = await sut.RegisterTravelerAsync("Ada Traveler", "ada@example.com", "P@ssword123", "+14155550100");
         Assert.True(registerResult.Succeeded);
         Assert.Equal(UserRole.Traveler, registerResult.User!.Role);
 
@@ -31,7 +31,7 @@ public class AuthServiceTests
     public async Task Login_WithWrongPassword_Fails()
     {
         var sut = CreateSut(out _);
-        await sut.RegisterTravelerAsync("Ada Traveler", "ada2@example.com", "P@ssword123");
+        await sut.RegisterTravelerAsync("Ada Traveler", "ada2@example.com", "P@ssword123", "+14155550100");
 
         var result = await sut.LoginAsync("ada2@example.com", "wrong-password");
 
@@ -43,9 +43,9 @@ public class AuthServiceTests
     public async Task Register_WithDuplicateEmail_Fails()
     {
         var sut = CreateSut(out _);
-        await sut.RegisterTravelerAsync("Ada Traveler", "dup@example.com", "P@ssword123");
+        await sut.RegisterTravelerAsync("Ada Traveler", "dup@example.com", "P@ssword123", "+14155550100");
 
-        var second = await sut.RegisterTravelerAsync("Someone Else", "DUP@example.com", "AnotherPass1");
+        var second = await sut.RegisterTravelerAsync("Someone Else", "DUP@example.com", "AnotherPass1", "+14155550101");
 
         Assert.False(second.Succeeded);
         Assert.Equal("A user with this email already exists.", second.Error);
@@ -56,7 +56,7 @@ public class AuthServiceTests
     {
         var sut = CreateSut(out _);
 
-        var result = await sut.CreateUserAsync("Guide One", "guide@example.com", "P@ssword123", UserRole.TourGuide);
+        var result = await sut.CreateUserAsync("Guide One", "guide@example.com", "P@ssword123", "+14155550102", UserRole.TourGuide);
 
         Assert.True(result.Succeeded);
         Assert.Equal(UserRole.TourGuide, result.User!.Role);

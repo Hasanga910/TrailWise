@@ -8,8 +8,9 @@ export interface AuthContextValue {
   status: AuthStatus;
   error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, contactNumber: string) => Promise<boolean>;
   logout: () => void;
+  updateUser: (user: CurrentUser) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

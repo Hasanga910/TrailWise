@@ -10,6 +10,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     {
         builder.Property(u => u.Name).IsRequired().HasMaxLength(200);
         builder.Property(u => u.Email).IsRequired().HasMaxLength(320);
+        builder.Property(u => u.ContactNumber).IsRequired().HasMaxLength(30);
         builder.Property(u => u.PasswordHash).IsRequired();
         builder.Property(u => u.Role).HasConversion<string>().HasMaxLength(32);
 

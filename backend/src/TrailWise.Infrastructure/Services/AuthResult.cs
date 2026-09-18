@@ -16,6 +16,14 @@ public class AuthResult
         Token = token
     };
 
+    public static AuthResult Success(User user) => new()
+    {
+        Succeeded = true,
+        User = user
+    };
+
+    public static AuthResult Ok() => new() { Succeeded = true };
+
     public static AuthResult Failure(string error) => new()
     {
         Succeeded = false,

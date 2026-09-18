@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { getHomeRouteForRole } from '../../auth/roleHome';
 import { Logo } from '../Logo';
 
 export function HomeNav() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const isAuthenticated = status === 'authenticated';
 
   return (
@@ -12,9 +13,9 @@ export function HomeNav() {
         <Logo onDark className="h-8 w-auto" />
 
         <div className="flex items-center gap-3">
-          {isAuthenticated ? (
+          {isAuthenticated && user ? (
             <Link
-              to="/dashboard"
+              to={getHomeRouteForRole(user.role)}
               className="rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-brand-950 transition hover:bg-accent-400"
             >
               Go to Dashboard
