@@ -27,6 +27,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
 
   final _groupSizeController = TextEditingController(text: '1');
   final _budgetController = TextEditingController();
+  final _specialRequestsController = TextEditingController();
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -38,6 +39,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
   void dispose() {
     _groupSizeController.dispose();
     _budgetController.dispose();
+    _specialRequestsController.dispose();
     super.dispose();
   }
 
@@ -110,12 +112,14 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
     });
 
     try {
+      final specialRequests = _specialRequestsController.text.trim();
       await _apiClient.post('/api/bookings', {
         'packageTierId': widget.tier.id,
         'groupSize': groupSize,
         'startDate': _formatDate(_startDate!),
         'endDate': _formatDate(_endDate!),
         'budgetPerPerson': budget,
+        'specialRequests': specialRequests.isEmpty ? null : specialRequests,
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -196,6 +200,15 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                   decoration: InputDecoration(
                     labelText: 'Budget per person',
                     errorText: _fieldErrors['budgetPerPerson'],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _specialRequestsController,
+                  maxLines: 3,
+                  maxLength: 1000,
+                  decoration: const InputDecoration(
+                    labelText: 'Special requests (optional)',
                   ),
                 ),
                 const SizedBox(height: 16),

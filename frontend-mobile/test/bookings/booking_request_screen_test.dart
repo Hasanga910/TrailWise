@@ -56,6 +56,8 @@ void main() {
     await tester.enterText(find.widgetWithText(TextField, 'Group size'), '13');
     await tester.enterText(find.widgetWithText(TextField, 'Budget per person'), '300');
 
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Submit request'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Submit request'));
     await tester.pumpAndSettle();
 

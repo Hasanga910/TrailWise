@@ -41,6 +41,7 @@ export function BookingRequestPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [budgetPerPerson, setBudgetPerPerson] = useState(0);
+  const [specialRequests, setSpecialRequests] = useState('');
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -66,7 +67,14 @@ export function BookingRequestPage() {
 
     setSubmitting(true);
     try {
-      await createBooking({ packageTierId, groupSize, startDate, endDate, budgetPerPerson });
+      await createBooking({
+        packageTierId,
+        groupSize,
+        startDate,
+        endDate,
+        budgetPerPerson,
+        specialRequests: specialRequests.trim() || undefined,
+      });
       navigate('/traveler/bookings');
     } catch (err) {
       const errors = extractFieldErrors(err);
@@ -184,6 +192,21 @@ export function BookingRequestPage() {
             />
             {fieldErrors.budgetPerPerson && <p className={fieldErrorClass}>{fieldErrors.budgetPerPerson}</p>}
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="specialRequests" className={labelClass}>
+            Special requests (optional)
+          </label>
+          <textarea
+            id="specialRequests"
+            rows={3}
+            maxLength={1000}
+            className={inputClass}
+            value={specialRequests}
+            onChange={(e) => setSpecialRequests(e.target.value)}
+          />
+          {fieldErrors.specialRequests && <p className={fieldErrorClass}>{fieldErrors.specialRequests}</p>}
         </div>
 
         <button

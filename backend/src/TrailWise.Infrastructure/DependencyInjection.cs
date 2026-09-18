@@ -30,6 +30,11 @@ public static class DependencyInjection
         });
         services.AddScoped<ILocationSearchService, NominatimLocationSearchService>();
 
+        services.AddScoped<IGuideMatchingAgent, MockGuideMatchingAgent>();
+        services.AddScoped<IFleetCapacityAgent, MockFleetCapacityAgent>();
+        services.AddScoped<IPricingValidationAgent, MockPricingValidationAgent>();
+        services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();
+
         return services;
     }
 }

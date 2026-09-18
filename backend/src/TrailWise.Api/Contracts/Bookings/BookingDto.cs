@@ -14,9 +14,12 @@ public record BookingDto(
     DateOnly StartDate,
     DateOnly EndDate,
     decimal BudgetPerPerson,
+    string? SpecialRequests,
     BookingStatus Status,
     bool IsLargeGroup)
 {
+    // Duplicated by value in TrailWise.Infrastructure.Services.BookingApprovalEvaluator.LargeGroupThreshold
+    // since Infrastructure cannot reference this (Api) project. Keep both in sync if this ever changes.
     public const int LargeGroupThreshold = 10;
 
     public static BookingDto FromEntity(Booking booking) => new(
@@ -29,6 +32,7 @@ public record BookingDto(
         booking.StartDate,
         booking.EndDate,
         booking.BudgetPerPerson,
+        booking.SpecialRequests,
         booking.Status,
         booking.GroupSize > LargeGroupThreshold);
 }

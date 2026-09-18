@@ -17,6 +17,7 @@ public class Booking : BaseEntity
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public decimal BudgetPerPerson { get; set; }
+    public string? SpecialRequests { get; set; }
     public BookingStatus Status { get; set; } = BookingStatus.Requested;
 
     public ICollection<BookingAddOn> BookingAddOns { get; set; } = new List<BookingAddOn>();
