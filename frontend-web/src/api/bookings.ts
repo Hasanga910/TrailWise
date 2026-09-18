@@ -16,6 +16,7 @@ export interface CreateBookingInput {
   startDate: string;
   endDate: string;
   budgetPerPerson: number;
+  specialRequests?: string;
 }
 
 export interface BookingDto {
@@ -28,6 +29,7 @@ export interface BookingDto {
   startDate: string;
   endDate: string;
   budgetPerPerson: number;
+  specialRequests?: string | null;
   status: BookingStatus;
   isLargeGroup: boolean;
 }

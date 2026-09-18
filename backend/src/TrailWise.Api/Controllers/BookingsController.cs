@@ -2,11 +2,13 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
 
@@ -18,12 +20,17 @@ public class BookingsController : ControllerBase
     private const int MaxAdvanceBookingDays = 365;
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 50;
+    private const int MaxSpecialRequestsLength = 1000;
 
     private readonly TrailWiseDbContext _db;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<BookingsController> _logger;
 
-    public BookingsController(TrailWiseDbContext db)
+    public BookingsController(TrailWiseDbContext db, IServiceScopeFactory scopeFactory, ILogger<BookingsController> logger)
     {
         _db = db;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -59,6 +66,7 @@ public class BookingsController : ControllerBase
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             BudgetPerPerson = request.BudgetPerPerson,
+            SpecialRequests = string.IsNullOrWhiteSpace(request.SpecialRequests) ? null : request.SpecialRequests.Trim(),
             // Large-group bookings (see BookingDto.IsLargeGroup) intentionally stay Requested here.
             // Routing them to PendingApproval is the future approval workflow/agent's responsibility,
             // not this endpoint's — there is currently no workflow that can move a booking back out
@@ -72,7 +80,56 @@ public class BookingsController : ControllerBase
         booking.TourPackage = tier.TourPackage;
         booking.PackageTier = tier;
 
+        DispatchCoordinatorWorkflow(booking.Id);
+
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, BookingDto.FromEntity(booking));
+    }
+
+    private void DispatchCoordinatorWorkflow(Guid bookingId)
+    {
+        try
+        {
+            _ = Task.Run(async () =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+                try
+                {
+                    var coordinator = scope.ServiceProvider.GetRequiredService<ICoordinatorAgentService>();
+                    // Deliberately CancellationToken.None: the HTTP request's `ct` will be cancelled
+                    // once the response is returned, long before this background work finishes.
+                    await coordinator.StartWorkflowAsync(bookingId, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Coordinator workflow failed for booking {BookingId}", bookingId);
+                    await MarkBookingNeedsManualReviewAsync(bookingId);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            // Scheduling itself should never fail booking creation, which has already succeeded.
+            _logger.LogError(ex, "Failed to schedule coordinator workflow for booking {BookingId}", bookingId);
+        }
+    }
+
+    private async Task MarkBookingNeedsManualReviewAsync(Guid bookingId)
+    {
+        try
+        {
+            using var recoveryScope = _scopeFactory.CreateScope();
+            var freshDb = recoveryScope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await freshDb.Bookings.FindAsync(bookingId);
+            if (booking is not null && booking.Status != BookingStatus.NeedsManualReview)
+            {
+                booking.Status = BookingStatus.NeedsManualReview;
+                await freshDb.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to mark booking {BookingId} as NeedsManualReview after workflow failure", bookingId);
+        }
     }
 
     [HttpGet("mine")]
@@ -198,6 +255,13 @@ public class BookingsController : ControllerBase
         if (request.BudgetPerPerson <= 0)
         {
             errors.Add(new FieldValidationError("budgetPerPerson", "Budget per person must be greater than 0."));
+        }
+
+        if (request.SpecialRequests?.Length > MaxSpecialRequestsLength)
+        {
+            errors.Add(new FieldValidationError(
+                "specialRequests",
+                $"Special requests cannot exceed {MaxSpecialRequestsLength} characters."));
         }
 
         return errors;

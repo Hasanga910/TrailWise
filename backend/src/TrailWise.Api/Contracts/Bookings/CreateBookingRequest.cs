@@ -14,4 +14,6 @@ public class CreateBookingRequest
     public DateOnly EndDate { get; set; }
 
     public decimal BudgetPerPerson { get; set; }
+
+    public string? SpecialRequests { get; set; }
 }
