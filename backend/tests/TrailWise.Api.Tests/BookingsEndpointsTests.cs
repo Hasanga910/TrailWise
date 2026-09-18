@@ -89,6 +89,87 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
     }
 
     [Fact]
+    public async Task Create_WithStartDateBeyondMaxAdvance_ReturnsStructuredFieldError()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(366)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(369)),
+            BudgetPerPerson = 500m
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var errors = body.GetProperty("errors");
+        Assert.Contains(errors.EnumerateArray(), e => e.GetProperty("field").GetString() == "startDate");
+    }
+
+    [Fact]
+    public async Task Create_WithGroupSizeExceedingMaxGroupSize_ReturnsStructuredFieldError()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(client); // Cultural Triangle Explorer, MaxGroupSize = 12
+
+        var response = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 13,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var errors = body.GetProperty("errors");
+        Assert.Contains(errors.EnumerateArray(), e => e.GetProperty("field").GetString() == "groupSize");
+    }
+
+    [Fact]
+    public async Task Create_WithEndDateNotAfterStartDate_ReturnsStructuredFieldError()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(client);
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
+
+        var response = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = startDate,
+            EndDate = startDate,
+            BudgetPerPerson = 500m
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var errors = body.GetProperty("errors");
+        Assert.Contains(errors.EnumerateArray(), e => e.GetProperty("field").GetString() == "endDate");
+    }
+
+    [Fact]
+    public async Task Create_WithNonexistentPackageTierId_ReturnsNotFound()
+    {
+        var client = await AuthenticatedTravelerAsync();
+
+        var response = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = Guid.NewGuid(),
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_WithZeroBudget_ReturnsStructuredFieldError()
     {
         var client = await AuthenticatedTravelerAsync();
@@ -246,6 +327,80 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
         Assert.Equal(1, resultA!.TotalCount);
     }
 
+    [Fact]
+    public async Task GetById_AsOwner_ReturnsOk()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(client);
+
+        var createResponse = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+
+        var response = await client.GetAsync($"/api/bookings/{created!.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetById_AsNonOwnerNonManager_ReturnsForbidden()
+    {
+        var ownerClient = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(ownerClient);
+
+        var createResponse = await ownerClient.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+
+        var otherClient = await AuthenticatedTravelerAsync();
+        var response = await otherClient.GetAsync($"/api/bookings/{created!.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetById_AsOperationsManager_ReturnsOk()
+    {
+        var travelerClient = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(travelerClient);
+
+        var createResponse = await travelerClient.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m
+        });
+        var created = await createResponse.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+
+        var managerClient = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+        var response = await managerClient.GetAsync($"/api/bookings/{created!.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetById_WithNonexistentId_ReturnsNotFound()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var response = await client.GetAsync($"/api/bookings/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private static async Task CreateBookingAsync(HttpClient client, Guid packageTierId, int startDaysFromNow)
     {
         var response = await client.PostAsJsonAsync("/api/bookings", new
@@ -277,5 +432,33 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
     {
         var packages = await client.GetFromJsonAsync<List<TourPackageDto>>("/api/packages", JsonOptions);
         return packages!.First(p => p.Tiers.Count > 0).Tiers.First();
+    }
+
+    private static async Task<HttpClient> AuthenticatedOperationsManagerAsync(HttpClient client)
+    {
+        var adminLoginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = "admin@test.local", Password = "TestAdminPass123!" });
+        var adminAuth = await adminLoginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+
+        using var adminRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/admin/users")
+        {
+            Headers = { Authorization = new AuthenticationHeaderValue("Bearer", adminAuth!.Token) },
+            Content = JsonContent.Create(new
+            {
+                Name = "Ops Manager",
+                Email = $"ops-{Guid.NewGuid():N}@example.com",
+                Password = "P@ssword123",
+                ContactNumber = "+14155550101",
+                Role = "OperationsManager"
+            })
+        };
+        var createResponse = await client.SendAsync(adminRequest);
+        createResponse.EnsureSuccessStatusCode();
+        var createdUser = await createResponse.Content.ReadFromJsonAsync<UserDto>(JsonOptions);
+
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = createdUser!.Email, Password = "P@ssword123" });
+        var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
+        return client;
     }
 }

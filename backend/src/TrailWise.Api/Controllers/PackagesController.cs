@@ -115,10 +115,15 @@ public class PackagesController : ControllerBase
         package.BasePricePerPerson = request.BasePricePerPerson;
         package.MaxGroupSize = request.MaxGroupSize;
 
+        // package is already tracked (loaded above), so replacing Locations purely via the
+        // navigation collection misdetects the new entries as Modified rather than Added, because
+        // BaseEntity pre-populates Id with a non-default Guid (same issue worked around in AddTier
+        // below). Removing/adding through the DbSet directly guarantees EF tracks each side correctly.
+        _db.PackageLocations.RemoveRange(package.Locations);
         package.Locations.Clear();
         foreach (var locationName in request.LocationNames)
         {
-            package.Locations.Add(new PackageLocation { Name = locationName.Trim() });
+            _db.PackageLocations.Add(new PackageLocation { TourPackageId = package.Id, Name = locationName.Trim() });
         }
 
         await _db.SaveChangesAsync(ct);

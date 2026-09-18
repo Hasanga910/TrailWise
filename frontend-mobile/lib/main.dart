@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'auth/auth_provider.dart';
 import 'auth/login_screen.dart';
-import 'home/home_screen.dart';
+import 'navigation/main_shell.dart';
 
 void main() {
   runApp(const TrailWiseApp());
@@ -36,7 +36,7 @@ class AuthGate extends StatelessWidget {
       case AuthStatus.unknown:
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       case AuthStatus.authenticated:
-        return const HomeScreen();
+        return const MainShell();
       case AuthStatus.authenticating:
       case AuthStatus.unauthenticated:
         return const LoginScreen();
