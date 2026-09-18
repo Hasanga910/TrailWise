@@ -280,8 +280,11 @@ export function PackageManager() {
         <form onSubmit={handleCreate} className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className={labelClass}>Name</label>
+              <label htmlFor="package-name" className={labelClass}>
+                Name
+              </label>
               <input
+                id="package-name"
                 required
                 className={inputClass}
                 value={createForm.name}
@@ -289,8 +292,11 @@ export function PackageManager() {
               />
             </div>
             <div>
-              <label className={labelClass}>Theme</label>
+              <label htmlFor="package-theme" className={labelClass}>
+                Theme
+              </label>
               <input
+                id="package-theme"
                 required
                 className={inputClass}
                 value={createForm.theme}
@@ -298,8 +304,11 @@ export function PackageManager() {
               />
             </div>
             <div>
-              <label className={labelClass}>Duration (days)</label>
+              <label htmlFor="package-duration-days" className={labelClass}>
+                Duration (days)
+              </label>
               <input
+                id="package-duration-days"
                 required
                 type="number"
                 min={1}
@@ -309,8 +318,11 @@ export function PackageManager() {
               />
             </div>
             <div>
-              <label className={labelClass}>Max group size</label>
+              <label htmlFor="package-max-group-size" className={labelClass}>
+                Max group size
+              </label>
               <input
+                id="package-max-group-size"
                 required
                 type="number"
                 min={1}
@@ -320,8 +332,11 @@ export function PackageManager() {
               />
             </div>
             <div>
-              <label className={labelClass}>Base price per person</label>
+              <label htmlFor="package-base-price" className={labelClass}>
+                Base price per person
+              </label>
               <input
+                id="package-base-price"
                 required
                 type="number"
                 min={0.01}
@@ -334,8 +349,11 @@ export function PackageManager() {
               />
             </div>
             <div>
-              <label className={labelClass}>Photo</label>
+              <label htmlFor="package-photo" className={labelClass}>
+                Photo
+              </label>
               <input
+                id="package-photo"
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className={inputClass}
@@ -379,6 +397,7 @@ export function PackageManager() {
                   className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-5 sm:items-center"
                 >
                   <select
+                    aria-label="Class type"
                     className={inputClass}
                     value={tier.classType}
                     onChange={(e) => updateCreateTier(index, { classType: e.target.value as ClassType })}
@@ -480,18 +499,21 @@ export function PackageManager() {
                   <form onSubmit={handleSaveEdit} className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <input
+                        aria-label="Name"
                         required
                         className={inputClass}
                         value={editForm.name}
                         onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
                       />
                       <input
+                        aria-label="Theme"
                         required
                         className={inputClass}
                         value={editForm.theme}
                         onChange={(e) => setEditForm((f) => ({ ...f, theme: e.target.value }))}
                       />
                       <input
+                        aria-label="Duration (days)"
                         required
                         type="number"
                         min={1}
@@ -502,6 +524,7 @@ export function PackageManager() {
                         }
                       />
                       <input
+                        aria-label="Max group size"
                         required
                         type="number"
                         min={1}
@@ -512,6 +535,7 @@ export function PackageManager() {
                         }
                       />
                       <input
+                        aria-label="Base price per person"
                         required
                         type="number"
                         min={0.01}
@@ -630,6 +654,7 @@ export function PackageManager() {
 
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3">
                   <select
+                    aria-label="Class type"
                     className={`${inputClass} w-auto`}
                     value={newTier.classType}
                     onChange={(e) =>
