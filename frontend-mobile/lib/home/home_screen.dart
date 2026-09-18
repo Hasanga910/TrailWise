@@ -36,8 +36,6 @@ class HomeScreen extends StatelessWidget {
                   Text(user.email),
                   const SizedBox(height: 4),
                   Chip(label: Text(user.role)),
-                  const SizedBox(height: 24),
-                  const Text('No tours booked yet.'),
                 ],
               ),
       ),
