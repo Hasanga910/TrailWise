@@ -16,6 +16,8 @@ namespace TrailWise.Api.Controllers;
 public class BookingsController : ControllerBase
 {
     private const int MaxAdvanceBookingDays = 365;
+    private const int DefaultPageSize = 10;
+    private const int MaxPageSize = 50;
 
     private readonly TrailWiseDbContext _db;
 
@@ -57,6 +59,10 @@ public class BookingsController : ControllerBase
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             BudgetPerPerson = request.BudgetPerPerson,
+            // Large-group bookings (see BookingDto.IsLargeGroup) intentionally stay Requested here.
+            // Routing them to PendingApproval is the future approval workflow/agent's responsibility,
+            // not this endpoint's — there is currently no workflow that can move a booking back out
+            // of PendingApproval, so setting it here would strand the booking in a dead-end state.
             Status = BookingStatus.Requested
         };
 
@@ -70,7 +76,13 @@ public class BookingsController : ControllerBase
     }
 
     [HttpGet("mine")]
-    public async Task<ActionResult<IReadOnlyList<BookingDto>>> GetMine(CancellationToken ct)
+    public async Task<ActionResult<PagedResult<BookingDto>>> GetMine(
+        BookingStatus? status,
+        DateOnly? from,
+        DateOnly? to,
+        int page = 1,
+        int pageSize = DefaultPageSize,
+        CancellationToken ct = default)
     {
         var travelerId = GetUserId();
         if (travelerId is null)
@@ -78,14 +90,51 @@ public class BookingsController : ControllerBase
             return Unauthorized();
         }
 
-        var bookings = await _db.Bookings
+        if (from.HasValue && to.HasValue && from.Value > to.Value)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("to", "'to' must be on or after 'from'.") }
+            });
+        }
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
+
+        var query = _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
-            .Where(b => b.TravelerId == travelerId.Value)
+            .Where(b => b.TravelerId == travelerId.Value);
+
+        if (status.HasValue)
+        {
+            query = query.Where(b => b.Status == status.Value);
+        }
+
+        if (from.HasValue)
+        {
+            query = query.Where(b => b.StartDate >= from.Value);
+        }
+
+        if (to.HasValue)
+        {
+            query = query.Where(b => b.StartDate <= to.Value);
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        var bookings = await query
+            .OrderByDescending(b => b.StartDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .AsNoTracking()
             .ToListAsync(ct);
 
-        return Ok(bookings.Select(BookingDto.FromEntity).ToList());
+        return Ok(new PagedResult<BookingDto>(
+            bookings.Select(BookingDto.FromEntity).ToList(),
+            totalCount,
+            page,
+            pageSize));
     }
 
     [HttpGet("{id:guid}")]

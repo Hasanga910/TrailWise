@@ -50,3 +50,19 @@ export function extractErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+export type FieldError = { field: string; message: string };
+
+export function extractFieldErrors(error: unknown): Record<string, string> {
+  if (!axios.isAxiosError(error)) {
+    return {};
+  }
+  const errors = (error.response?.data as { errors?: FieldError[] } | undefined)?.errors;
+  if (!Array.isArray(errors)) {
+    return {};
+  }
+  return errors.reduce<Record<string, string>>((acc, e) => {
+    acc[e.field] = e.message;
+    return acc;
+  }, {});
+}
