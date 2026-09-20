@@ -28,6 +28,17 @@ frontend-mobile/**/ios/Flutter/Flutter.framework
 frontend-mobile/**/android/.gradle/
 frontend-mobile/**/android/local.properties
 
+# Python / FastApi / Agent Service
+venv/
+.venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
 # OS
 .DS_Store
 Thumbs.db
