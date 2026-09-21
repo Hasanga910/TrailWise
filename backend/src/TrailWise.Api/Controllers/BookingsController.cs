@@ -7,8 +7,8 @@ using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
+using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
-using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
 

@@ -1,4 +1,4 @@
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 public record GuideMatchResult(Guid GuideId, double MatchScore, string Reasoning);
 
