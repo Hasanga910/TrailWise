@@ -1,4 +1,4 @@
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 /// <summary>
 /// Stand-in for Person 2's real Guide Matching Agent. Returns plausible, deterministic
