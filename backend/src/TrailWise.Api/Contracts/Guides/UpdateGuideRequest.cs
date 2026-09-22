@@ -1,14 +1,18 @@
-namespace TrailWise.Domain.Entities;
+using System.ComponentModel.DataAnnotations;
 
-public class Guide : BaseEntity
+namespace TrailWise.Api.Contracts.Guides;
+
+public class UpdateGuideRequest
 {
-    public Guid? UserId { get; set; }
-    public User? User { get; set; }
-
+    [Required, MaxLength(200)]
     public string Name { get; set; } = string.Empty;
+
     public string[] Languages { get; set; } = Array.Empty<string>();
+
     public string[] Specializations { get; set; } = Array.Empty<string>();
+
+    [MaxLength(200)]
     public string ContactInfo { get; set; } = string.Empty;
 
-    public ICollection<GuideAvailability> Availability { get; set; } = new List<GuideAvailability>();
+    public Guid? UserId { get; set; }
 }
