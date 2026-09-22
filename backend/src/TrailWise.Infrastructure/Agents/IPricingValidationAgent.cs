@@ -1,4 +1,4 @@
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 public record PricingResult(decimal TotalCost, string Breakdown, string ValidationResult);
 

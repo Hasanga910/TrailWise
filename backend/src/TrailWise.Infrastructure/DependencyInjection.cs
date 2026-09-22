@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
 using TrailWise.Infrastructure.Services;

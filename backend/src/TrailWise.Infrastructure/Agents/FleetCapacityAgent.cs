@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;
 
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 public class FleetCapacityAgent : IFleetCapacityAgent
 {

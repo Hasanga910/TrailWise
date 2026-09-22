@@ -1,4 +1,4 @@
-using TrailWise.Infrastructure.Services;
+using TrailWise.Infrastructure.Agents;
 using Xunit;
 
 namespace TrailWise.Api.Tests;

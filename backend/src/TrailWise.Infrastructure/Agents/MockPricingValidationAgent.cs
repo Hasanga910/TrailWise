@@ -2,7 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TrailWise.Infrastructure.Persistence;
 
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 /// <summary>
 /// Stand-in for Person 4's real Pricing &amp; Validation Agent. Unlike the guide/fleet mocks,

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
+using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
 using TrailWise.Infrastructure.Services;
 using Xunit;

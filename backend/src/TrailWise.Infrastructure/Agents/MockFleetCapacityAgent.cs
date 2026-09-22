@@ -1,4 +1,4 @@
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 /// <summary>
 /// Stand-in for Person 3's real Fleet &amp; Capacity Agent. Returns plausible, deterministic

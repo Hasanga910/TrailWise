@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 internal static class AgentJsonOptions
 {
