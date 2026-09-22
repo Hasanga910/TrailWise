@@ -29,11 +29,11 @@ frontend-mobile/**/android/.gradle/
 frontend-mobile/**/android/local.properties
 
 # Python / FastApi / Agent Service
-venv/
-.venv/
-ENV/
-env/
-__pycache__/
+**/venv/
+**/.venv/
+**/ENV/
+**/env/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
