@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IGuideMatchingAgent, MockGuideMatchingAgent>();
         services.AddScoped<IFleetCapacityAgent, FleetCapacityAgent>();
         services.AddScoped<IFleetReservationService, FleetReservationService>();
+        services.AddScoped<IGuideAvailabilityService, GuideAvailabilityService>();
         services.AddScoped<IPricingValidationAgent, MockPricingValidationAgent>();
         services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();
         return services;

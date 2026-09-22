@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -203,6 +204,172 @@ public class GuidesController : ControllerBase
         _logger.LogInformation("Guide {GuideId} updated.", guide.Id);
 
         return Ok(GuideDto.FromEntity(guide));
+    }
+
+    [HttpGet("{id:guid}/availability")]
+    public async Task<ActionResult<IReadOnlyList<GuideAvailabilityDto>>> GetAvailability(
+        Guid id,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        CancellationToken ct)
+    {
+        var guideExists = await _db.Guides.AsNoTracking().AnyAsync(g => g.Id == id, ct);
+        if (!guideExists)
+        {
+            return NotFound();
+        }
+
+        if (from.HasValue && to.HasValue && from.Value > to.Value)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("to", "'to' must be on or after 'from'.") }
+            });
+        }
+
+        var query = _db.GuideAvailabilities
+            .AsNoTracking()
+            .Where(a => a.GuideId == id);
+
+        if (from.HasValue)
+        {
+            query = query.Where(a => a.Date >= from.Value);
+        }
+
+        if (to.HasValue)
+        {
+            query = query.Where(a => a.Date <= to.Value);
+        }
+
+        var availabilities = await query
+            .OrderBy(a => a.Date)
+            .ToListAsync(ct);
+
+        return Ok(availabilities.Select(GuideAvailabilityDto.FromEntity).ToList());
+    }
+
+    [HttpPut("{id:guid}/availability")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<ActionResult<IReadOnlyList<GuideAvailabilityDto>>> UpdateAvailability(
+        Guid id,
+        UpdateGuideAvailabilityRequest request,
+        CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides.FirstOrDefaultAsync(g => g.Id == id, ct);
+        if (guide is null)
+        {
+            return NotFound();
+        }
+
+        if (guide.UserId != currentUserId.Value)
+        {
+            return Forbid();
+        }
+
+        if (request.Dates is null || request.Dates.Count == 0)
+        {
+            return Ok(new List<GuideAvailabilityDto>());
+        }
+
+        var duplicateDates = request.Dates
+            .GroupBy(d => d.Date)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateDates.Count > 0)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("dates", "Duplicate dates supplied in request.") }
+            });
+        }
+
+        var targetDates = request.Dates.Select(d => d.Date).ToList();
+        var existingRows = await _db.GuideAvailabilities
+            .Where(a => a.GuideId == id && targetDates.Contains(a.Date))
+            .ToListAsync(ct);
+
+        var existingDict = existingRows.ToDictionary(a => a.Date);
+
+        // Verify that no date with an assigned booking is being marked as available
+        foreach (var item in request.Dates)
+        {
+            if (existingDict.TryGetValue(item.Date, out var existing))
+            {
+                if (existing.AssignedBookingId != null && item.IsAvailable)
+                {
+                    return BadRequest(new
+                    {
+                        errors = new[]
+                        {
+                            new FieldValidationError(
+                                "dates",
+                                $"Date {item.Date:yyyy-MM-dd} is assigned to booking {existing.AssignedBookingId} and cannot be marked available.")
+                        }
+                    });
+                }
+            }
+        }
+
+        foreach (var item in request.Dates)
+        {
+            if (existingDict.TryGetValue(item.Date, out var existing))
+            {
+                existing.IsAvailable = item.IsAvailable;
+            }
+            else
+            {
+                var newRow = new GuideAvailability
+                {
+                    GuideId = id,
+                    Date = item.Date,
+                    IsAvailable = item.IsAvailable
+                };
+                _db.GuideAvailabilities.Add(newRow);
+            }
+        }
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        var updatedRows = await _db.GuideAvailabilities
+            .AsNoTracking()
+            .Where(a => a.GuideId == id && targetDates.Contains(a.Date))
+            .OrderBy(a => a.Date)
+            .ToListAsync(ct);
+
+        return Ok(updatedRows.Select(GuideAvailabilityDto.FromEntity).ToList());
+    }
+
+    private Guid? GetUserId()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return Guid.TryParse(userId, out var id) ? id : null;
     }
 
     private static string[] NormalizeArray(string[]? input)
