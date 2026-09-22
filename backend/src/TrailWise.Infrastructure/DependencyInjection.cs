@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<IPricingValidationAgent, PricingValidationAgent>();
         services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();
         services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IReviewService, ReviewService>();
 
         return services;
     }
