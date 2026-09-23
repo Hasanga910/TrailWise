@@ -6,10 +6,12 @@ using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Api.Contracts.Guides;
+using TrailWise.Api.Contracts.Itineraries;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
 
@@ -25,12 +27,18 @@ public class BookingsController : ControllerBase
 
     private readonly TrailWiseDbContext _db;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IItineraryService _itineraryService;
     private readonly ILogger<BookingsController> _logger;
 
-    public BookingsController(TrailWiseDbContext db, IServiceScopeFactory scopeFactory, ILogger<BookingsController> logger)
+    public BookingsController(
+        TrailWiseDbContext db,
+        IServiceScopeFactory scopeFactory,
+        IItineraryService itineraryService,
+        ILogger<BookingsController> logger)
     {
         _db = db;
         _scopeFactory = scopeFactory;
+        _itineraryService = itineraryService;
         _logger = logger;
     }
 
@@ -279,6 +287,173 @@ public class BookingsController : ControllerBase
             guide.Id, booking.Id, booking.Attended, booking.Completed);
 
         return Ok(AssignedTourDto.FromEntity(booking, guide));
+    }
+
+    [HttpGet("{id:guid}/itinerary")]
+    public async Task<ActionResult<IReadOnlyList<ItineraryStepDto>>> GetItinerary(Guid id, CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var booking = await _db.Bookings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var isManager = User.IsInRole("OperationsManager") || User.IsInRole("Admin");
+        var isOwner = booking.TravelerId == currentUserId.Value;
+
+        var isAssignedGuide = false;
+        if (!isManager && !isOwner && User.IsInRole("TourGuide"))
+        {
+            var guide = await _db.Guides
+                .AsNoTracking()
+                .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+            if (guide is not null)
+            {
+                isAssignedGuide = await _db.GuideAvailabilities
+                    .AnyAsync(a => a.GuideId == guide.Id && a.AssignedBookingId == id, ct);
+            }
+        }
+
+        if (!isManager && !isOwner && !isAssignedGuide)
+        {
+            return Forbid();
+        }
+
+        var steps = await _itineraryService.GetItineraryAsync(id, ct);
+        return Ok(steps.Select(ItineraryStepDto.FromEntity).ToList());
+    }
+
+    [HttpPost("{id:guid}/itinerary")]
+    [Authorize(Roles = "OperationsManager,TourGuide,Admin")]
+    public async Task<ActionResult<IReadOnlyList<ItineraryStepDto>>> SetItinerary(
+        Guid id,
+        SetItineraryRequest request,
+        CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var booking = await _db.Bookings
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (booking.Status != BookingStatus.Confirmed)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("status", "Itineraries can only be created for confirmed bookings.") }
+            });
+        }
+
+        var isManager = User.IsInRole("OperationsManager") || User.IsInRole("Admin");
+        if (!isManager)
+        {
+            if (User.IsInRole("TourGuide"))
+            {
+                var guide = await _db.Guides
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+                if (guide is null)
+                {
+                    return Forbid();
+                }
+
+                var isAssigned = await _db.GuideAvailabilities
+                    .AnyAsync(a => a.GuideId == guide.Id && a.AssignedBookingId == id, ct);
+
+                if (!isAssigned)
+                {
+                    return Forbid();
+                }
+            }
+            else
+            {
+                return Forbid();
+            }
+        }
+
+        if (request?.Steps is null)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("steps", "Steps list cannot be null.") }
+            });
+        }
+
+        var errors = new List<FieldValidationError>();
+
+        for (var i = 0; i < request.Steps.Count; i++)
+        {
+            var step = request.Steps[i];
+            if (step.DayNumber <= 0)
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].dayNumber", "Day number must be greater than 0."));
+            }
+
+            if (string.IsNullOrWhiteSpace(step.Activity))
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].activity", "Activity is required."));
+            }
+            else if (step.Activity.Trim().Length > 300)
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].activity", "Activity cannot exceed 300 characters."));
+            }
+
+            if (string.IsNullOrWhiteSpace(step.Location))
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].location", "Location is required."));
+            }
+            else if (step.Location.Trim().Length > 300)
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].location", "Location cannot exceed 300 characters."));
+            }
+        }
+
+        var duplicateSchedule = request.Steps
+            .GroupBy(s => (s.DayNumber, s.StartTime))
+            .FirstOrDefault(g => g.Count() > 1);
+
+        if (duplicateSchedule is not null)
+        {
+            errors.Add(new FieldValidationError("steps", $"Duplicate step scheduled for Day {duplicateSchedule.Key.DayNumber} at {duplicateSchedule.Key.StartTime}."));
+        }
+
+        if (errors.Count > 0)
+        {
+            return BadRequest(new { errors });
+        }
+
+        var newSteps = request.Steps.Select(s => new ItineraryStep
+        {
+            DayNumber = s.DayNumber,
+            Activity = s.Activity.Trim(),
+            Location = s.Location.Trim(),
+            StartTime = s.StartTime
+        });
+
+        var savedSteps = await _itineraryService.SetItineraryAsync(id, newSteps, ct);
+
+        _logger.LogInformation("Itinerary updated for booking {BookingId} with {Count} steps", id, savedSteps.Count);
+
+        return Ok(savedSteps.Select(ItineraryStepDto.FromEntity).ToList());
     }
 
     private static List<FieldValidationError> Validate(CreateBookingRequest request, PackageTier tier)
