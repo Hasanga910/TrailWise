@@ -9,11 +9,16 @@ namespace TrailWise.Infrastructure.Services;
 public class ReviewService : IReviewService
 {
     private readonly TrailWiseDbContext _db;
+    private readonly IAuditLogService _auditLogService;
     private readonly ILogger<ReviewService> _logger;
 
-    public ReviewService(TrailWiseDbContext db, ILogger<ReviewService> logger)
+    public ReviewService(
+        TrailWiseDbContext db,
+        IAuditLogService auditLogService,
+        ILogger<ReviewService> logger)
     {
         _db = db;
+        _auditLogService = auditLogService;
         _logger = logger;
     }
 
@@ -67,8 +72,40 @@ public class ReviewService : IReviewService
             SubmittedAt = DateTimeOffset.UtcNow
         };
 
-        _db.Reviews.Add(review);
-        await _db.SaveChangesAsync(ct);
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            _db.Reviews.Add(review);
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Review",
+                entityId: review.Id,
+                action: "ReviewSubmitted",
+                performedBy: travelerId,
+                details: new
+                {
+                    bookingId,
+                    rating
+                },
+                ct: ct);
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
 
         _logger.LogInformation("Review {ReviewId} with rating {Rating} submitted for booking {BookingId}",
             review.Id, rating, bookingId);

@@ -10,11 +10,16 @@ namespace TrailWise.Infrastructure.Services;
 public class PaymentService : IPaymentService
 {
     private readonly TrailWiseDbContext _db;
+    private readonly IAuditLogService _auditLogService;
     private readonly ILogger<PaymentService> _logger;
 
-    public PaymentService(TrailWiseDbContext db, ILogger<PaymentService> logger)
+    public PaymentService(
+        TrailWiseDbContext db,
+        IAuditLogService auditLogService,
+        ILogger<PaymentService> logger)
     {
         _db = db;
+        _auditLogService = auditLogService;
         _logger = logger;
     }
 
@@ -88,8 +93,42 @@ public class PaymentService : IPaymentService
             Status = paymentStatus
         };
 
-        _db.Payments.Add(payment);
-        await _db.SaveChangesAsync(ct);
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            _db.Payments.Add(payment);
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Payment",
+                entityId: payment.Id,
+                action: "PaymentRecorded",
+                performedBy: travelerId,
+                details: new
+                {
+                    bookingId,
+                    amount,
+                    method = normalizedMethod,
+                    status = paymentStatus.ToString()
+                },
+                ct: ct);
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
 
         _logger.LogInformation("Payment of {Amount} recorded for booking {BookingId}. New cumulative status: {Status}",
             amount, bookingId, paymentStatus);
