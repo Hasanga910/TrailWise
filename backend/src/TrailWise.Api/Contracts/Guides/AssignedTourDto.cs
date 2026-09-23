@@ -15,7 +15,10 @@ public record AssignedTourDto(
     IReadOnlyList<string> Locations,
     string? SpecialRequests,
     Guid GuideId,
-    string GuideName)
+    string GuideName,
+    bool Attended = false,
+    bool Completed = false,
+    string? GuideNotes = null)
 {
     public BookingStatus BookingStatus => Status;
     public Guid Id => BookingId;
@@ -32,5 +35,8 @@ public record AssignedTourDto(
         booking.TourPackage.Locations.OrderBy(l => l.Id).Select(l => l.Name).ToList(),
         booking.SpecialRequests,
         guide.Id,
-        guide.Name);
+        guide.Name,
+        booking.Attended,
+        booking.Completed,
+        booking.GuideNotes);
 }

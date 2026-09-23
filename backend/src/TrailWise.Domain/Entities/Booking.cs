@@ -20,6 +20,10 @@ public class Booking : BaseEntity
     public string? SpecialRequests { get; set; }
     public BookingStatus Status { get; set; } = BookingStatus.Requested;
 
+    public bool Attended { get; set; } = false;
+    public bool Completed { get; set; } = false;
+    public string? GuideNotes { get; set; }
+
     public ICollection<BookingAddOn> BookingAddOns { get; set; } = new List<BookingAddOn>();
     public ICollection<GuideAvailability> GuideAvailabilities { get; set; } = new List<GuideAvailability>();
     public ICollection<VehicleAssignment> VehicleAssignments { get; set; } = new List<VehicleAssignment>();

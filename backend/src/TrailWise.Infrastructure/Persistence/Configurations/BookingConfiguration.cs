@@ -11,6 +11,9 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(b => b.BudgetPerPerson).HasPrecision(10, 2);
         builder.Property(b => b.SpecialRequests).HasMaxLength(1000);
+        builder.Property(b => b.Attended).HasDefaultValue(false);
+        builder.Property(b => b.Completed).HasDefaultValue(false);
+        builder.Property(b => b.GuideNotes).HasMaxLength(2000);
 
         builder.HasOne(b => b.Traveler)
             .WithMany(u => u.Bookings)

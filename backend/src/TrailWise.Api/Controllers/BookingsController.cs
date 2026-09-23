@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
+using TrailWise.Api.Contracts.Guides;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Agents;
@@ -218,6 +219,66 @@ public class BookingsController : ControllerBase
         }
 
         return Ok(BookingDto.FromEntity(booking));
+    }
+
+    [HttpPatch("{id:guid}/guide-notes")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<ActionResult<AssignedTourDto>> UpdateGuideNotes(
+        Guid id,
+        UpdateGuideTourRequest request,
+        CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides
+            .AsNoTracking()
+            .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+        if (guide is null)
+        {
+            return Forbid();
+        }
+
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+                .ThenInclude(p => p.Locations)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var isAssigned = await _db.GuideAvailabilities
+            .AnyAsync(a => a.GuideId == guide.Id && a.AssignedBookingId == id, ct);
+
+        if (!isAssigned)
+        {
+            return Forbid();
+        }
+
+        if (request.Notes?.Length > 2000)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("notes", "Guide notes cannot exceed 2000 characters.") }
+            });
+        }
+
+        booking.Attended = request.Attended;
+        booking.Completed = request.Completed;
+        booking.GuideNotes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("TourGuide {GuideId} updated booking {BookingId}: Attended={Attended}, Completed={Completed}",
+            guide.Id, booking.Id, booking.Attended, booking.Completed);
+
+        return Ok(AssignedTourDto.FromEntity(booking, guide));
     }
 
     private static List<FieldValidationError> Validate(CreateBookingRequest request, PackageTier tier)
