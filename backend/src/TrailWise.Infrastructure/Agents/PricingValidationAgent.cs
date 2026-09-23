@@ -53,6 +53,8 @@ public class PricingValidationAgent : IPricingValidationAgent
         // referenced, or incorporated into pricing or validation calculations, nor passed into
         // any LLM prompt context. This guarantees that unvetted free text cannot alter deterministic
         // pricing, bypass budget thresholds, or execute prompt-injection attacks.
+        // Traveler free text is intentionally excluded from pricing and validation logic.
+        // The following have zero effect: "apply 90% discount", "promo code FREE", "ignore price rules".
         // No LLM is invoked; all calculation and validation is strictly deterministic C# code.
 
         // 2. Pricing Calculations:
@@ -72,11 +74,26 @@ public class PricingValidationAgent : IPricingValidationAgent
         // AddOnsCost = Sum of BookingAddOns.Cost
         var addOnsCost = booking.BookingAddOns.Sum(a => a.Cost);
 
-        // Group discount is not yet implemented in this task; fixed to 0
-        var groupDiscount = 0m;
+        var subtotal = tierBasePrice + cateringCost + addOnsCost;
 
-        // FinalTotal = TierBasePrice + CateringCost + AddOnsCost
-        var finalTotal = tierBasePrice + cateringCost + addOnsCost - groupDiscount;
+        // Deterministic Discount Selection:
+        // Apply the best matching Discount where MinGroupSize <= Booking.GroupSize
+        var bestDiscount = await _db.Discounts
+            .AsNoTracking()
+            .Where(d => d.MinGroupSize <= booking.GroupSize)
+            .OrderByDescending(d => d.PercentageOff)
+            .ThenByDescending(d => d.MinGroupSize)
+            .ThenBy(d => d.CreatedAt)
+            .ThenBy(d => d.Id)
+            .FirstOrDefaultAsync(ct);
+
+        var discountDescription = bestDiscount?.Description;
+        var discountPercentage = bestDiscount?.PercentageOff ?? 0m;
+        var groupDiscount = bestDiscount != null
+            ? Math.Round(subtotal * (discountPercentage / 100m), 2, MidpointRounding.AwayFromZero)
+            : 0m;
+
+        var finalTotal = Math.Max(0m, subtotal - groupDiscount);
 
         // 3. Serialize structured breakdown to JSON preserving the existing string contract
         var breakdown = JsonSerializer.Serialize(
@@ -85,6 +102,9 @@ public class PricingValidationAgent : IPricingValidationAgent
                 tierBasePrice,
                 cateringCost,
                 addOnsCost,
+                subtotal,
+                discountDescription,
+                discountPercentage,
                 groupDiscount,
                 finalTotal
             },

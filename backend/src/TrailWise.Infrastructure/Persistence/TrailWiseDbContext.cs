@@ -23,6 +23,7 @@ public class TrailWiseDbContext : DbContext
     public DbSet<ItineraryStep> ItinerarySteps => Set<ItineraryStep>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<Discount> Discounts => Set<Discount>();
     public DbSet<AgentWorkflowRun> AgentWorkflowRuns => Set<AgentWorkflowRun>();
     public DbSet<AgentStepLog> AgentStepLogs => Set<AgentStepLog>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
