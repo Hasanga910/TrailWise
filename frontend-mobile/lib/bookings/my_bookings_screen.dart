@@ -8,6 +8,7 @@ import '../models/paged_result.dart';
 import 'booking_status.dart';
 import 'itinerary_screen.dart';
 import 'payment_status_screen.dart';
+import 'review_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key, this.apiClient});
@@ -123,6 +124,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     );
   }
 
+  void _openReview(Booking booking) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReviewScreen(
+          booking: booking,
+          apiClient: _apiClient,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -210,6 +222,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               booking: result.items[i],
               onTap: () => _openBooking(result.items[i]),
               onPaymentTap: () => _openPayment(result.items[i]),
+              onReviewTap: () => _openReview(result.items[i]),
             ),
           ),
         ),
@@ -250,16 +263,19 @@ class _BookingCard extends StatelessWidget {
     required this.booking,
     required this.onTap,
     this.onPaymentTap,
+    this.onReviewTap,
   });
 
   final Booking booking;
   final VoidCallback onTap;
   final VoidCallback? onPaymentTap;
+  final VoidCallback? onReviewTap;
 
   @override
   Widget build(BuildContext context) {
     final color = BookingStatus.color(booking.status);
     final isConfirmed = booking.status == BookingStatus.confirmed;
+    final isCompleted = booking.status == BookingStatus.completed;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -302,6 +318,20 @@ class _BookingCard extends StatelessWidget {
                       icon: const Icon(Icons.payment, size: 16),
                       label: const Text('Payment'),
                       onPressed: onPaymentTap,
+                    ),
+                  ],
+                ),
+              )
+            else if (isCompleted && onReviewTap != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.rate_review_outlined, size: 16),
+                      label: const Text('Review'),
+                      onPressed: onReviewTap,
                     ),
                   ],
                 ),
