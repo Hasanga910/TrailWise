@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Reports;
 using TrailWise.Domain.Entities;
+using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;
 using Xunit;
 
@@ -330,4 +331,316 @@ public class ReportsEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         var created = await response.Content.ReadFromJsonAsync<UserDto>(JsonOptions);
         return created!.Email;
     }
+
+    [Fact]
+    public async Task GetOccupancyReport_CalculatesOccupancyAndExcludesNonConfirmedBookings()
+    {
+        var client = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+
+        var (packageAId, tierAId) = await SeedPackageWithTierAsync($"Occ A {Guid.NewGuid():N}", maxGroupSize: 10);
+        var (packageBId, tierBId) = await SeedPackageWithTierAsync($"Occ B {Guid.NewGuid():N}", maxGroupSize: 20);
+
+        var travelerId = Guid.NewGuid();
+
+        // Package A:
+        // Booking 1: Confirmed, 4 travelers, 2026-06-05 to 2026-06-10 (overlaps)
+        await SeedBookingAsync(packageAId, tierAId, travelerId, 4, BookingStatus.Confirmed, new DateOnly(2026, 6, 5), new DateOnly(2026, 6, 10));
+        // Booking 2: Completed, 6 travelers, 2026-06-15 to 2026-06-20 (overlaps)
+        await SeedBookingAsync(packageAId, tierAId, travelerId, 6, BookingStatus.Completed, new DateOnly(2026, 6, 15), new DateOnly(2026, 6, 20));
+        // Booking 3: Cancelled, 8 travelers, 2026-06-12 to 2026-06-16 (overlaps but cancelled -> excluded)
+        await SeedBookingAsync(packageAId, tierAId, travelerId, 8, BookingStatus.Cancelled, new DateOnly(2026, 6, 12), new DateOnly(2026, 6, 16));
+        // Booking 4: PendingApproval, 5 travelers, 2026-06-18 to 2026-06-22 (overlaps but pending -> excluded)
+        await SeedBookingAsync(packageAId, tierAId, travelerId, 5, BookingStatus.PendingApproval, new DateOnly(2026, 6, 18), new DateOnly(2026, 6, 22));
+        // Booking 5: Confirmed, 3 travelers, 2026-07-05 to 2026-07-10 (non-overlapping -> excluded)
+        await SeedBookingAsync(packageAId, tierAId, travelerId, 3, BookingStatus.Confirmed, new DateOnly(2026, 7, 5), new DateOnly(2026, 7, 10));
+
+        // Package B:
+        // Booking 6: Confirmed, 10 travelers, 2026-06-01 to 2026-06-05
+        await SeedBookingAsync(packageBId, tierBId, travelerId, 10, BookingStatus.Confirmed, new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 5));
+
+        var response = await client.GetAsync("/api/reports/occupancy?from=2026-06-01&to=2026-06-30");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var report = await response.Content.ReadFromJsonAsync<List<PackageOccupancyDto>>(JsonOptions);
+        Assert.NotNull(report);
+
+        var occA = report.FirstOrDefault(p => p.TourPackageId == packageAId);
+        Assert.NotNull(occA);
+        Assert.Equal(2, occA.BookingCount);
+        Assert.Equal(10, occA.BookedTravelers);
+        Assert.Equal(5.0, occA.AverageGroupSize);
+        Assert.Equal(50.0, occA.OccupancyPercentage);
+
+        var occB = report.FirstOrDefault(p => p.TourPackageId == packageBId);
+        Assert.NotNull(occB);
+        Assert.Equal(1, occB.BookingCount);
+        Assert.Equal(10, occB.BookedTravelers);
+        Assert.Equal(10.0, occB.AverageGroupSize);
+        Assert.Equal(50.0, occB.OccupancyPercentage);
+    }
+
+    [Fact]
+    public async Task GetRevenueReport_CalculatesRevenueCorrectlyWithFiltersAndGroupings()
+    {
+        var client = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+
+        var (packageAId, tierAId) = await SeedPackageWithTierAsync($"Rev A {Guid.NewGuid():N}", maxGroupSize: 10);
+        var (packageBId, tierBId) = await SeedPackageWithTierAsync($"Rev B {Guid.NewGuid():N}", maxGroupSize: 20);
+
+        var travelerId = Guid.NewGuid();
+        var bookingAId = await SeedBookingAsync(packageAId, tierAId, travelerId, 2, BookingStatus.Confirmed, new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 5));
+        var bookingBId = await SeedBookingAsync(packageBId, tierBId, travelerId, 4, BookingStatus.Confirmed, new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 5));
+
+        // Booking A payments: DepositPaid (200), FullyPaid (400), Refunded (300)
+        await SeedPaymentAsync(bookingAId, 200m, PaymentStatus.DepositPaid, new DateTimeOffset(2026, 5, 10, 10, 0, 0, TimeSpan.Zero));
+        await SeedPaymentAsync(bookingAId, 400m, PaymentStatus.FullyPaid, new DateTimeOffset(2026, 5, 20, 10, 0, 0, TimeSpan.Zero));
+        await SeedPaymentAsync(bookingAId, 300m, PaymentStatus.Refunded, new DateTimeOffset(2026, 5, 25, 10, 0, 0, TimeSpan.Zero)); // Excluded
+
+        // Booking B payments: FullyPaid (500), Pending (150)
+        await SeedPaymentAsync(bookingBId, 500m, PaymentStatus.FullyPaid, new DateTimeOffset(2026, 6, 15, 10, 0, 0, TimeSpan.Zero));
+        await SeedPaymentAsync(bookingBId, 150m, PaymentStatus.Pending, null); // Excluded
+
+        var response = await client.GetAsync("/api/reports/revenue?from=2026-05-01&to=2026-06-30");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var report = await response.Content.ReadFromJsonAsync<RevenueReportResponse>(JsonOptions);
+        Assert.NotNull(report);
+
+        // 200 (DepositPaid) + 400 (FullyPaid) + 500 (FullyPaid) = 1100
+        Assert.Equal(1100m, report.TotalRevenue);
+
+        // Group by package
+        var revA = report.ByPackage.FirstOrDefault(p => p.TourPackageId == packageAId);
+        Assert.NotNull(revA);
+        Assert.Equal(600m, revA.Revenue);
+
+        var revB = report.ByPackage.FirstOrDefault(p => p.TourPackageId == packageBId);
+        Assert.NotNull(revB);
+        Assert.Equal(500m, revB.Revenue);
+
+        // Group by month
+        var may = report.ByMonth.FirstOrDefault(m => m.Year == 2026 && m.Month == 5);
+        Assert.NotNull(may);
+        Assert.Equal(600m, may.Revenue);
+        Assert.Equal("May 2026", may.Label);
+
+        var jun = report.ByMonth.FirstOrDefault(m => m.Year == 2026 && m.Month == 6);
+        Assert.NotNull(jun);
+        Assert.Equal(500m, jun.Revenue);
+        Assert.Equal("Jun 2026", jun.Label);
+    }
+
+    [Fact]
+    public async Task GetGuideUtilizationReport_CalculatesUtilizationAccurately()
+    {
+        var client = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+
+        var (packageId, tierId) = await SeedPackageWithTierAsync($"Guide Tour {Guid.NewGuid():N}", maxGroupSize: 10);
+        var bookingId = await SeedBookingAsync(packageId, tierId, Guid.NewGuid(), 2, BookingStatus.Confirmed, new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 5));
+
+        var guideAId = await SeedGuideAsync($"Guide A {Guid.NewGuid():N}");
+        var guideBId = await SeedGuideAsync($"Guide B {Guid.NewGuid():N}");
+
+        // Guide A: 2 assigned days, 3 available days
+        await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 1), isAvailable: true, assignedBookingId: bookingId);
+        await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 2), isAvailable: true, assignedBookingId: bookingId);
+        await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 3), isAvailable: true, assignedBookingId: null);
+        await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 4), isAvailable: true, assignedBookingId: null);
+        await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 5), isAvailable: true, assignedBookingId: null);
+
+        // Guide B: 0 recorded days in that range
+
+        var response = await client.GetAsync("/api/reports/guide-utilization?from=2026-08-01&to=2026-08-10");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var report = await response.Content.ReadFromJsonAsync<List<GuideUtilizationDto>>(JsonOptions);
+        Assert.NotNull(report);
+
+        var utilA = report.FirstOrDefault(g => g.GuideId == guideAId);
+        Assert.NotNull(utilA);
+        Assert.Equal(2, utilA.AssignedDays);
+        Assert.Equal(3, utilA.AvailableDays);
+        Assert.Equal(5, utilA.RecordedDays);
+        Assert.Equal(40.0, utilA.UtilizationPercentage);
+
+        var utilB = report.FirstOrDefault(g => g.GuideId == guideBId);
+        Assert.NotNull(utilB);
+        Assert.Equal(0, utilB.AssignedDays);
+        Assert.Equal(0, utilB.AvailableDays);
+        Assert.Equal(0, utilB.RecordedDays);
+        Assert.Equal(0.0, utilB.UtilizationPercentage);
+    }
+
+    [Fact]
+    public async Task OperationsReports_WhenAccessedByTraveler_ReturnsForbidden()
+    {
+        var client = await AuthenticatedTravelerAsync(_factory.CreateClient());
+
+        var occResponse = await client.GetAsync("/api/reports/occupancy?from=2026-01-01&to=2026-01-31");
+        Assert.Equal(HttpStatusCode.Forbidden, occResponse.StatusCode);
+
+        var revResponse = await client.GetAsync("/api/reports/revenue?from=2026-01-01&to=2026-01-31");
+        Assert.Equal(HttpStatusCode.Forbidden, revResponse.StatusCode);
+
+        var guideResponse = await client.GetAsync("/api/reports/guide-utilization?from=2026-01-01&to=2026-01-31");
+        Assert.Equal(HttpStatusCode.Forbidden, guideResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task OperationsReports_WhenUnauthenticated_ReturnsUnauthorized()
+    {
+        var client = _factory.CreateClient();
+
+        var occResponse = await client.GetAsync("/api/reports/occupancy?from=2026-01-01&to=2026-01-31");
+        Assert.Equal(HttpStatusCode.Unauthorized, occResponse.StatusCode);
+
+        var revResponse = await client.GetAsync("/api/reports/revenue?from=2026-01-01&to=2026-01-31");
+        Assert.Equal(HttpStatusCode.Unauthorized, revResponse.StatusCode);
+
+        var guideResponse = await client.GetAsync("/api/reports/guide-utilization?from=2026-01-01&to=2026-01-31");
+        Assert.Equal(HttpStatusCode.Unauthorized, guideResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task OperationsReports_Validation_ReturnsBadRequestOnInvalidDates()
+    {
+        var client = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+
+        // Occupancy: missing from
+        var missingFrom = await client.GetAsync("/api/reports/occupancy?to=2026-01-31");
+        Assert.Equal(HttpStatusCode.BadRequest, missingFrom.StatusCode);
+
+        // Occupancy: missing to
+        var missingTo = await client.GetAsync("/api/reports/occupancy?from=2026-01-01");
+        Assert.Equal(HttpStatusCode.BadRequest, missingTo.StatusCode);
+
+        // Occupancy: from > to
+        var invalidOccDates = await client.GetAsync("/api/reports/occupancy?from=2026-02-01&to=2026-01-01");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidOccDates.StatusCode);
+
+        // Revenue: from > to
+        var invalidRevDates = await client.GetAsync("/api/reports/revenue?from=2026-02-01&to=2026-01-01");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidRevDates.StatusCode);
+
+        // Guide Utilization: from > to
+        var invalidGuideDates = await client.GetAsync("/api/reports/guide-utilization?from=2026-02-01&to=2026-01-01");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidGuideDates.StatusCode);
+    }
+
+    private async Task<(Guid PackageId, Guid TierId)> SeedPackageWithTierAsync(string name, int maxGroupSize)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+
+        var package = new TourPackage
+        {
+            Name = name,
+            Theme = "Adventure",
+            DurationDays = 3,
+            BasePricePerPerson = 200m,
+            MaxGroupSize = maxGroupSize
+        };
+        var tier = new PackageTier
+        {
+            TourPackage = package,
+            ClassType = ClassType.Normal,
+            IncludesFood = false,
+            BasePricePerPerson = 200m,
+            RequiresAC = false
+        };
+        db.TourPackages.Add(package);
+        db.PackageTiers.Add(tier);
+        await db.SaveChangesAsync();
+
+        return (package.Id, tier.Id);
+    }
+
+    private async Task<Guid> SeedBookingAsync(
+        Guid packageId,
+        Guid tierId,
+        Guid travelerId,
+        int groupSize,
+        BookingStatus status,
+        DateOnly startDate,
+        DateOnly endDate)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+
+        var booking = new Booking
+        {
+            TourPackageId = packageId,
+            PackageTierId = tierId,
+            TravelerId = travelerId,
+            GroupSize = groupSize,
+            Status = status,
+            StartDate = startDate,
+            EndDate = endDate,
+            BudgetPerPerson = 500m
+        };
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+
+        return booking.Id;
+    }
+
+    private async Task<Guid> SeedPaymentAsync(
+        Guid bookingId,
+        decimal amount,
+        PaymentStatus status,
+        DateTimeOffset? paidAt)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+
+        var payment = new Payment
+        {
+            BookingId = bookingId,
+            Amount = amount,
+            Method = "Card",
+            Status = status,
+            PaidAt = paidAt
+        };
+        db.Payments.Add(payment);
+        await db.SaveChangesAsync();
+
+        return payment.Id;
+    }
+
+    private async Task<Guid> SeedGuideAsync(string name)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+
+        var guide = new Guide
+        {
+            Name = name,
+            ContactInfo = "guide@example.com"
+        };
+        db.Guides.Add(guide);
+        await db.SaveChangesAsync();
+
+        return guide.Id;
+    }
+
+    private async Task SeedGuideAvailabilityAsync(
+        Guid guideId,
+        DateOnly date,
+        bool isAvailable,
+        Guid? assignedBookingId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+
+        var availability = new GuideAvailability
+        {
+            GuideId = guideId,
+            Date = date,
+            IsAvailable = isAvailable,
+            AssignedBookingId = assignedBookingId
+        };
+        db.GuideAvailabilities.Add(availability);
+        await db.SaveChangesAsync();
+    }
 }
+

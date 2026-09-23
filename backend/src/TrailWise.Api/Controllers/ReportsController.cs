@@ -13,10 +13,14 @@ public class ReportsController : ControllerBase
 {
     private const int MaxPageSize = 100;
     private readonly IAuditReportService _auditReportService;
+    private readonly IOperationsReportService _operationsReportService;
 
-    public ReportsController(IAuditReportService auditReportService)
+    public ReportsController(
+        IAuditReportService auditReportService,
+        IOperationsReportService operationsReportService)
     {
         _auditReportService = auditReportService;
+        _operationsReportService = operationsReportService;
     }
 
     [HttpGet("audit")]
@@ -87,5 +91,101 @@ public class ReportsController : ControllerBase
 
         var fileName = $"trailwise-audit-report-{DateTimeOffset.UtcNow:yyyyMMdd}.csv";
         return File(csvBytes, "text/csv", fileName);
+    }
+
+    [HttpGet("occupancy")]
+    public async Task<ActionResult<IReadOnlyList<PackageOccupancyDto>>> GetOccupancyReport(
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        CancellationToken ct)
+    {
+        var errors = new List<FieldValidationError>();
+
+        if (!from.HasValue)
+        {
+            errors.Add(new FieldValidationError("from", "'from' date is required."));
+        }
+
+        if (!to.HasValue)
+        {
+            errors.Add(new FieldValidationError("to", "'to' date is required."));
+        }
+
+        if (from.HasValue && to.HasValue && from.Value > to.Value)
+        {
+            errors.Add(new FieldValidationError("to", "'to' date must be on or after 'from' date."));
+        }
+
+        if (errors.Count > 0)
+        {
+            return BadRequest(new { errors });
+        }
+
+        var results = await _operationsReportService.GetOccupancyReportAsync(from!.Value, to!.Value, ct);
+
+        var dtos = results.Select(r => new PackageOccupancyDto(
+            r.TourPackageId,
+            r.PackageName,
+            r.MaxGroupSize,
+            r.BookingCount,
+            r.BookedTravelers,
+            r.AverageGroupSize,
+            r.OccupancyPercentage
+        )).ToList();
+
+        return Ok(dtos);
+    }
+
+    [HttpGet("revenue")]
+    public async Task<ActionResult<RevenueReportResponse>> GetRevenueReport(
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        CancellationToken ct)
+    {
+        if (from.HasValue && to.HasValue && from.Value > to.Value)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("to", "'to' date must be on or after 'from' date.") }
+            });
+        }
+
+        var result = await _operationsReportService.GetRevenueReportAsync(from, to, ct);
+
+        var response = new RevenueReportResponse(
+            result.TotalRevenue,
+            result.ByPackage.Select(p => new PackageRevenueDto(p.TourPackageId, p.PackageName, p.Revenue)).ToList(),
+            result.ByMonth.Select(m => new MonthlyRevenueDto(m.Year, m.Month, m.Label, m.Revenue)).ToList()
+        );
+
+        return Ok(response);
+    }
+
+    [HttpGet("guide-utilization")]
+    public async Task<ActionResult<IReadOnlyList<GuideUtilizationDto>>> GetGuideUtilizationReport(
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        CancellationToken ct)
+    {
+        if (from.HasValue && to.HasValue && from.Value > to.Value)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("to", "'to' date must be on or after 'from' date.") }
+            });
+        }
+
+        var results = await _operationsReportService.GetGuideUtilizationReportAsync(from, to, ct);
+
+        var dtos = results.Select(g => new GuideUtilizationDto(
+            g.GuideId,
+            g.GuideName,
+            g.AssignedDays,
+            g.AvailableDays,
+            g.RecordedDays,
+            g.UtilizationPercentage
+        )).ToList();
+
+        return Ok(dtos);
     }
 }
