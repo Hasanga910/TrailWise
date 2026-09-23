@@ -5,6 +5,7 @@ import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../bookings/booking_status.dart';
 import '../models/assigned_tour.dart';
+import 'tour_detail_screen.dart';
 
 class AssignedToursScreen extends StatefulWidget {
   const AssignedToursScreen({super.key, this.apiClient});
@@ -50,6 +51,28 @@ class _AssignedToursScreenState extends State<AssignedToursScreen> {
       setState(() {
         _error = 'Could not reach the server. Please try again.';
         _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openTourDetail(AssignedTour tour) async {
+    final updated = await Navigator.of(context).push<AssignedTour>(
+      MaterialPageRoute(
+        builder: (_) => TourDetailScreen(
+          tour: tour,
+          apiClient: _apiClient,
+        ),
+      ),
+    );
+
+    if (updated != null && mounted) {
+      setState(() {
+        if (_tours != null) {
+          final index = _tours!.indexWhere((t) => t.bookingId == updated.bookingId);
+          if (index != -1) {
+            _tours![index] = updated;
+          }
+        }
       });
     }
   }
@@ -109,7 +132,10 @@ class _AssignedToursScreenState extends State<AssignedToursScreen> {
         itemCount: tours.length,
         itemBuilder: (context, index) {
           final tour = tours[index];
-          return _AssignedTourCard(tour: tour);
+          return _AssignedTourCard(
+            tour: tour,
+            onTap: () => _openTourDetail(tour),
+          );
         },
       ),
     );
@@ -117,9 +143,13 @@ class _AssignedToursScreenState extends State<AssignedToursScreen> {
 }
 
 class _AssignedTourCard extends StatelessWidget {
-  const _AssignedTourCard({required this.tour});
+  const _AssignedTourCard({
+    required this.tour,
+    this.onTap,
+  });
 
   final AssignedTour tour;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -129,11 +159,15 @@ class _AssignedTourCard extends StatelessWidget {
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
             // Top Row: Tour Package Name and Status Chip
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,9 +289,89 @@ class _AssignedTourCard extends StatelessWidget {
                 ),
               ),
             ],
+
+            // Attendance and Completion Badges
+            if (tour.attended || tour.completed) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  if (tour.attended) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_outline, size: 14, color: Colors.green),
+                          SizedBox(width: 4),
+                          Text(
+                            'Attended',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  if (tour.completed) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.done_all, size: 14, color: Colors.blue),
+                          SizedBox(width: 4),
+                          Text(
+                            'Completed',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+
+            // Guide Notes preview if any
+            if (tour.guideNotes != null &&
+                tour.guideNotes!.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.comment_outlined, size: 14, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Notes: ${tour.guideNotes}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 }
+

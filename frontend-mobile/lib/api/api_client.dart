@@ -50,6 +50,15 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<dynamic> patch(String path, Map<String, dynamic> body) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
+
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
     final response = await http.get(_buildUri(path, query), headers: _headers);
     return _decode(response);
@@ -65,6 +74,20 @@ class ApiClient {
     }
     return [];
   }
+
+  Future<void> updateGuideTour({
+    required String bookingId,
+    required bool attended,
+    required bool completed,
+    String? notes,
+  }) async {
+    await patch('/api/bookings/$bookingId/guide-notes', {
+      'attended': attended,
+      'completed': completed,
+      'notes': notes,
+    });
+  }
+
 
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
     final uri = Uri.parse('$baseUrl$path');

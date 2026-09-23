@@ -6,6 +6,7 @@ import 'package:trailwise_mobile/api/api_client.dart';
 import 'package:trailwise_mobile/auth/auth_provider.dart';
 import 'package:trailwise_mobile/auth/current_user.dart';
 import 'package:trailwise_mobile/guides/assigned_tours_screen.dart';
+import 'package:trailwise_mobile/guides/tour_detail_screen.dart';
 import 'package:trailwise_mobile/models/assigned_tour.dart';
 import 'package:trailwise_mobile/navigation/main_shell.dart';
 
@@ -60,6 +61,9 @@ Map<String, dynamic> _sampleTourJson({
   String status = 'Confirmed',
   List<String> locations = const ['Kandy', 'Sigiriya'],
   String? specialRequests = 'Vegetarian meals',
+  bool attended = false,
+  bool completed = false,
+  String? guideNotes,
 }) =>
     {
       'bookingId': bookingId,
@@ -74,12 +78,19 @@ Map<String, dynamic> _sampleTourJson({
       'specialRequests': specialRequests,
       'guideId': 'guide-1',
       'guideName': 'Guide Alpha',
+      'attended': attended,
+      'completed': completed,
+      'guideNotes': guideNotes,
     };
 
 void main() {
   group('AssignedTour Model', () {
     test('fromJson parses backend response correctly', () {
-      final json = _sampleTourJson();
+      final json = _sampleTourJson(
+        attended: true,
+        completed: false,
+        guideNotes: 'Group arrived safe and sound.',
+      );
       final tour = AssignedTour.fromJson(json);
 
       expect(tour.bookingId, 'booking-1');
@@ -94,6 +105,9 @@ void main() {
       expect(tour.specialRequests, 'Vegetarian meals');
       expect(tour.guideId, 'guide-1');
       expect(tour.guideName, 'Guide Alpha');
+      expect(tour.attended, isTrue);
+      expect(tour.completed, isFalse);
+      expect(tour.guideNotes, 'Group arrived safe and sound.');
     });
 
     test('fromJson handles null specialRequests and empty locations', () {
@@ -102,6 +116,9 @@ void main() {
 
       expect(tour.specialRequests, isNull);
       expect(tour.locations, isEmpty);
+      expect(tour.attended, isFalse);
+      expect(tour.completed, isFalse);
+      expect(tour.guideNotes, isNull);
     });
   });
 
@@ -218,5 +235,69 @@ void main() {
       expect(find.text('My Bookings'), findsOneWidget);
       expect(find.text('Assigned Tours'), findsNothing);
     });
+
+    testWidgets('9. Tapping assigned tour card opens TourDetailScreen', (tester) async {
+      final fake = FakeApiClient(getResponses: {
+        '/api/guides/me/assigned-tours': [
+          _sampleTourJson(tourPackageName: 'Cultural Heritage Tour'),
+        ],
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        home: AssignedToursScreen(apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      // Tap card
+      await tester.tap(find.text('Cultural Heritage Tour'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TourDetailScreen), findsOneWidget);
+      expect(find.text('Tour Details'), findsOneWidget);
+      expect(find.text('Save Updates'), findsOneWidget);
+      expect(find.text('Attended'), findsOneWidget);
+      expect(find.text('Completed'), findsOneWidget);
+    });
+
+    testWidgets('10. Returning after update refreshes or updates the assigned tours list', (tester) async {
+      final fake = FakeApiClient(getResponses: {
+        '/api/guides/me/assigned-tours': [
+          _sampleTourJson(
+            bookingId: 'booking-1',
+            tourPackageName: 'Cultural Heritage Tour',
+            attended: false,
+            completed: false,
+          ),
+        ],
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        home: AssignedToursScreen(apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      // Initially no Attended badge on AssignedToursScreen card
+      expect(find.text('Attended'), findsNothing);
+
+      // Tap card to open TourDetailScreen
+      await tester.tap(find.text('Cultural Heritage Tour'));
+      await tester.pumpAndSettle();
+
+      // On TourDetailScreen: toggle Attended switch and tap Save Updates
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Attended'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Save Updates'));
+      await tester.pumpAndSettle();
+
+      // Return back to AssignedToursScreen via back button
+      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.pumpAndSettle();
+
+      // Verify we are back on AssignedToursScreen and the card now displays the Attended badge!
+      expect(find.byType(TourDetailScreen), findsNothing);
+      expect(find.text('Cultural Heritage Tour'), findsOneWidget);
+      expect(find.text('Attended'), findsOneWidget);
+    });
   });
 }
+
