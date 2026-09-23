@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../auth/auth_provider.dart';
+import '../guides/assigned_tours_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -36,6 +37,18 @@ class HomeScreen extends StatelessWidget {
                   Text(user.email),
                   const SizedBox(height: 4),
                   Chip(label: Text(user.role)),
+                  if (user.role == 'TourGuide') ...[
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.assignment),
+                      label: const Text('My Assigned Tours'),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const AssignedToursScreen(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
       ),

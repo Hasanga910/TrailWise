@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../models/assigned_tour.dart';
+
 class FieldError {
   final String field;
   final String message;
@@ -51,6 +53,17 @@ class ApiClient {
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
     final response = await http.get(_buildUri(path, query), headers: _headers);
     return _decode(response);
+  }
+
+  Future<List<AssignedTour>> getAssignedTours() async {
+    final response = await get('/api/guides/me/assigned-tours');
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(AssignedTour.fromJson)
+          .toList();
+    }
+    return [];
   }
 
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
