@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/AuthContext';
 
 const CARDS = [
   { to: '/ops/packages', title: 'Packages', description: 'Create, edit, and remove tour packages and tiers.' },
+  { to: '/guides/availability', title: 'Guide Availability', description: 'Inspect tour guide availability schedules.' },
   { to: '/ops/profile', title: 'Profile', description: 'Update your own name, email, and password.' },
 ];
 
