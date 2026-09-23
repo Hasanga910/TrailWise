@@ -56,6 +56,41 @@ public class GuidesController : ControllerBase
         return Ok(guides.Select(GuideDto.FromEntity).ToList());
     }
 
+    [HttpGet("me/assigned-tours")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<ActionResult<IReadOnlyList<AssignedTourDto>>> GetMyAssignedTours(CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides
+            .AsNoTracking()
+            .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+        if (guide is null)
+        {
+            return Problem(statusCode: StatusCodes.Status404NotFound, title: "Guide profile not found for current user.");
+        }
+
+        var bookings = await _db.Bookings
+            .AsNoTracking()
+            .Where(b => b.GuideAvailabilities.Any(g => g.GuideId == guide.Id))
+            .Include(b => b.TourPackage)
+                .ThenInclude(p => p.Locations)
+            .OrderBy(b => b.StartDate)
+            .ThenBy(b => b.Id)
+            .ToListAsync(ct);
+
+        var result = bookings
+            .Select(b => AssignedTourDto.FromEntity(b, guide))
+            .ToList();
+
+        return Ok(result);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<GuideDto>> GetById(Guid id, CancellationToken ct)
     {
