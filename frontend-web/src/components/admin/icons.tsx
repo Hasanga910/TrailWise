@@ -195,3 +195,15 @@ export function CheckCircleIcon({ className = base }: IconProps) {
     </svg>
   );
 }
+
+export function ReportsIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path d="M4 19.5h16" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 16.5v-4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 16.5v-8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17 16.5v-12" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+

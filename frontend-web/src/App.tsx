@@ -17,6 +17,7 @@ import { UserManagementIndexPage } from './pages/admin/UserManagementIndexPage';
 import { OpsDashboardPage } from './pages/ops/OpsDashboardPage';
 import { OpsPackagesPage } from './pages/ops/OpsPackagesPage';
 import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
+import { OpsReportsPage } from './pages/ops/OpsReportsPage';
 import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
 import { MyBookingsPage } from './pages/traveler/MyBookingsPage';
 import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
@@ -64,6 +65,7 @@ function App() {
       >
         <Route index element={<OpsDashboardPage />} />
         <Route path="packages" element={<OpsPackagesPage />} />
+        <Route path="reports" element={<OpsReportsPage />} />
         <Route path="profile" element={<OpsProfileSettingsPage />} />
       </Route>
 

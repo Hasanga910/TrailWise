@@ -7,6 +7,7 @@ import '../models/booking.dart';
 import '../models/paged_result.dart';
 import 'booking_status.dart';
 import 'itinerary_screen.dart';
+import 'payment_status_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key, this.apiClient});
@@ -111,6 +112,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
   }
 
+  void _openPayment(Booking booking) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PaymentStatusScreen(
+          booking: booking,
+          apiClient: _apiClient,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -197,6 +209,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             itemBuilder: (_, i) => _BookingCard(
               booking: result.items[i],
               onTap: () => _openBooking(result.items[i]),
+              onPaymentTap: () => _openPayment(result.items[i]),
             ),
           ),
         ),
@@ -233,37 +246,65 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 }
 
 class _BookingCard extends StatelessWidget {
-  const _BookingCard({required this.booking, required this.onTap});
+  const _BookingCard({
+    required this.booking,
+    required this.onTap,
+    this.onPaymentTap,
+  });
 
   final Booking booking;
   final VoidCallback onTap;
+  final VoidCallback? onPaymentTap;
 
   @override
   Widget build(BuildContext context) {
     final color = BookingStatus.color(booking.status);
+    final isConfirmed = booking.status == BookingStatus.confirmed;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        onTap: onTap,
-        title: Text('${booking.tourPackageName} — ${booking.packageTier.classType}'),
-        subtitle: Text(
-          '${booking.startDate} to ${booking.endDate} · ${booking.groupSize} '
-          '${booking.groupSize == 1 ? 'traveler' : 'travelers'} · '
-          '\$${booking.budgetPerPerson.toStringAsFixed(2)}/person',
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
           children: [
-            Chip(
-              label: Text(booking.status, style: TextStyle(color: color, fontSize: 12)),
-              backgroundColor: color.withValues(alpha: 0.15),
-              visualDensity: VisualDensity.compact,
+            ListTile(
+              onTap: onTap,
+              title: Text('${booking.tourPackageName} — ${booking.packageTier.classType}'),
+              subtitle: Text(
+                '${booking.startDate} to ${booking.endDate} · ${booking.groupSize} '
+                '${booking.groupSize == 1 ? 'traveler' : 'travelers'} · '
+                '\$${booking.budgetPerPerson.toStringAsFixed(2)}/person',
+              ),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Chip(
+                    label: Text(booking.status, style: TextStyle(color: color, fontSize: 12)),
+                    backgroundColor: color.withValues(alpha: 0.15),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  if (booking.isLargeGroup)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text('Large group', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ),
+                ],
+              ),
             ),
-            if (booking.isLargeGroup)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Text('Large group', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            if (isConfirmed && onPaymentTap != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.payment, size: 16),
+                      label: const Text('Payment'),
+                      onPressed: onPaymentTap,
+                    ),
+                  ],
+                ),
               ),
           ],
         ),
