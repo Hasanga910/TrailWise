@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
 using TrailWise.Infrastructure.Services;
@@ -31,10 +32,10 @@ public static class DependencyInjection
         services.AddScoped<ILocationSearchService, NominatimLocationSearchService>();
 
         services.AddScoped<IGuideMatchingAgent, MockGuideMatchingAgent>();
-        services.AddScoped<IFleetCapacityAgent, MockFleetCapacityAgent>();
+        services.AddScoped<IFleetCapacityAgent, FleetCapacityAgent>();
+        services.AddScoped<IFleetReservationService, FleetReservationService>();
         services.AddScoped<IPricingValidationAgent, MockPricingValidationAgent>();
         services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();
-
         return services;
     }
 }

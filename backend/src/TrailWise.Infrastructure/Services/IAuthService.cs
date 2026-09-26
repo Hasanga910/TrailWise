@@ -11,6 +11,7 @@ public interface IAuthService
     Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<User>> GetStaffAsync(CancellationToken ct = default);
     Task<AuthResult> DeleteUserAsync(Guid id, Guid requestedById, CancellationToken ct = default);
+    Task<AuthResult> DeleteSelfAsync(Guid userId, CancellationToken ct = default);
     Task<AuthResult> UpdateProfileAsync(Guid userId, string name, string email, string contactNumber, CancellationToken ct = default);
     Task<AuthResult> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default);
 }

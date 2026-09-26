@@ -1,4 +1,4 @@
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 /// <summary>
 /// Deterministic business-rule gate for a booking proposal. Runs in plain code, never

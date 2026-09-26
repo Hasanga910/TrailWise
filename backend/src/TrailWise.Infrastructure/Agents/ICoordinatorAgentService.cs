@@ -1,4 +1,4 @@
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 public interface ICoordinatorAgentService
 {

@@ -1,4 +1,4 @@
-namespace TrailWise.Infrastructure.Services;
+namespace TrailWise.Infrastructure.Agents;
 
 public record VehicleMatchResult(
     Guid VehicleId,
@@ -11,3 +11,4 @@ public interface IFleetCapacityAgent
 {
     Task<VehicleMatchResult> MatchAsync(Guid bookingId, CancellationToken ct = default);
 }
+//day coment 
