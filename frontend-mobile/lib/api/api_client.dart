@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../models/assigned_tour.dart';
@@ -25,10 +27,16 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:5080',
-  );
+  static final String baseUrl = () {
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
+    if (!kIsWeb && Platform.isAndroid) {
+      return 'http://10.0.2.2:5080';
+    }
+    return 'http://localhost:5080';
+  }();
 
   String? _token;
 

@@ -20,9 +20,6 @@ public record AssignedTourDto(
     bool Completed = false,
     string? GuideNotes = null)
 {
-    public BookingStatus BookingStatus => Status;
-    public Guid Id => BookingId;
-
     public static AssignedTourDto FromEntity(Booking booking, Guide guide) => new(
         booking.Id,
         booking.StartDate,

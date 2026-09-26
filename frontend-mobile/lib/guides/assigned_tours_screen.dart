@@ -371,7 +371,8 @@ class _AssignedTourCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 

@@ -21,22 +21,21 @@ class _CompleterFakeApiClient extends ApiClient {
 }
 
 class _MockAuthProvider extends ChangeNotifier implements AuthProvider {
-  _MockAuthProvider(this._user, this._apiClient);
+  _MockAuthProvider(this.user, this._apiClient);
 
-  final CurrentUser? _user;
   final ApiClient _apiClient;
 
   @override
-  CurrentUser? get user => _user;
+  CurrentUser? user;
 
   @override
-  AuthStatus get status => AuthStatus.authenticated;
+  AuthStatus status = AuthStatus.authenticated;
 
   @override
   ApiClient get apiClient => _apiClient;
 
   @override
-  String? get errorMessage => null;
+  String? errorMessage;
 
   @override
   Future<bool> login(String email, String password) async => true;

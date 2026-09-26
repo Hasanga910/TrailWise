@@ -31,7 +31,7 @@ public static class DependencyInjection
         });
         services.AddScoped<ILocationSearchService, NominatimLocationSearchService>();
 
-        services.AddScoped<IGuideMatchingAgent, MockGuideMatchingAgent>();
+        services.AddScoped<IGuideMatchingAgent, GuideMatchingAgent>();
         services.AddScoped<IFleetCapacityAgent, FleetCapacityAgent>();
         services.AddScoped<IFleetReservationService, FleetReservationService>();
         services.AddScoped<IGuideAvailabilityService, GuideAvailabilityService>();
