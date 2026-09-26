@@ -20,6 +20,9 @@ import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
 import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
 import { MyBookingsPage } from './pages/traveler/MyBookingsPage';
 import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
+import { FleetLayout } from './components/fleet/FleetLayout';
+import { FleetManagementPage } from './pages/admin/FleetManagementPage';
+import { FleetProfileSettingsPage } from './pages/fleet/FleetProfileSettingsPage';
 import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
 import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
 
@@ -68,6 +71,18 @@ function App() {
       </Route>
 
       <Route
+        path="/fleet"
+        element={
+          <RequireRole allowedRoles={['FleetCoordinator']}>
+            <FleetLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<FleetManagementPage />} />
+        <Route path="profile" element={<FleetProfileSettingsPage />} />
+      </Route>
+
+      <Route
         path="/admin"
         element={
           <RequireRole allowedRoles={['Admin']}>
@@ -78,6 +93,7 @@ function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="packages" element={<PackagesOverviewPage />} />
         <Route path="packages/manage" element={<PackageManagementPage />} />
+        <Route path="fleet" element={<FleetManagementPage />} />
         <Route path="staff" element={<UserManagementIndexPage />} />
         <Route path="staff/tour-guides" element={<StaffRolePage role="TourGuide" roleLabel="Tour Guide" />} />
         <Route

@@ -201,4 +201,22 @@ public class VehiclesController : ControllerBase
 
         return Ok(VehicleAssignmentDto.FromEntity(result.Assignment!));
     }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = FleetCoordinatorOrAdmin)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.Id == id, ct);
+        if (vehicle is null)
+        {
+            return NotFound();
+        }
+
+        _db.Vehicles.Remove(vehicle);
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Vehicle {VehicleId} deleted.", id);
+
+        return NoContent();
+    }
 }

@@ -11,6 +11,7 @@ import {
   ProfileIcon,
   SparkleIcon,
   TagIcon,
+  TruckIcon,
   UsersIcon,
 } from '../../components/admin/icons';
 
@@ -20,6 +21,12 @@ const CARDS = [
     title: 'Packages',
     description: 'View all tour packages, or jump into management to create, edit, and remove them.',
     icon: PackagesIcon,
+  },
+  {
+    to: '/admin/fleet',
+    title: 'Fleet & Transport',
+    description: 'Manage vehicles, check live availability, and assign fleet to bookings.',
+    icon: TruckIcon,
   },
   {
     to: '/admin/staff',

@@ -105,6 +105,29 @@ public class AuthService : IAuthService
         return AuthResult.Ok();
     }
 
+    public async Task<AuthResult> DeleteSelfAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+        {
+            return AuthResult.Failure("User not found.");
+        }
+
+        if (user.Role == UserRole.Admin)
+        {
+            var adminCount = await _db.Users.CountAsync(u => u.Role == UserRole.Admin, ct);
+            if (adminCount <= 1)
+            {
+                return AuthResult.Failure("Cannot delete the only administrator account.");
+            }
+        }
+
+        _db.Users.Remove(user);
+        await _db.SaveChangesAsync(ct);
+
+        return AuthResult.Ok();
+    }
+
     public async Task<AuthResult> UpdateProfileAsync(Guid userId, string name, string email, string contactNumber, CancellationToken ct = default)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
