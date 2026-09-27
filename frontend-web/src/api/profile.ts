@@ -20,3 +20,7 @@ export async function updateProfile(input: UpdateProfileInput): Promise<CurrentU
 export async function changePassword(input: ChangePasswordInput): Promise<void> {
   await apiClient.put('/api/auth/me/password', input);
 }
+
+export async function deleteSelfProfile(): Promise<void> {
+  await apiClient.delete('/api/auth/me');
+}

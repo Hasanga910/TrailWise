@@ -49,6 +49,16 @@ export interface GetMyBookingsParams {
   pageSize?: number;
 }
 
+export interface BookingSummaryDto {
+  id: string;
+  travelerName: string;
+  packageName: string;
+  status: BookingStatus;
+  createdAt: string;
+  startDate: string;
+  groupSize: number;
+}
+
 export async function createBooking(input: CreateBookingInput): Promise<BookingDto> {
   const response = await apiClient.post<BookingDto>('/api/bookings', input);
   return response.data;
@@ -61,5 +71,10 @@ export async function getMyBookings(params: GetMyBookingsParams = {}): Promise<P
 
 export async function getBookingById(id: string): Promise<BookingDto> {
   const response = await apiClient.get<BookingDto>(`/api/bookings/${id}`);
+  return response.data;
+}
+
+export async function getAllBookings(): Promise<BookingSummaryDto[]> {
+  const response = await apiClient.get<BookingSummaryDto[]>('/api/bookings');
   return response.data;
 }

@@ -95,6 +95,9 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("SummaryText")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -849,7 +852,7 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.HasOne("TrailWise.Domain.Entities.Vehicle", "Vehicle")
                         .WithMany("Assignments")
                         .HasForeignKey("VehicleId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Booking");
