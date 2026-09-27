@@ -24,6 +24,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   static const _pageSize = 10;
 
+  static const _cancellableStatuses = [
+    BookingStatus.requested,
+    BookingStatus.planProposed,
+    BookingStatus.pendingApproval,
+    BookingStatus.needsManualReview,
+    BookingStatus.confirmed,
+  ];
+
   String? _statusFilter;
   DateTime? _from;
   DateTime? _to;
@@ -135,6 +143,64 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     );
   }
 
+  bool _isUpcoming(Booking booking) {
+    final today = _formatDate(DateTime.now());
+    return booking.startDate.compareTo(today) >= 0;
+  }
+
+  bool _isCancellable(Booking booking) =>
+      _cancellableStatuses.contains(booking.status) && _isUpcoming(booking);
+
+  Future<void> _cancelBooking(Booking booking) async {
+    final reasonController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel booking'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Are you sure you want to cancel this booking?'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(labelText: 'Reason (optional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Back'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Confirm cancellation'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await _apiClient.patch('/api/bookings/${booking.id}/cancel', {
+        'reason': reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+      });
+      _load();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not reach the server. Please try again.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -223,6 +289,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               onTap: () => _openBooking(result.items[i]),
               onPaymentTap: () => _openPayment(result.items[i]),
               onReviewTap: () => _openReview(result.items[i]),
+              onCancelTap:
+                  _isCancellable(result.items[i]) ? () => _cancelBooking(result.items[i]) : null,
             ),
           ),
         ),
@@ -264,12 +332,14 @@ class _BookingCard extends StatelessWidget {
     required this.onTap,
     this.onPaymentTap,
     this.onReviewTap,
+    this.onCancelTap,
   });
 
   final Booking booking;
   final VoidCallback onTap;
   final VoidCallback? onPaymentTap;
   final VoidCallback? onReviewTap;
+  final VoidCallback? onCancelTap;
 
   @override
   Widget build(BuildContext context) {
@@ -308,31 +378,33 @@ class _BookingCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (isConfirmed && onPaymentTap != null)
+            if ((isConfirmed && onPaymentTap != null) ||
+                (isCompleted && onReviewTap != null) ||
+                onCancelTap != null)
               Padding(
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
                   children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.payment, size: 16),
-                      label: const Text('Payment'),
-                      onPressed: onPaymentTap,
-                    ),
-                  ],
-                ),
-              )
-            else if (isCompleted && onReviewTap != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.rate_review_outlined, size: 16),
-                      label: const Text('Review'),
-                      onPressed: onReviewTap,
-                    ),
+                    if (isConfirmed && onPaymentTap != null)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.payment, size: 16),
+                        label: const Text('Payment'),
+                        onPressed: onPaymentTap,
+                      )
+                    else if (isCompleted && onReviewTap != null)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.rate_review_outlined, size: 16),
+                        label: const Text('Review'),
+                        onPressed: onReviewTap,
+                      ),
+                    if (onCancelTap != null)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.cancel_outlined, size: 16),
+                        label: const Text('Cancel Booking'),
+                        onPressed: onCancelTap,
+                      ),
                   ],
                 ),
               ),

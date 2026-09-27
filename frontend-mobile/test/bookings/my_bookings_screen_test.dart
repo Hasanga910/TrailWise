@@ -58,4 +58,65 @@ void main() {
 
     expect(find.text('No bookings match your filters.'), findsOneWidget);
   });
+
+  testWidgets('shows a Cancel Booking button for an upcoming, non-terminal booking', (tester) async {
+    final fake = FakeApiClient(getResponses: {
+      '/api/bookings/mine': {
+        'items': [_bookingJson(status: 'Confirmed')],
+        'totalCount': 1,
+        'page': 1,
+        'pageSize': 10,
+      },
+    });
+
+    await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cancel Booking'), findsOneWidget);
+  });
+
+  testWidgets('does not show a Cancel Booking button for a completed booking', (tester) async {
+    final fake = FakeApiClient(getResponses: {
+      '/api/bookings/mine': {
+        'items': [_bookingJson(status: 'Completed')],
+        'totalCount': 1,
+        'page': 1,
+        'pageSize': 10,
+      },
+    });
+
+    await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cancel Booking'), findsNothing);
+  });
+
+  testWidgets('cancels an upcoming booking through the confirm dialog', (tester) async {
+    final fake = FakeApiClient(
+      getResponses: {
+        '/api/bookings/mine': {
+          'items': [_bookingJson(status: 'Confirmed')],
+          'totalCount': 1,
+          'page': 1,
+          'pageSize': 10,
+        },
+      },
+      patchResponses: {
+        '/api/bookings/booking-1/cancel': _bookingJson(status: 'Cancelled'),
+      },
+    );
+
+    await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancel Booking'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Are you sure you want to cancel this booking?'), findsOneWidget);
+
+    await tester.tap(find.text('Confirm cancellation'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsNothing);
+  });
 }

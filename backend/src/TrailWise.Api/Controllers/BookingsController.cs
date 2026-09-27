@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,7 @@ using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
 
@@ -25,12 +27,18 @@ public class BookingsController : ControllerBase
 
     private readonly TrailWiseDbContext _db;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IAuditLogService _auditLogService;
     private readonly ILogger<BookingsController> _logger;
 
-    public BookingsController(TrailWiseDbContext db, IServiceScopeFactory scopeFactory, ILogger<BookingsController> logger)
+    public BookingsController(
+        TrailWiseDbContext db,
+        IServiceScopeFactory scopeFactory,
+        IAuditLogService auditLogService,
+        ILogger<BookingsController> logger)
     {
         _db = db;
         _scopeFactory = scopeFactory;
+        _auditLogService = auditLogService;
         _logger = logger;
     }
 
@@ -230,6 +238,229 @@ public class BookingsController : ControllerBase
         if (!isOwner && !isManager)
         {
             return Forbid();
+        }
+
+        return Ok(BookingDto.FromEntity(booking));
+    }
+
+    [HttpPatch("{id:guid}/decision")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<BookingDto>> Decide(Guid id, BookingDecisionRequest request, CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (!BookingStatusTransitions.CanDecide(booking.Status))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: $"This booking is already {booking.Status} and cannot be decided again.");
+        }
+
+        var performedBy = GetUserId();
+        if (performedBy is null)
+        {
+            return Unauthorized();
+        }
+
+        booking.Status = request.Decision == BookingDecision.Approve
+            ? BookingStatus.Confirmed
+            : BookingStatus.Cancelled;
+
+        var run = await _db.AgentWorkflowRuns
+            .Where(r => r.BookingId == booking.Id)
+            .OrderByDescending(r => r.StartedAt)
+            .FirstOrDefaultAsync(ct);
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            if (run is not null)
+            {
+                // "Completed" here means the workflow run itself is finished, not that the
+                // booking was approved — both an approve and a reject conclude the run, they
+                // just leave the booking in different final statuses.
+                run.Status = "Completed";
+                run.CompletedAt = DateTimeOffset.UtcNow;
+
+                _db.AgentStepLogs.Add(new AgentStepLog
+                {
+                    WorkflowRunId = run.Id,
+                    AgentName = "manager_decision",
+                    InputJson = JsonSerializer.Serialize(
+                        new { decision = request.Decision.ToString(), request.Notes },
+                        AgentJsonOptions.Default),
+                    OutputJson = JsonSerializer.Serialize(
+                        new { newStatus = booking.Status.ToString() },
+                        AgentJsonOptions.Default),
+                    DurationMs = 0,
+                });
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: request.Decision == BookingDecision.Approve ? "BookingApproved" : "BookingRejected",
+                performedBy: performedBy.Value,
+                details: new { decision = request.Decision.ToString(), request.Notes },
+                ct: ct);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        return Ok(BookingDto.FromEntity(booking));
+    }
+
+    [HttpPatch("{id:guid}/complete")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<BookingDto>> Complete(Guid id, CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (!BookingStatusTransitions.CanComplete(booking.Status))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: $"This booking is {booking.Status} and cannot be marked completed.");
+        }
+
+        var performedBy = GetUserId();
+        if (performedBy is null)
+        {
+            return Unauthorized();
+        }
+
+        booking.Status = BookingStatus.Completed;
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: "BookingCompleted",
+                performedBy: performedBy.Value,
+                ct: ct);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        return Ok(BookingDto.FromEntity(booking));
+    }
+
+    [HttpPatch("{id:guid}/cancel")]
+    public async Task<ActionResult<BookingDto>> Cancel(Guid id, CancelBookingRequest request, CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var callerId = GetUserId();
+        var isOwner = callerId.HasValue && booking.TravelerId == callerId.Value;
+        var isManager = User.IsInRole("Admin") || User.IsInRole("OperationsManager");
+
+        if (!isOwner && !isManager)
+        {
+            return Forbid();
+        }
+
+        if (!BookingStatusTransitions.CanCancel(booking.Status))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: $"This booking is {booking.Status} and cannot be cancelled.");
+        }
+
+        if (!isManager && booking.StartDate <= DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "This booking has already started or finished and cannot be self-cancelled.");
+        }
+
+        booking.Status = BookingStatus.Cancelled;
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: isManager ? "BookingCancelledByStaff" : "BookingCancelledByTraveler",
+                performedBy: callerId,
+                details: new { request.Reason },
+                ct: ct);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
         }
 
         return Ok(BookingDto.FromEntity(booking));

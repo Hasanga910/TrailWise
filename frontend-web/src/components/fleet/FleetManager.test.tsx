@@ -9,6 +9,7 @@ const mockVehicles: vehiclesApi.VehicleDto[] = [
   {
     id: '11111111-1111-1111-1111-111111111111',
     type: 'Van',
+    registrationNumber: 'WP-CAB-0001',
     capacity: 7,
     hasAC: true,
     seatConfiguration: '2-2-3',
@@ -19,6 +20,7 @@ const mockVehicles: vehiclesApi.VehicleDto[] = [
   {
     id: '22222222-2222-2222-2222-222222222222',
     type: 'SUV',
+    registrationNumber: 'WP-CAC-0002',
     capacity: 4,
     hasAC: false,
     seatConfiguration: '2-2',
@@ -64,6 +66,35 @@ describe('FleetManager Component', () => {
     expect(screen.getByText('2')).toBeInTheDocument(); // total fleet count
   });
 
+  it('renders each vehicle\'s registration number in the roster table', async () => {
+    render(
+      <MemoryRouter>
+        <FleetManager />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('WP-CAB-0001')).toBeInTheDocument();
+    expect(screen.getByText('WP-CAC-0002')).toBeInTheDocument();
+  });
+
+  it('filters vehicles by registration number', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <FleetManager />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('#11111111')).toBeInTheDocument();
+    expect(screen.getByText('#22222222')).toBeInTheDocument();
+
+    const registrationFilter = screen.getByLabelText(/registration no\./i);
+    await user.type(registrationFilter, 'cab');
+
+    expect(screen.getByText('#11111111')).toBeInTheDocument();
+    expect(screen.queryByText('#22222222')).not.toBeInTheDocument();
+  });
+
   it('filters vehicles by vehicle type', async () => {
     const user = userEvent.setup();
     render(
@@ -88,6 +119,7 @@ describe('FleetManager Component', () => {
     const createSpy = vi.spyOn(vehiclesApi, 'createVehicle').mockResolvedValue({
       id: '33333333-3333-3333-3333-333333333333',
       type: 'Coach',
+      registrationNumber: 'WP-CAB-9999',
       capacity: 35,
       hasAC: true,
       seatConfiguration: '2-2-coach',
@@ -108,10 +140,14 @@ describe('FleetManager Component', () => {
 
     expect(screen.getByRole('heading', { name: /add vehicle to fleet/i })).toBeInTheDocument();
 
+    await user.type(screen.getByLabelText(/registration number/i), 'wp-cab-9999');
+
     const submitBtn = screen.getByRole('button', { name: /save vehicle/i });
     await user.click(submitBtn);
 
-    expect(createSpy).toHaveBeenCalled();
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ registrationNumber: 'WP-CAB-9999' }),
+    );
   });
 
   it('updates vehicle maintenance status inline', async () => {

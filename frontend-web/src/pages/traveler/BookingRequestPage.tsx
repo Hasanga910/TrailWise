@@ -206,6 +206,10 @@ export function BookingRequestPage() {
             value={specialRequests}
             onChange={(e) => setSpecialRequests(e.target.value)}
           />
+          <p className="mt-1 text-xs text-slate-400">
+            This note is processed by an AI service to help plan your trip. Avoid including sensitive personal
+            or payment details.
+          </p>
           {fieldErrors.specialRequests && <p className={fieldErrorClass}>{fieldErrors.specialRequests}</p>}
         </div>
 

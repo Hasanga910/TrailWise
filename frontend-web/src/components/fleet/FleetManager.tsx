@@ -79,10 +79,12 @@ export function FleetManager() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterAC, setFilterAC] = useState<string>('all');
   const [filterMinCap, setFilterMinCap] = useState<string>('');
+  const [filterRegistration, setFilterRegistration] = useState<string>('');
 
   // Add Vehicle Form State
   const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
   const [newType, setNewType] = useState<VehicleType>('Van');
+  const [newRegistrationNumber, setNewRegistrationNumber] = useState<string>('');
   const [newCapacity, setNewCapacity] = useState<number>(7);
   const [newHasAC, setNewHasAC] = useState<boolean>(true);
   const [newSeatConfig, setNewSeatConfig] = useState<string>('2-2-3');
@@ -157,6 +159,7 @@ export function FleetManager() {
     try {
       await createVehicle({
         type: newType,
+        registrationNumber: newRegistrationNumber.trim().toUpperCase(),
         capacity: Number(newCapacity),
         hasAC: newHasAC,
         seatConfiguration: newSeatConfig,
@@ -165,6 +168,7 @@ export function FleetManager() {
       setShowAddVehicleModal(false);
       // Reset form
       setNewType('Van');
+      setNewRegistrationNumber('');
       setNewCapacity(7);
       setNewHasAC(true);
       setNewSeatConfig('2-2-3');
@@ -293,6 +297,11 @@ export function FleetManager() {
     if (filterMinCap) {
       const minCap = parseInt(filterMinCap, 10);
       if (!isNaN(minCap) && v.capacity < minCap) return false;
+    }
+    if (filterRegistration) {
+      if (!v.registrationNumber.toLowerCase().includes(filterRegistration.trim().toLowerCase())) {
+        return false;
+      }
     }
     return true;
   });
@@ -429,10 +438,23 @@ export function FleetManager() {
             />
           </div>
 
+          <div className="min-w-36 flex-1">
+            <label htmlFor="filter-registration-number" className={labelClass}>Registration No.</label>
+            <input
+              id="filter-registration-number"
+              type="text"
+              placeholder="e.g. WP-CAB-1234"
+              value={filterRegistration}
+              onChange={(e) => setFilterRegistration(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
           {(filterType !== 'all' ||
             filterStatus !== 'all' ||
             filterAC !== 'all' ||
-            filterMinCap !== '') && (
+            filterMinCap !== '' ||
+            filterRegistration !== '') && (
             <div className="flex items-end">
               <button
                 type="button"
@@ -441,6 +463,7 @@ export function FleetManager() {
                   setFilterStatus('all');
                   setFilterAC('all');
                   setFilterMinCap('');
+                  setFilterRegistration('');
                 }}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
               >
@@ -487,6 +510,7 @@ export function FleetManager() {
               <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-3.5 py-3">Vehicle</th>
+                  <th className="px-3.5 py-3">Registration No.</th>
                   <th className="px-3 py-3">Capacity</th>
                   <th className="px-3 py-3">AC</th>
                   <th className="px-3 py-3">Layout</th>
@@ -504,6 +528,9 @@ export function FleetManager() {
                           #{vehicle.id.substring(0, 8)}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-3.5 py-3 font-mono text-xs font-semibold text-slate-700 whitespace-nowrap">
+                      {vehicle.registrationNumber}
                     </td>
                     <td className="px-3 py-3 text-slate-700 whitespace-nowrap">
                       <span className="font-semibold text-slate-900">{vehicle.capacity}</span> seats
@@ -641,6 +668,20 @@ export function FleetManager() {
                     className={inputClass}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="new-registration-number" className={labelClass}>Registration Number</label>
+                <input
+                  id="new-registration-number"
+                  type="text"
+                  required
+                  maxLength={20}
+                  placeholder="e.g. WP-CAB-1234"
+                  value={newRegistrationNumber}
+                  onChange={(e) => setNewRegistrationNumber(e.target.value)}
+                  className={inputClass}
+                />
               </div>
 
               <div>

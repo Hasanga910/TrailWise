@@ -78,3 +78,25 @@ export async function getAllBookings(): Promise<BookingSummaryDto[]> {
   const response = await apiClient.get<BookingSummaryDto[]>('/api/bookings');
   return response.data;
 }
+
+export type BookingDecision = 'Approve' | 'Reject';
+
+export interface DecideBookingInput {
+  decision: BookingDecision;
+  notes?: string;
+}
+
+export async function decideBooking(id: string, input: DecideBookingInput): Promise<BookingDto> {
+  const response = await apiClient.patch<BookingDto>(`/api/bookings/${id}/decision`, input);
+  return response.data;
+}
+
+export async function completeBooking(id: string): Promise<BookingDto> {
+  const response = await apiClient.patch<BookingDto>(`/api/bookings/${id}/complete`, {});
+  return response.data;
+}
+
+export async function cancelBooking(id: string, reason?: string): Promise<BookingDto> {
+  const response = await apiClient.patch<BookingDto>(`/api/bookings/${id}/cancel`, { reason });
+  return response.data;
+}

@@ -37,6 +37,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var vanResponse = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
         {
             Type = VehicleType.Van,
+            RegistrationNumber = NewRegistrationNumber(),
             Capacity = 8,
             HasAC = true,
             SeatConfiguration = "2-2-2-2",
@@ -47,6 +48,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var coachResponse = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
         {
             Type = VehicleType.Coach,
+            RegistrationNumber = NewRegistrationNumber(),
             Capacity = 30,
             HasAC = false,
             SeatConfiguration = "2-2 across 8 rows",
@@ -91,6 +93,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var anonRes = await anonymousClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
         {
             Type = VehicleType.SUV,
+            RegistrationNumber = NewRegistrationNumber(),
             Capacity = 4,
             HasAC = true
         });
@@ -100,6 +103,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var travelerRes = await travelerClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
         {
             Type = VehicleType.SUV,
+            RegistrationNumber = NewRegistrationNumber(),
             Capacity = 4,
             HasAC = true
         });
@@ -111,9 +115,11 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     {
         var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
 
+        var registrationNumber = NewRegistrationNumber();
         var response = await coordinatorClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
         {
             Type = VehicleType.Van,
+            RegistrationNumber = registrationNumber,
             Capacity = 10,
             HasAC = true,
             SeatConfiguration = "Standard 10-seater",
@@ -125,7 +131,51 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.NotNull(created);
         Assert.Equal(10, created.Capacity);
         Assert.Equal(VehicleType.Van, created.Type);
+        Assert.Equal(registrationNumber.ToUpperInvariant(), created.RegistrationNumber);
         Assert.True(created.HasAC);
+    }
+
+    [Fact]
+    public async Task CreateVehicle_MissingRegistrationNumber_ReturnsBadRequest()
+    {
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
+
+        var response = await coordinatorClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.Van,
+            RegistrationNumber = string.Empty,
+            Capacity = 10,
+            HasAC = true
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateVehicle_DuplicateRegistrationNumber_ReturnsConflict()
+    {
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
+        var registrationNumber = NewRegistrationNumber();
+
+        var firstResponse = await coordinatorClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.Van,
+            RegistrationNumber = registrationNumber,
+            Capacity = 8,
+            HasAC = true
+        });
+        firstResponse.EnsureSuccessStatusCode();
+
+        // Same plate in a different case/whitespace variant must still collide.
+        var duplicateResponse = await coordinatorClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.SUV,
+            RegistrationNumber = $" {registrationNumber.ToLowerInvariant()} ",
+            Capacity = 4,
+            HasAC = true
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
     }
 
     [Fact]
@@ -135,6 +185,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var createResponse = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
         {
             Type = VehicleType.SUV,
+            RegistrationNumber = NewRegistrationNumber(),
             Capacity = 5,
             HasAC = true,
             MaintenanceStatus = VehicleMaintenanceStatus.Available
@@ -160,6 +211,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var vehRes = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
         {
             Type = VehicleType.Van,
+            RegistrationNumber = NewRegistrationNumber(),
             Capacity = 12,
             HasAC = true,
             MaintenanceStatus = VehicleMaintenanceStatus.Available
@@ -267,6 +319,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var vehicleRes = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
         {
             Type = VehicleType.SUV,
+            RegistrationNumber = NewRegistrationNumber(),
             Capacity = 4,
             HasAC = true,
             SeatConfiguration = "2-2",
@@ -283,6 +336,8 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var getRes = await adminClient.GetAsync($"/api/vehicles/{vehicle.Id}");
         Assert.Equal(HttpStatusCode.NotFound, getRes.StatusCode);
     }
+
+    private static string NewRegistrationNumber() => $"REG-{Guid.NewGuid():N}"[..12];
 
     private async Task<HttpClient> AdminClientAsync()
     {

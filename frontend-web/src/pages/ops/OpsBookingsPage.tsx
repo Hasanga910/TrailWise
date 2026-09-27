@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/apiClient';
-import { getAllBookings, type BookingStatus, type BookingSummaryDto } from '../../api/bookings';
+import {
+  cancelBooking,
+  completeBooking,
+  decideBooking,
+  getAllBookings,
+  type BookingStatus,
+  type BookingSummaryDto,
+} from '../../api/bookings';
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
   Requested: 'bg-slate-100 text-slate-600',
@@ -13,18 +20,95 @@ const STATUS_STYLES: Record<BookingStatus, string> = {
   NeedsManualReview: 'bg-red-50 text-red-700',
 };
 
+const CANCELLABLE_STATUSES: BookingStatus[] = [
+  'Requested',
+  'PlanProposed',
+  'PendingApproval',
+  'NeedsManualReview',
+  'Confirmed',
+];
+
+type PromptKind = 'reject' | 'cancel';
+
+interface PromptState {
+  kind: PromptKind;
+  bookingId: string;
+  text: string;
+}
+
 export function OpsBookingsPage() {
   const [bookings, setBookings] = useState<BookingSummaryDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<PromptState | null>(null);
 
-  useEffect(() => {
+  function load() {
     getAllBookings()
       .then((data) => {
         setBookings(data);
         setError(null);
       })
       .catch((err) => setError(extractErrorMessage(err, 'Could not load bookings.')));
+  }
+
+  useEffect(() => {
+    load();
   }, []);
+
+  function patchStatus(bookingId: string, status: BookingStatus) {
+    setBookings((prev) => prev?.map((b) => (b.id === bookingId ? { ...b, status } : b)) ?? prev);
+  }
+
+  async function handleApprove(bookingId: string) {
+    setActioningId(bookingId);
+    setActionError(null);
+    try {
+      const updated = await decideBooking(bookingId, { decision: 'Approve' });
+      patchStatus(bookingId, updated.status);
+    } catch (err) {
+      setActionError(extractErrorMessage(err, 'Could not approve this booking.'));
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  async function handleComplete(bookingId: string) {
+    setActioningId(bookingId);
+    setActionError(null);
+    try {
+      const updated = await completeBooking(bookingId);
+      patchStatus(bookingId, updated.status);
+    } catch (err) {
+      setActionError(extractErrorMessage(err, 'Could not mark this booking as completed.'));
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  async function handlePromptSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!prompt) {
+      return;
+    }
+    const { kind, bookingId, text } = prompt;
+    setActioningId(bookingId);
+    setActionError(null);
+    try {
+      const updated =
+        kind === 'reject'
+          ? await decideBooking(bookingId, { decision: 'Reject', notes: text || undefined })
+          : await cancelBooking(bookingId, text || undefined);
+      patchStatus(bookingId, updated.status);
+      setPrompt(null);
+    } catch (err) {
+      setActionError(
+        extractErrorMessage(err, kind === 'reject' ? 'Could not reject this booking.' : 'Could not cancel this booking.'),
+      );
+    } finally {
+      setActioningId(null);
+    }
+  }
 
   return (
     <div>
@@ -36,6 +120,12 @@ export function OpsBookingsPage() {
       {error && (
         <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
+        </p>
+      )}
+
+      {actionError && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {actionError}
         </p>
       )}
 
@@ -68,32 +158,121 @@ export function OpsBookingsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {bookings.map((booking) => (
-                <tr key={booking.id} className="transition hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{booking.travelerName}</td>
-                  <td className="px-4 py-3 text-slate-600">{booking.packageName}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[booking.status]}`}
-                    >
-                      {booking.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{booking.createdAt}</td>
-                  <td className="px-4 py-3 text-slate-600">{booking.startDate}</td>
-                  <td className="px-4 py-3 text-slate-600">{booking.groupSize}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/ops/bookings/${booking.id}/workflow`}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                    >
-                      View agent workflow
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {bookings.map((booking) => {
+                const isActioning = actioningId === booking.id;
+                const canDecide = booking.status === 'PendingApproval' || booking.status === 'NeedsManualReview';
+                const canComplete = booking.status === 'Confirmed';
+                const canCancel = CANCELLABLE_STATUSES.includes(booking.status);
+
+                return (
+                  <tr key={booking.id} className="transition hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-900">{booking.travelerName}</td>
+                    <td className="px-4 py-3 text-slate-600">{booking.packageName}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[booking.status]}`}
+                      >
+                        {booking.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{booking.createdAt}</td>
+                    <td className="px-4 py-3 text-slate-600">{booking.startDate}</td>
+                    <td className="px-4 py-3 text-slate-600">{booking.groupSize}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {canDecide && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isActioning}
+                              onClick={() => handleApprove(booking.id)}
+                              className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isActioning}
+                              onClick={() => setPrompt({ kind: 'reject', bookingId: booking.id, text: '' })}
+                              className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {canComplete && (
+                          <button
+                            type="button"
+                            disabled={isActioning}
+                            onClick={() => handleComplete(booking.id)}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Mark Completed
+                          </button>
+                        )}
+                        {canCancel && (
+                          <button
+                            type="button"
+                            disabled={isActioning}
+                            onClick={() => setPrompt({ kind: 'cancel', bookingId: booking.id, text: '' })}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        <Link
+                          to={`/ops/bookings/${booking.id}/workflow`}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          View agent workflow
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {prompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
+            <h3 className="font-heading text-base font-bold text-slate-900">
+              {prompt.kind === 'reject' ? 'Reject booking' : 'Cancel booking'}
+            </h3>
+            <form onSubmit={handlePromptSubmit} className="mt-4 space-y-4">
+              <div>
+                <label htmlFor="booking-prompt-text" className="mb-1 block text-sm font-medium text-slate-700">
+                  {prompt.kind === 'reject' ? 'Notes (optional)' : 'Reason (optional)'}
+                </label>
+                <textarea
+                  id="booking-prompt-text"
+                  value={prompt.text}
+                  onChange={(e) => setPrompt({ ...prompt, text: e.target.value })}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPrompt(null)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={actioningId === prompt.bookingId}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                >
+                  {prompt.kind === 'reject' ? 'Reject' : 'Confirm cancellation'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
