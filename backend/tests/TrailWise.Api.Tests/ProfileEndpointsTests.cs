@@ -74,6 +74,23 @@ public class ProfileEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task DeleteSelf_RemovesAccount_CannotLoginAfterwards()
+    {
+        var (client, email) = await RegisterAndLoginAsync();
+
+        var deleteResponse = await client.DeleteAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        // Attempting to log in should now fail with 401
+        var loginResponse = await _factory.CreateClient().PostAsJsonAsync("/api/auth/login", new
+        {
+            Email = email,
+            Password = "P@ssword123"
+        });
+        Assert.Equal(HttpStatusCode.Unauthorized, loginResponse.StatusCode);
+    }
+
     private async Task<(HttpClient Client, string Email)> RegisterAndLoginAsync()
     {
         var client = _factory.CreateClient();

@@ -11,7 +11,7 @@ public class VehicleAssignmentConfiguration : IEntityTypeConfiguration<VehicleAs
         builder.HasOne(v => v.Vehicle)
             .WithMany(veh => veh.Assignments)
             .HasForeignKey(v => v.VehicleId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(v => v.Driver)
             .WithMany(d => d.Assignments)
