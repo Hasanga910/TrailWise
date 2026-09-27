@@ -1,9 +1,10 @@
-import { BookingsIcon, DashboardIcon, PackagesIcon, ProfileIcon, ReportsIcon } from '../admin/icons';
+import { BookingsIcon, DashboardIcon, PackagesIcon, ProfileIcon, ReportsIcon, TagIcon } from '../admin/icons';
 import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/ops', label: 'Dashboard', icon: DashboardIcon, end: true },
   { to: '/ops/packages', label: 'Packages', icon: PackagesIcon },
+  { to: '/ops/discounts', label: 'Discounts', icon: TagIcon },
   { to: '/ops/bookings', label: 'Bookings', icon: BookingsIcon },
   { to: '/ops/reports', label: 'Reports', icon: ReportsIcon },
   { to: '/ops/profile', label: 'Profile', icon: ProfileIcon },
@@ -17,6 +18,9 @@ function resolveTitle(pathname: string): string {
   }
   if (pathname === '/ops/packages') {
     return 'Packages';
+  }
+  if (pathname === '/ops/discounts') {
+    return 'Discounts';
   }
   if (pathname === '/ops/bookings') {
     return 'Bookings';

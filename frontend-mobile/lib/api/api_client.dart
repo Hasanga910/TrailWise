@@ -48,6 +48,15 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
+
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
     final response = await http.get(_buildUri(path, query), headers: _headers);
     return _decode(response);

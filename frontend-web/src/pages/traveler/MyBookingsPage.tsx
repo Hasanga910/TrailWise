@@ -1,8 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { extractErrorMessage } from '../../api/apiClient';
-import { getMyBookings, type BookingDto, type BookingStatus, type PagedResult } from '../../api/bookings';
+import {
+  cancelBooking,
+  getMyBookings,
+  type BookingDto,
+  type BookingStatus,
+  type PagedResult,
+} from '../../api/bookings';
 
 const PAGE_SIZE = 10;
+
+const CANCELLABLE_STATUSES: BookingStatus[] = [
+  'Requested',
+  'PlanProposed',
+  'PendingApproval',
+  'NeedsManualReview',
+  'Confirmed',
+];
+
+function isUpcoming(startDate: string): boolean {
+  const today = new Date().toISOString().slice(0, 10);
+  return startDate >= today;
+}
 
 const STATUS_OPTIONS: BookingStatus[] = [
   'Requested',
@@ -38,6 +57,10 @@ export function MyBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [cancelPrompt, setCancelPrompt] = useState<{ bookingId: string; reason: string } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
   useEffect(() => {
     setLoading(true);
     const timeout = setTimeout(() => {
@@ -71,6 +94,29 @@ export function MyBookingsPage() {
   function handleToChange(value: string) {
     setTo(value);
     setPage(1);
+  }
+
+  async function handleCancelSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!cancelPrompt) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const updated = await cancelBooking(cancelPrompt.bookingId, cancelPrompt.reason || undefined);
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((b) => (b.id === updated.id ? { ...b, status: updated.status } : b)),
+            }
+          : prev,
+      );
+      setCancelPrompt(null);
+    } catch (err) {
+      setCancelError(extractErrorMessage(err, 'Could not cancel this booking.'));
+    } finally {
+      setCancelling(false);
+    }
   }
 
   const totalPages = result ? Math.max(1, Math.ceil(result.totalCount / result.pageSize)) : 1;
@@ -129,6 +175,12 @@ export function MyBookingsPage() {
         </div>
       </div>
 
+      {cancelError && (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {cancelError}
+        </p>
+      )}
+
       {error && (
         <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
@@ -180,6 +232,15 @@ export function MyBookingsPage() {
                   >
                     {booking.status}
                   </span>
+                  {CANCELLABLE_STATUSES.includes(booking.status) && isUpcoming(booking.startDate) && (
+                    <button
+                      type="button"
+                      onClick={() => setCancelPrompt({ bookingId: booking.id, reason: '' })}
+                      className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Cancel Booking
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -207,6 +268,45 @@ export function MyBookingsPage() {
             </button>
           </div>
         </>
+      )}
+
+      {cancelPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
+            <h3 className="font-heading text-base font-bold text-slate-900">Cancel booking</h3>
+            <p className="mt-1 text-sm text-slate-500">Are you sure you want to cancel this booking?</p>
+            <form onSubmit={handleCancelSubmit} className="mt-4 space-y-4">
+              <div>
+                <label htmlFor="cancel-reason" className="mb-1 block text-sm font-medium text-slate-700">
+                  Reason (optional)
+                </label>
+                <textarea
+                  id="cancel-reason"
+                  value={cancelPrompt.reason}
+                  onChange={(e) => setCancelPrompt({ ...cancelPrompt, reason: e.target.value })}
+                  rows={3}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCancelPrompt(null)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={cancelling}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                >
+                  Confirm cancellation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -23,7 +23,12 @@ public class TrailWiseWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:Audience"] = "TrailWiseClients",
                 ["Jwt:ExpiryMinutes"] = "60",
                 ["AdminSeed:Email"] = "admin@test.local",
-                ["AdminSeed:Password"] = "TestAdminPass123!"
+                ["AdminSeed:Password"] = "TestAdminPass123!",
+                // Tests log in far more than 5 times a minute against a shared TestServer "client
+                // IP" — raise the limit so the login rate limiter (Program.cs) never interferes
+                // with test setup while still enforcing the real, low default outside tests.
+                ["RateLimiting:LoginPermitLimit"] = "10000",
+                ["RateLimiting:LoginWindowSeconds"] = "60"
             });
         });
 
