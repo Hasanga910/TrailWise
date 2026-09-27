@@ -17,6 +17,8 @@ class FakeApiClient extends ApiClient {
   final ApiException? postError;
   final ApiException? patchError;
 
+  final List<Map<String, dynamic>> patchCalls = [];
+
   @override
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
     if (getError != null) throw getError!;
@@ -30,8 +32,10 @@ class FakeApiClient extends ApiClient {
   }
 
   @override
-  Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body) async {
+  Future<dynamic> patch(String path, Map<String, dynamic> body) async {
+    patchCalls.add({'path': path, 'body': body});
     if (patchError != null) throw patchError!;
-    return patchResponses[path] as Map<String, dynamic>;
+    return patchResponses[path];
   }
 }
+

@@ -29,6 +29,7 @@ import { FleetManagementPage } from './pages/admin/FleetManagementPage';
 import { FleetProfileSettingsPage } from './pages/fleet/FleetProfileSettingsPage';
 import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
 import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
+import { GuideAvailabilityPage } from './pages/guides/GuideAvailabilityPage';
 
 function App() {
   return (
@@ -43,6 +44,15 @@ function App() {
           <ProtectedRoute>
             <PortalFallbackPage />
           </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/guides/availability"
+        element={
+          <RequireRole allowedRoles={['OperationsManager', 'FleetCoordinator', 'TourGuide']}>
+            <GuideAvailabilityPage />
+          </RequireRole>
         }
       />
 

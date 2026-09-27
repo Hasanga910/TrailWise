@@ -1,5 +1,9 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+
+import '../models/assigned_tour.dart';
 
 class FieldError {
   final String field;
@@ -23,10 +27,16 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:5080',
-  );
+  static final String baseUrl = () {
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) {
+      return envUrl;
+    }
+    if (!kIsWeb && Platform.isAndroid) {
+      return 'http://10.0.2.2:5080';
+    }
+    return 'http://localhost:5080';
+  }();
 
   String? _token;
 
@@ -48,7 +58,7 @@ class ApiClient {
     return _decode(response);
   }
 
-  Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body) async {
+  Future<dynamic> patch(String path, Map<String, dynamic> body) async {
     final response = await http.patch(
       Uri.parse('$baseUrl$path'),
       headers: _headers,
@@ -61,6 +71,31 @@ class ApiClient {
     final response = await http.get(_buildUri(path, query), headers: _headers);
     return _decode(response);
   }
+
+  Future<List<AssignedTour>> getAssignedTours() async {
+    final response = await get('/api/guides/me/assigned-tours');
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(AssignedTour.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<void> updateGuideTour({
+    required String bookingId,
+    required bool attended,
+    required bool completed,
+    String? notes,
+  }) async {
+    await patch('/api/bookings/$bookingId/guide-notes', {
+      'attended': attended,
+      'completed': completed,
+      'notes': notes,
+    });
+  }
+
 
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
     final uri = Uri.parse('$baseUrl$path');

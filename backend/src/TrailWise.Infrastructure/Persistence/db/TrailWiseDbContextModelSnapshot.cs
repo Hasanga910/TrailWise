@@ -153,9 +153,19 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("Attended")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<decimal>("BudgetPerPerson")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
+
+                    b.Property<bool>("Completed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -165,6 +175,14 @@ namespace TrailWise.Infrastructure.Persistence.Db
 
                     b.Property<int>("GroupSize")
                         .HasColumnType("integer");
+
+                    b.Property<string>("GuideNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("LanguagePreference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<Guid>("PackageTierId")
                         .HasColumnType("uuid");
@@ -324,7 +342,13 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("Guides");
                 });
@@ -357,7 +381,8 @@ namespace TrailWise.Infrastructure.Persistence.Db
 
                     b.HasIndex("AssignedBookingId");
 
-                    b.HasIndex("GuideId", "Date");
+                    b.HasIndex("GuideId", "Date")
+                        .IsUnique();
 
                     b.ToTable("GuideAvailabilities");
                 });
@@ -768,6 +793,16 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .IsRequired();
 
                     b.Navigation("Booking");
+                });
+
+            modelBuilder.Entity("TrailWise.Domain.Entities.Guide", b =>
+                {
+                    b.HasOne("TrailWise.Domain.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("TrailWise.Domain.Entities.Guide", "UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("TrailWise.Domain.Entities.GuideAvailability", b =>

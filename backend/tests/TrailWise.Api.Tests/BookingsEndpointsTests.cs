@@ -402,6 +402,55 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
     }
 
     [Fact]
+    public async Task Create_WithLanguagePreference_PersistsAndExposesInDto()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m,
+            LanguagePreference = "  French  "
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+        Assert.NotNull(created);
+        Assert.Equal("French", created.LanguagePreference);
+
+        // Fetch via GetById to verify persistence
+        var fetched = await client.GetFromJsonAsync<BookingDto>($"/api/bookings/{created.Id}", JsonOptions);
+        Assert.NotNull(fetched);
+        Assert.Equal("French", fetched.LanguagePreference);
+    }
+
+    [Fact]
+    public async Task Create_WithLanguagePreferenceExceedingMaxLength_ReturnsBadRequest()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m,
+            LanguagePreference = new string('x', 101)
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var errors = body.GetProperty("errors");
+        Assert.Contains(errors.EnumerateArray(), e => e.GetProperty("field").GetString() == "languagePreference");
+    }
+
+    [Fact]
     public async Task GetAll_AsOperationsManager_ReturnsAllBookings()
     {
         var travelerAClient = await AuthenticatedTravelerAsync();
