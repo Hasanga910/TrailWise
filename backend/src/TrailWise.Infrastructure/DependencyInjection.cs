@@ -56,8 +56,14 @@ public static class DependencyInjection
         services.AddScoped<IGuideMatchingAgent, MockGuideMatchingAgent>();
         services.AddScoped<IFleetCapacityAgent, FleetCapacityAgent>();
         services.AddScoped<IFleetReservationService, FleetReservationService>();
-        services.AddScoped<IPricingValidationAgent, MockPricingValidationAgent>();
+        services.AddScoped<IPricingValidationAgent, PricingValidationAgent>();
         services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IReviewService, ReviewService>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<IAuditReportService, AuditReportService>();
+        services.AddScoped<IOperationsReportService, OperationsReportService>();
+
         return services;
     }
 }

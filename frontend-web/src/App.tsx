@@ -19,6 +19,7 @@ import { OpsBookingsPage } from './pages/ops/OpsBookingsPage';
 import { OpsDashboardPage } from './pages/ops/OpsDashboardPage';
 import { OpsPackagesPage } from './pages/ops/OpsPackagesPage';
 import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
+import { OpsReportsPage } from './pages/ops/OpsReportsPage';
 import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
 import { MyBookingsPage } from './pages/traveler/MyBookingsPage';
 import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
@@ -69,6 +70,7 @@ function App() {
       >
         <Route index element={<OpsDashboardPage />} />
         <Route path="packages" element={<OpsPackagesPage />} />
+        <Route path="reports" element={<OpsReportsPage />} />
         <Route path="bookings" element={<OpsBookingsPage />} />
         <Route path="bookings/:bookingId/workflow" element={<AgentWorkflowPage />} />
         <Route path="profile" element={<OpsProfileSettingsPage />} />

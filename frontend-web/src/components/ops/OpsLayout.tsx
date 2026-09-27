@@ -1,10 +1,11 @@
-import { BookingsIcon, DashboardIcon, PackagesIcon, ProfileIcon } from '../admin/icons';
+import { BookingsIcon, DashboardIcon, PackagesIcon, ProfileIcon, ReportsIcon } from '../admin/icons';
 import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/ops', label: 'Dashboard', icon: DashboardIcon, end: true },
   { to: '/ops/packages', label: 'Packages', icon: PackagesIcon },
   { to: '/ops/bookings', label: 'Bookings', icon: BookingsIcon },
+  { to: '/ops/reports', label: 'Reports', icon: ReportsIcon },
   { to: '/ops/profile', label: 'Profile', icon: ProfileIcon },
 ];
 
@@ -22,6 +23,9 @@ function resolveTitle(pathname: string): string {
   }
   if (WORKFLOW_ROUTE_PATTERN.test(pathname)) {
     return 'Agent Workflow';
+  }
+  if (pathname === '/ops/reports') {
+    return 'Operations Reports';
   }
   if (pathname === '/ops/profile') {
     return 'Profile Settings';
