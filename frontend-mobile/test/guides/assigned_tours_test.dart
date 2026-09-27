@@ -285,6 +285,8 @@ void main() {
       // On TourDetailScreen: toggle Attended switch and tap Save Updates
       await tester.tap(find.widgetWithText(SwitchListTile, 'Attended'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save Updates'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Save Updates'));
       await tester.pumpAndSettle();
 

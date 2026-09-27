@@ -1,5 +1,5 @@
 import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
-import { DashboardIcon, PackagesIcon, ProfileIcon, UsersIcon } from './icons';
+import { CalendarIcon, CompassIcon, DashboardIcon, PackagesIcon, ProfileIcon, UsersIcon } from './icons';
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true },
@@ -22,6 +22,8 @@ const NAV_ITEMS: SidebarNavItem[] = [
       { to: '/admin/staff/fleet-coordinators', label: 'Fleet Coordinators' },
     ],
   },
+  { to: '/admin/guides', label: 'Guides', icon: CompassIcon },
+  { to: '/guides/availability', label: 'Guide Availability', icon: CalendarIcon },
   { to: '/admin/profile', label: 'Profile', icon: ProfileIcon },
 ];
 
@@ -33,6 +35,9 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/staff/tour-guides': 'Tour Guides',
   '/admin/staff/operations-managers': 'Operations Managers',
   '/admin/staff/fleet-coordinators': 'Fleet Coordinators',
+  '/admin/guides': 'Tour Guides',
+  '/admin/guides/new': 'Create Guide',
+  '/guides/availability': 'Guide Availability',
   '/admin/profile': 'Profile Settings',
 };
 

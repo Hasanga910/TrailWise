@@ -17,6 +17,7 @@ export interface CreateBookingInput {
   endDate: string;
   budgetPerPerson: number;
   specialRequests?: string;
+  languagePreference?: string;
 }
 
 export interface BookingDto {
@@ -30,6 +31,7 @@ export interface BookingDto {
   endDate: string;
   budgetPerPerson: number;
   specialRequests?: string | null;
+  languagePreference?: string | null;
   status: BookingStatus;
   isLargeGroup: boolean;
 }
@@ -63,3 +65,11 @@ export async function getBookingById(id: string): Promise<BookingDto> {
   const response = await apiClient.get<BookingDto>(`/api/bookings/${id}`);
   return response.data;
 }
+
+export {
+  getItinerary,
+  setItinerary,
+  type ItineraryStepDto,
+  type ItineraryStepRequest,
+  type SetItineraryRequest,
+} from './itineraries';

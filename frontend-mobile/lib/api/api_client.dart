@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../models/assigned_tour.dart';
+import '../models/guide.dart';
+import '../models/guide_availability.dart';
+import '../models/itinerary_step.dart';
 
 class FieldError {
   final String field;
@@ -49,8 +52,17 @@ class ApiClient {
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
-  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
+  Future<dynamic> post(String path, Map<String, dynamic> body) async {
     final response = await http.post(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
+
+  Future<dynamic> put(String path, Map<String, dynamic> body) async {
+    final response = await http.put(
       Uri.parse('$baseUrl$path'),
       headers: _headers,
       body: jsonEncode(body),
@@ -96,6 +108,126 @@ class ApiClient {
     });
   }
 
+  Future<List<Guide>> getGuides({String? specialization, String? language}) async {
+    final query = <String, dynamic>{};
+    if (specialization != null && specialization.isNotEmpty) {
+      query['specialization'] = specialization;
+    }
+    if (language != null && language.isNotEmpty) {
+      query['language'] = language;
+    }
+    final response = await get('/api/guides', query: query);
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(Guide.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<Guide> getGuideById(String id) async {
+    final response = await get('/api/guides/$id');
+    return Guide.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<Guide> createGuide({
+    required String name,
+    List<String> languages = const [],
+    List<String> specializations = const [],
+    required String contactInfo,
+    String? userId,
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'languages': languages,
+      'specializations': specializations,
+      'contactInfo': contactInfo,
+      if (userId != null && userId.isNotEmpty) 'userId': userId,
+    };
+    final response = await post('/api/guides', body);
+    return Guide.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<Guide> updateGuide(
+    String id, {
+    required String name,
+    List<String> languages = const [],
+    List<String> specializations = const [],
+    required String contactInfo,
+    String? userId,
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'languages': languages,
+      'specializations': specializations,
+      'contactInfo': contactInfo,
+      if (userId != null && userId.isNotEmpty) 'userId': userId,
+    };
+    final response = await put('/api/guides/$id', body);
+    return Guide.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<List<GuideAvailability>> getGuideAvailability(
+    String guideId, {
+    String? from,
+    String? to,
+  }) async {
+    final query = <String, dynamic>{};
+    if (from != null) query['from'] = from;
+    if (to != null) query['to'] = to;
+    final response = await get('/api/guides/$guideId/availability', query: query);
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(GuideAvailability.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<GuideAvailability>> updateGuideAvailability(
+    String guideId,
+    List<Map<String, dynamic>> dates,
+  ) async {
+    final response = await put('/api/guides/$guideId/availability', {
+      'dates': dates,
+    });
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(GuideAvailability.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<ItineraryStep>> getItinerary(String bookingId) async {
+    final response = await get('/api/bookings/$bookingId/itinerary');
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(ItineraryStep.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<ItineraryStep>> setItinerary(
+    String bookingId,
+    List<Map<String, dynamic>> steps,
+  ) async {
+    final response = await post('/api/bookings/$bookingId/itinerary', {
+      'steps': steps,
+    });
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(ItineraryStep.fromJson)
+          .toList();
+    }
+    return [];
+  }
 
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
     final uri = Uri.parse('$baseUrl$path');

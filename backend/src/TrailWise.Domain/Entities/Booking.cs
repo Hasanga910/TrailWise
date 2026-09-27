@@ -18,6 +18,7 @@ public class Booking : BaseEntity
     public DateOnly EndDate { get; set; }
     public decimal BudgetPerPerson { get; set; }
     public string? SpecialRequests { get; set; }
+    public string? LanguagePreference { get; set; }
     public BookingStatus Status { get; set; } = BookingStatus.Requested;
 
     public bool Attended { get; set; } = false;

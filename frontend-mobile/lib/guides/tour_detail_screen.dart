@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../bookings/booking_status.dart';
+import '../bookings/itinerary_screen.dart';
 import '../models/assigned_tour.dart';
 
 class TourDetailScreen extends StatefulWidget {
@@ -302,6 +303,25 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.map_outlined),
+                          label: const Text('View & Manage Itinerary'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ItineraryScreen(
+                                  bookingId: _tour.bookingId,
+                                  title: '${_tour.tourPackageName} Itinerary',
+                                  apiClient: _apiClient,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),
