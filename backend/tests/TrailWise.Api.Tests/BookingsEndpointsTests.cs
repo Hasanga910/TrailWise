@@ -450,6 +450,37 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
         Assert.Contains(errors.EnumerateArray(), e => e.GetProperty("field").GetString() == "languagePreference");
     }
 
+    [Fact]
+    public async Task GetAll_AsOperationsManager_ReturnsAllBookings()
+    {
+        var travelerAClient = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(travelerAClient);
+        await CreateBookingAsync(travelerAClient, tier.Id, startDaysFromNow: 10);
+
+        var travelerBClient = await AuthenticatedTravelerAsync();
+        await CreateBookingAsync(travelerBClient, tier.Id, startDaysFromNow: 20);
+
+        var managerClient = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+        var response = await managerClient.GetAsync("/api/bookings");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bookings = await response.Content.ReadFromJsonAsync<List<BookingSummaryDto>>(JsonOptions);
+
+        Assert.NotNull(bookings);
+        Assert.True(bookings!.Count >= 2);
+        Assert.Contains(bookings, b => !string.IsNullOrEmpty(b.TravelerName) && !string.IsNullOrEmpty(b.PackageName));
+    }
+
+    [Fact]
+    public async Task GetAll_WithTravelerToken_ReturnsForbidden()
+    {
+        var client = await AuthenticatedTravelerAsync();
+
+        var response = await client.GetAsync("/api/bookings");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private static async Task CreateBookingAsync(HttpClient client, Guid packageTierId, int startDaysFromNow)
     {
         var response = await client.PostAsJsonAsync("/api/bookings", new

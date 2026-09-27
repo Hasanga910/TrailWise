@@ -27,25 +27,31 @@ internal static class WorkflowRunStatus
 public class CoordinatorAgentService : ICoordinatorAgentService
 {
     private readonly TrailWiseDbContext _db;
+    private readonly IPreferenceExtractionAgent _preferenceAgent;
     private readonly IGuideMatchingAgent _guideAgent;
     private readonly IFleetCapacityAgent _fleetAgent;
     private readonly IPricingValidationAgent _pricingAgent;
     private readonly IGuideAssignmentService _guideAssignmentService;
+    private readonly IProposalSummaryAgent _summaryAgent;
     private readonly ILogger<CoordinatorAgentService> _logger;
 
     public CoordinatorAgentService(
         TrailWiseDbContext db,
+        IPreferenceExtractionAgent preferenceAgent,
         IGuideMatchingAgent guideAgent,
         IFleetCapacityAgent fleetAgent,
         IPricingValidationAgent pricingAgent,
         IGuideAssignmentService guideAssignmentService,
+        IProposalSummaryAgent summaryAgent,
         ILogger<CoordinatorAgentService> logger)
     {
         _db = db;
+        _preferenceAgent = preferenceAgent;
         _guideAgent = guideAgent;
         _fleetAgent = fleetAgent;
         _pricingAgent = pricingAgent;
         _guideAssignmentService = guideAssignmentService;
+        _summaryAgent = summaryAgent;
         _logger = logger;
     }
 
@@ -65,10 +71,12 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         {
             Steps =
             {
+                new AgentWorkflowPlanStep { Step = "extract_preferences", Agent = "PreferenceExtractionAgent" },
                 new AgentWorkflowPlanStep { Step = "match_guide", Agent = "GuideMatchingAgent" },
                 new AgentWorkflowPlanStep { Step = "check_vehicle", Agent = "FleetCapacityAgent" },
                 new AgentWorkflowPlanStep { Step = "calculate_price", Agent = "PricingValidationAgent" },
                 new AgentWorkflowPlanStep { Step = "validate", Agent = "PricingValidationAgent" },
+                new AgentWorkflowPlanStep { Step = "summarize", Agent = "ProposalSummaryAgent" },
             },
         };
 
@@ -76,10 +84,13 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         {
             BookingId = bookingId,
             // SECURITY (E5): booking.SpecialRequests is untrusted free text supplied by the
-            // traveler. It must NEVER be interpolated into Objective, InputJson, or any other
-            // field that could later be fed to an LLM prompt/instruction context. It is
-            // intentionally not referenced anywhere in this service — only structured, typed
-            // booking fields are used below.
+            // traveler. It must NEVER be interpolated into Objective (this run-level description,
+            // shared by every step) or into any OTHER step's InputJson/LLM context — e.g. the
+            // future Proposal Summary agent must never see it directly. It is legitimately read
+            // ONLY by PreferenceExtractionAgent below, and only ever placed inside an explicitly
+            // labeled <untrusted_traveler_note> block that instructs the model never to treat it
+            // as instructions. That step's own InputJson intentionally records the raw text, since
+            // documenting exactly what was sent to the LLM is the point of this step's audit trail.
             Objective = "Match a guide, verify vehicle capacity, price the trip, and validate against business rules.",
             PlanJson = Serialize(plan),
             Status = WorkflowRunStatus.Running,
@@ -87,6 +98,15 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         };
         _db.AgentWorkflowRuns.Add(run);
         await _db.SaveChangesAsync(ct);
+
+        var preferencesResult = await RunStepAsync(
+            run,
+            plan,
+            "extract_preferences",
+            "PreferenceExtractionAgent",
+            new { specialRequests = booking.SpecialRequests },
+            () => _preferenceAgent.ExtractAsync(booking.SpecialRequests, ct),
+            ct);
 
         var guideResult = await RunStepAsync(
             run,
@@ -203,6 +223,48 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             {
                 await transaction.DisposeAsync();
             }
+        }
+
+        // Best-effort, non-blocking: the booking's real outcome is already durably committed
+        // above. Any failure here (disabled/unreachable LLM, malformed response) must never be
+        // able to fail an already-successful workflow run — it only means SummaryText stays null.
+        try
+        {
+            var summaryInput = new ProposalSummaryInput(
+                bookingId,
+                booking.GroupSize,
+                booking.StartDate,
+                booking.EndDate,
+                booking.BudgetPerPerson,
+                booking.PackageTier.ClassType.ToString(),
+                booking.PackageTier.RequiresAC,
+                guideResult,
+                vehicleResult,
+                pricingResult,
+                decisionResult.Decision,
+                decisionResult.Reasons,
+                preferencesResult);
+
+            var summarySw = Stopwatch.StartNew();
+            var summary = await _summaryAgent.SummarizeAsync(summaryInput, ct);
+            summarySw.Stop();
+
+            run.SummaryText = summary.SummaryText;
+            _db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRunId = run.Id,
+                AgentName = "ProposalSummaryAgent",
+                InputJson = Serialize(summaryInput),
+                OutputJson = Serialize(summary),
+                DurationMs = summarySw.ElapsedMilliseconds,
+            });
+            MarkStepDone(plan, "summarize");
+            run.PlanJson = Serialize(plan);
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Proposal summary generation failed for booking {BookingId}; leaving SummaryText null.", bookingId);
         }
     }
 

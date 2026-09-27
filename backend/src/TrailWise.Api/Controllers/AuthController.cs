@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Infrastructure.Services;
 
@@ -32,6 +33,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("LoginRateLimiter")]
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request, CancellationToken ct)
     {
         var result = await _authService.LoginAsync(request.Email, request.Password, ct);
@@ -132,6 +134,25 @@ public class AuthController : ControllerBase
         }
 
         var result = await _authService.ChangePasswordAsync(userId.Value, request.CurrentPassword, request.NewPassword, ct);
+        if (!result.Succeeded)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: result.Error);
+        }
+
+        return NoContent();
+    }
+
+    [HttpDelete("me")]
+    [Authorize]
+    public async Task<IActionResult> DeleteMe(CancellationToken ct)
+    {
+        var userId = GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _authService.DeleteSelfAsync(userId.Value, ct);
         if (!result.Succeeded)
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, title: result.Error);
