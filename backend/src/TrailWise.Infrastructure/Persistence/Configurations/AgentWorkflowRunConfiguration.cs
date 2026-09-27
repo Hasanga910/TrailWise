@@ -11,6 +11,7 @@ public class AgentWorkflowRunConfiguration : IEntityTypeConfiguration<AgentWorkf
         builder.Property(w => w.Objective).IsRequired().HasMaxLength(500);
         builder.Property(w => w.PlanJson).HasColumnType("jsonb");
         builder.Property(w => w.Status).HasMaxLength(32);
+        builder.Property(w => w.SummaryText).HasColumnType("text");
 
         builder.HasMany(w => w.StepLogs)
             .WithOne(s => s.WorkflowRun)

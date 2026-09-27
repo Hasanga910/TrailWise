@@ -10,6 +10,7 @@ public class AgentWorkflowRun : BaseEntity
     public string Status { get; set; } = "Started";
     public DateTimeOffset StartedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? CompletedAt { get; set; }
+    public string? SummaryText { get; set; }
 
     public ICollection<AgentStepLog> StepLogs { get; set; } = new List<AgentStepLog>();
 }

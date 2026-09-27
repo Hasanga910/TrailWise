@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TrailWise.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace TrailWise.Infrastructure.Persistence.Db
+namespace TrailWise.Infrastructure.Persistence.db
 {
     [DbContext(typeof(TrailWiseDbContext))]
-    partial class TrailWiseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926174542_AddAgentWorkflowRunSummaryText")]
+    partial class AddAgentWorkflowRunSummaryText
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -823,7 +826,7 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.HasOne("TrailWise.Domain.Entities.Vehicle", "Vehicle")
                         .WithMany("Assignments")
                         .HasForeignKey("VehicleId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Booking");
