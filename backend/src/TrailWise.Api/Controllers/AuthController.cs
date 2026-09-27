@@ -140,6 +140,25 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    [HttpDelete("me")]
+    [Authorize]
+    public async Task<IActionResult> DeleteMe(CancellationToken ct)
+    {
+        var userId = GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _authService.DeleteSelfAsync(userId.Value, ct);
+        if (!result.Succeeded)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: result.Error);
+        }
+
+        return NoContent();
+    }
+
     private Guid? GetUserId()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");

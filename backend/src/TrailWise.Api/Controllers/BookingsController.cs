@@ -7,8 +7,8 @@ using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
+using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
-using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
 
@@ -17,6 +17,7 @@ namespace TrailWise.Api.Controllers;
 [Authorize]
 public class BookingsController : ControllerBase
 {
+    private const string ManagerRoles = "OperationsManager,Admin";
     private const int MaxAdvanceBookingDays = 365;
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 50;
@@ -83,6 +84,20 @@ public class BookingsController : ControllerBase
         DispatchCoordinatorWorkflow(booking.Id);
 
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, BookingDto.FromEntity(booking));
+    }
+
+    [HttpGet]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<IReadOnlyList<BookingSummaryDto>>> GetAll(CancellationToken ct)
+    {
+        var bookings = await _db.Bookings
+            .Include(b => b.Traveler)
+            .Include(b => b.TourPackage)
+            .OrderByDescending(b => b.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        return Ok(bookings.Select(BookingSummaryDto.FromEntity).ToList());
     }
 
     private void DispatchCoordinatorWorkflow(Guid bookingId)

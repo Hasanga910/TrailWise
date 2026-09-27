@@ -18,7 +18,7 @@ public record BookingDto(
     BookingStatus Status,
     bool IsLargeGroup)
 {
-    // Duplicated by value in TrailWise.Infrastructure.Services.BookingApprovalEvaluator.LargeGroupThreshold
+    // Duplicated by value in TrailWise.Infrastructure.Agents.BookingApprovalEvaluator.LargeGroupThreshold
     // since Infrastructure cannot reference this (Api) project. Keep both in sync if this ever changes.
     public const int LargeGroupThreshold = 10;
 
