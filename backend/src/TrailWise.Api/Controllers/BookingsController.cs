@@ -9,6 +9,7 @@ using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
 
@@ -25,12 +26,18 @@ public class BookingsController : ControllerBase
     private readonly TrailWiseDbContext _db;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BookingsController> _logger;
+    private readonly IAuditLogService _auditLogService;
 
-    public BookingsController(TrailWiseDbContext db, IServiceScopeFactory scopeFactory, ILogger<BookingsController> logger)
+    public BookingsController(
+        TrailWiseDbContext db,
+        IServiceScopeFactory scopeFactory,
+        ILogger<BookingsController> logger,
+        IAuditLogService auditLogService)
     {
         _db = db;
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _auditLogService = auditLogService;
     }
 
     [HttpPost]
@@ -215,6 +222,80 @@ public class BookingsController : ControllerBase
         if (!isOwner && !isManager)
         {
             return Forbid();
+        }
+
+        return Ok(BookingDto.FromEntity(booking));
+    }
+
+    [HttpPost("{id:guid}/complete")]
+    [Authorize(Roles = "Admin,OperationsManager")]
+    public async Task<ActionResult<BookingDto>> Complete(Guid id, CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (booking.Status == BookingStatus.Completed)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Booking is already completed.");
+        }
+
+        if (booking.Status != BookingStatus.Confirmed)
+        {
+            return BadRequest(new
+            {
+                message = "Only confirmed bookings can be marked as completed."
+            });
+        }
+
+        var userId = GetUserId();
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            booking.Status = BookingStatus.Completed;
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: "BookingCompleted",
+                performedBy: userId,
+                details: new
+                {
+                    travelerId = booking.TravelerId,
+                    tourPackageId = booking.TourPackageId,
+                    startDate = booking.StartDate.ToString("yyyy-MM-dd"),
+                    endDate = booking.EndDate.ToString("yyyy-MM-dd"),
+                    previousStatus = "Confirmed",
+                    newStatus = "Completed",
+                    completedAt = DateTimeOffset.UtcNow
+                },
+                ct: ct);
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
         }
 
         return Ok(BookingDto.FromEntity(booking));
