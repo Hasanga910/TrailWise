@@ -68,13 +68,13 @@ class AuthProvider extends ChangeNotifier {
         }));
   }
 
-  Future<bool> _authenticate(Future<dynamic> Function() request) async {
+  Future<bool> _authenticate(Future<Map<String, dynamic>> Function() request) async {
     status = AuthStatus.authenticating;
     errorMessage = null;
     notifyListeners();
 
     try {
-      final response = (await request()) as Map<String, dynamic>;
+      final response = await request();
       final token = response['token'] as String;
       await _storage.write(key: _tokenKey, value: token);
       _apiClient.setToken(token);

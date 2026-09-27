@@ -59,8 +59,6 @@ export function GuideAvailabilityPage() {
 
   // Load guides
   const fetchGuides = useCallback(async () => {
-    setLoadingGuides(true);
-    setGuidesError(null);
     try {
       const data = await getGuides();
       setGuides(data);
@@ -85,8 +83,29 @@ export function GuideAvailabilityPage() {
   }, [isTourGuide, user?.id]);
 
   useEffect(() => {
-    fetchGuides();
-  }, [fetchGuides]);
+    let cancelled = false;
+    getGuides()
+      .then((data) => {
+        if (cancelled) return;
+        setGuides(data);
+        if (isTourGuide) {
+          const myGuide = data.find((g) => g.userId === user?.id);
+          setSelectedGuideId(myGuide ? myGuide.id : '');
+        } else if (data.length > 0) {
+          setSelectedGuideId((prev) => (prev && data.some((g) => g.id === prev) ? prev : data[0].id));
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setGuidesError(extractErrorMessage(err, 'Failed to load guides.'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingGuides(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isTourGuide, user?.id]);
 
   // Load availability when selectedGuideId or month/year changes
   const fetchAvailability = useCallback(async () => {
@@ -114,8 +133,30 @@ export function GuideAvailabilityPage() {
   }, [selectedGuideId, currentYear, currentMonth]);
 
   useEffect(() => {
-    fetchAvailability();
-  }, [fetchAvailability]);
+    if (!selectedGuideId) {
+      return;
+    }
+
+    let cancelled = false;
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const from = formatDate(currentYear, currentMonth, 1);
+    const to = formatDate(currentYear, currentMonth, lastDayOfMonth);
+
+    getGuideAvailability(selectedGuideId, from, to)
+      .then((data) => {
+        if (!cancelled) setAvailabilities(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setAvailabilityError(extractErrorMessage(err, 'Failed to load availability.'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAvailability(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedGuideId, currentYear, currentMonth]);
 
   function handlePrevMonth() {
     setInfoMessage(null);

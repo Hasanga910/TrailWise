@@ -65,9 +65,6 @@ public class GuideMatchingAgent : IGuideMatchingAgent
                     "Tour package does not specify a theme for guide specialization matching.");
             }
 
-            var languagePref = string.IsNullOrWhiteSpace(booking.LanguagePreference) ? null : booking.LanguagePreference.Trim();
-            var hasLanguagePref = languagePref != null;
-
             // TASK 2: Candidate Guide Filtering
             // Query guides from database
             var guides = await _db.Guides
@@ -90,32 +87,10 @@ public class GuideMatchingAgent : IGuideMatchingAgent
                     $"No guide with {theme} specialization is available for the requested dates.");
             }
 
-            // Filter by language if traveler specified a LanguagePreference
-            var candidateGuides = specializationCandidates;
-            if (hasLanguagePref)
-            {
-                candidateGuides = specializationCandidates
-                    .Where(g => g.Languages != null && g.Languages.Any(l =>
-                        !string.IsNullOrWhiteSpace(l) &&
-                        string.Equals(l.Trim(), languagePref, StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
-
-                if (candidateGuides.Count == 0)
-                {
-                    _logger.LogInformation(
-                        "No guide with {Theme} specialization and {Language} language found for booking {BookingId}.",
-                        theme, languagePref, bookingId);
-                    return new GuideMatchResult(
-                        Guid.Empty,
-                        0,
-                        $"No guide with {theme} specialization and {languagePref} language is available for the requested dates.");
-                }
-            }
-
             // Evaluate availability and deterministic score for each candidate
             var qualifiedCandidates = new List<(Domain.Entities.Guide Guide, double Score, bool HasBufferBonus)>();
 
-            foreach (var guide in candidateGuides)
+            foreach (var guide in specializationCandidates)
             {
                 // Must be available for the complete booking date range
                 var isAvailable = await _availabilityService.IsGuideAvailableAsync(
@@ -164,22 +139,8 @@ public class GuideMatchingAgent : IGuideMatchingAgent
                 var hasBufferBonus = beforeBufferFree && afterBufferFree;
 
                 // TASK 3: Deterministic Scoring
-                // If language preference is provided:
-                // - Specialization match: 0.5
-                // - Language match: 0.3
-                // - Buffer-day bonus: 0.2
-                // If language preference is absent:
-                // - Specialization + availability: 0.7
-                // - Buffer-day bonus: 0.3
-                double score;
-                if (hasLanguagePref)
-                {
-                    score = hasBufferBonus ? 1.0 : 0.8;
-                }
-                else
-                {
-                    score = hasBufferBonus ? 1.0 : 0.7;
-                }
+                // Base specialization match = 0.7; Buffer-day bonus = 0.3 if both buffer days are free.
+                var score = hasBufferBonus ? 1.0 : 0.7;
 
                 qualifiedCandidates.Add((guide, score, hasBufferBonus));
             }
@@ -189,13 +150,10 @@ public class GuideMatchingAgent : IGuideMatchingAgent
                 _logger.LogInformation(
                     "No guide with {Theme} specialization is available for booking {BookingId} between {StartDate} and {EndDate}.",
                     theme, bookingId, booking.StartDate, booking.EndDate);
-                var notAvailableMessage = hasLanguagePref
-                    ? $"No guide with {theme} specialization and {languagePref} language is available for the requested dates."
-                    : $"No guide with {theme} specialization is available for the requested dates.";
                 return new GuideMatchResult(
                     Guid.Empty,
                     0,
-                    notAvailableMessage);
+                    $"No guide with {theme} specialization is available for the requested dates.");
             }
 
             // TASK 5: Choose Candidate
@@ -210,18 +168,10 @@ public class GuideMatchingAgent : IGuideMatchingAgent
                 ? "with free buffer days"
                 : "without free buffer days";
 
-            string reasoning;
-            if (hasLanguagePref)
-            {
-                var spokenLanguage = bestCandidate.Guide.Languages?
-                    .FirstOrDefault(l => !string.IsNullOrWhiteSpace(l) && string.Equals(l.Trim(), languagePref, StringComparison.OrdinalIgnoreCase))?
-                    .Trim() ?? languagePref;
-                reasoning = $"Guide {bestCandidate.Guide.Name} matched the {theme} specialization, speaks {spokenLanguage}, and is available for the full booking period {bufferText}.";
-            }
-            else
-            {
-                reasoning = $"Guide {bestCandidate.Guide.Name} matched the {theme} specialization and is available for the full booking period {bufferText}. No traveler language preference was provided.";
-            }
+            // LANGUAGE NOTE:
+            // Language matching was omitted from candidate filtering and scoring because the
+            // current Booking model has no LanguagePreference field.
+            var reasoning = $"Guide {bestCandidate.Guide.Name} matched the {theme} specialization and is available for the full booking period {bufferText}. Language matching was not evaluated because the current Booking model does not store LanguagePreference.";
 
             _logger.LogInformation(
                 "Matched guide {GuideId} ({GuideName}) for booking {BookingId} with score {Score}. {Reasoning}",

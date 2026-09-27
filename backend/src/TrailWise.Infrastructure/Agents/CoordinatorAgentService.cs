@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;
-using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Infrastructure.Agents;
 
@@ -30,7 +29,6 @@ public class CoordinatorAgentService : ICoordinatorAgentService
     private readonly IGuideMatchingAgent _guideAgent;
     private readonly IFleetCapacityAgent _fleetAgent;
     private readonly IPricingValidationAgent _pricingAgent;
-    private readonly IGuideAssignmentService _guideAssignmentService;
     private readonly ILogger<CoordinatorAgentService> _logger;
 
     public CoordinatorAgentService(
@@ -38,14 +36,12 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         IGuideMatchingAgent guideAgent,
         IFleetCapacityAgent fleetAgent,
         IPricingValidationAgent pricingAgent,
-        IGuideAssignmentService guideAssignmentService,
         ILogger<CoordinatorAgentService> logger)
     {
         _db = db;
         _guideAgent = guideAgent;
         _fleetAgent = fleetAgent;
         _pricingAgent = pricingAgent;
-        _guideAssignmentService = guideAssignmentService;
         _logger = logger;
     }
 
@@ -143,26 +139,9 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         switch (decisionResult.Decision)
         {
             case BookingApprovalEvaluator.Decision.Approved:
-                var assignmentSucceeded = true;
-                if (guideResult.GuideId != Guid.Empty)
-                {
-                    assignmentSucceeded = await _guideAssignmentService.AssignGuideAsync(bookingId, guideResult.GuideId, ct);
-                }
-
-                if (assignmentSucceeded)
-                {
-                    booking.Status = BookingStatus.Confirmed;
-                    run.Status = WorkflowRunStatus.Completed;
-                    run.CompletedAt = DateTimeOffset.UtcNow;
-                }
-                else
-                {
-                    _logger.LogWarning("Guide assignment failed for approved booking {BookingId} with guide {GuideId}. Marking booking for manual review.",
-                        bookingId, guideResult.GuideId);
-                    booking.Status = BookingStatus.NeedsManualReview;
-                    run.Status = WorkflowRunStatus.Failed;
-                    run.CompletedAt = DateTimeOffset.UtcNow;
-                }
+                booking.Status = BookingStatus.Confirmed;
+                run.Status = WorkflowRunStatus.Completed;
+                run.CompletedAt = DateTimeOffset.UtcNow;
                 break;
             case BookingApprovalEvaluator.Decision.NeedsApproval:
                 booking.Status = BookingStatus.PendingApproval;

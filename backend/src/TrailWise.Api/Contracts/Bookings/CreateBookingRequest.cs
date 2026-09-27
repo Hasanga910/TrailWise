@@ -16,6 +16,4 @@ public class CreateBookingRequest
     public decimal BudgetPerPerson { get; set; }
 
     public string? SpecialRequests { get; set; }
-
-    public string? LanguagePreference { get; set; }
 }

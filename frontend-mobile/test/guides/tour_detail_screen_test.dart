@@ -203,8 +203,6 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap Save Updates
-      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save Updates'));
-      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Save Updates'));
       await tester.pumpAndSettle();
 
@@ -227,8 +225,6 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save Updates'));
-      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Save Updates'));
       await tester.pumpAndSettle();
 
@@ -246,8 +242,6 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save Updates'));
-      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Save Updates'));
       await tester.pumpAndSettle();
 

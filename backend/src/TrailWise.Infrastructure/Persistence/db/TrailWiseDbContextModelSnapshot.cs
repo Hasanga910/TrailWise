@@ -177,10 +177,6 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
-                    b.Property<string>("LanguagePreference")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<Guid>("PackageTierId")
                         .HasColumnType("uuid");
 

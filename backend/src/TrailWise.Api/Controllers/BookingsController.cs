@@ -24,7 +24,6 @@ public class BookingsController : ControllerBase
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 50;
     private const int MaxSpecialRequestsLength = 1000;
-    private const int MaxLanguagePreferenceLength = 100;
 
     private readonly TrailWiseDbContext _db;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -77,7 +76,6 @@ public class BookingsController : ControllerBase
             EndDate = request.EndDate,
             BudgetPerPerson = request.BudgetPerPerson,
             SpecialRequests = string.IsNullOrWhiteSpace(request.SpecialRequests) ? null : request.SpecialRequests.Trim(),
-            LanguagePreference = string.IsNullOrWhiteSpace(request.LanguagePreference) ? null : request.LanguagePreference.Trim(),
             // Large-group bookings (see BookingDto.IsLargeGroup) intentionally stay Requested here.
             // Routing them to PendingApproval is the future approval workflow/agent's responsibility,
             // not this endpoint's — there is currently no workflow that can move a booking back out
@@ -500,13 +498,6 @@ public class BookingsController : ControllerBase
             errors.Add(new FieldValidationError(
                 "specialRequests",
                 $"Special requests cannot exceed {MaxSpecialRequestsLength} characters."));
-        }
-
-        if (request.LanguagePreference?.Length > MaxLanguagePreferenceLength)
-        {
-            errors.Add(new FieldValidationError(
-                "languagePreference",
-                $"Language preference cannot exceed {MaxLanguagePreferenceLength} characters."));
         }
 
         return errors;

@@ -28,8 +28,7 @@ public class GuideMatchingAgentTests
         TrailWiseDbContext db,
         string theme = "Cultural",
         DateOnly? startDate = null,
-        DateOnly? endDate = null,
-        string? languagePreference = null)
+        DateOnly? endDate = null)
     {
         var start = startDate ?? new DateOnly(2026, 10, 10);
         var end = endDate ?? new DateOnly(2026, 10, 15);
@@ -73,7 +72,6 @@ public class GuideMatchingAgentTests
             StartDate = start,
             EndDate = end,
             BudgetPerPerson = 200m,
-            LanguagePreference = languagePreference,
             Status = BookingStatus.Requested
         };
         db.Bookings.Add(booking);
@@ -86,15 +84,14 @@ public class GuideMatchingAgentTests
         TrailWiseDbContext db,
         string name = "Janindu",
         string[]? specializations = null,
-        Guid? id = null,
-        string[]? languages = null)
+        Guid? id = null)
     {
         var guide = new Guide
         {
             Id = id ?? Guid.NewGuid(),
             Name = name,
             Specializations = specializations ?? new[] { "Cultural" },
-            Languages = languages ?? new[] { "English", "Sinhala" },
+            Languages = new[] { "English", "Sinhala" },
             ContactInfo = "contact@example.com"
         };
         db.Guides.Add(guide);
@@ -220,7 +217,7 @@ public class GuideMatchingAgentTests
         Assert.Equal(guide.Id, result.GuideId);
         Assert.Equal(1.0, result.MatchScore);
         Assert.Contains("with free buffer days", result.Reasoning);
-        Assert.Contains("No traveler language preference was provided", result.Reasoning);
+        Assert.Contains("Language matching was not evaluated", result.Reasoning);
     }
 
     // 7. Valid guide without complete buffer scores 0.7
@@ -439,141 +436,6 @@ public class GuideMatchingAgentTests
         Assert.Equal(Guid.Empty, result.GuideId);
         Assert.Equal(0, result.MatchScore);
         Assert.Contains("Tour package does not specify a theme", result.Reasoning);
-    }
-
-    // 16. Language preference match is case-insensitive and trims whitespace
-    [Fact]
-    public async Task MatchAsync_WithLanguagePreference_MatchesCaseInsensitively()
-    {
-        var db = TestDbContextFactory.Create();
-        var (_, booking) = SeedBooking(db, theme: "Cultural", languagePreference: "  fReNcH  ");
-        var guide = SeedGuide(db, name: "Pierre", specializations: new[] { "Cultural" }, languages: new[] { " French ", "English" });
-
-        var sut = CreateSut(db);
-        var result = await sut.MatchAsync(booking.Id);
-
-        Assert.Equal(guide.Id, result.GuideId);
-        Assert.Equal(1.0, result.MatchScore);
-        Assert.Contains("Pierre", result.Reasoning);
-        Assert.Contains("speaks French", result.Reasoning);
-    }
-
-    // 17. Wrong-language guide is excluded when preference exists
-    [Fact]
-    public async Task MatchAsync_WrongLanguageGuide_IsExcludedWhenPreferenceExists()
-    {
-        var db = TestDbContextFactory.Create();
-        var (_, booking) = SeedBooking(db, theme: "Cultural", languagePreference: "German");
-        // Guide matches specialization but speaks English and Sinhala, not German
-        SeedGuide(db, name: "Janindu", specializations: new[] { "Cultural" }, languages: new[] { "English", "Sinhala" });
-
-        var sut = CreateSut(db);
-        var result = await sut.MatchAsync(booking.Id);
-
-        Assert.Equal(Guid.Empty, result.GuideId);
-        Assert.Equal(0, result.MatchScore);
-        Assert.Contains("German", result.Reasoning);
-    }
-
-    // 18. Correct-language guide is selected among candidates
-    [Fact]
-    public async Task MatchAsync_SelectsCorrectLanguageGuide_AmongCandidates()
-    {
-        var db = TestDbContextFactory.Create();
-        var (_, booking) = SeedBooking(db, theme: "Cultural", languagePreference: "German");
-
-        var englishGuide = SeedGuide(db, name: "Janindu", specializations: new[] { "Cultural" }, languages: new[] { "English" });
-        var germanGuide = SeedGuide(db, name: "Hans", specializations: new[] { "Cultural" }, languages: new[] { "German", "English" });
-
-        var sut = CreateSut(db);
-        var result = await sut.MatchAsync(booking.Id);
-
-        Assert.Equal(germanGuide.Id, result.GuideId);
-        Assert.Equal(1.0, result.MatchScore);
-        Assert.Contains("Hans", result.Reasoning);
-        Assert.Contains("speaks German", result.Reasoning);
-    }
-
-    // 19. Null or empty LanguagePreference preserves valid matching behavior without rejecting guides
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task MatchAsync_NullOrEmptyLanguagePreference_PreservesValidMatching(string? langPref)
-    {
-        var db = TestDbContextFactory.Create();
-        var (_, booking) = SeedBooking(db, theme: "Cultural", languagePreference: langPref);
-        var guide = SeedGuide(db, name: "Janindu", specializations: new[] { "Cultural" }, languages: new[] { "Sinhala" });
-
-        var sut = CreateSut(db);
-        var result = await sut.MatchAsync(booking.Id);
-
-        Assert.Equal(guide.Id, result.GuideId);
-        Assert.Equal(1.0, result.MatchScore);
-        Assert.Contains("No traveler language preference was provided", result.Reasoning);
-    }
-
-    // 20. Scoring with language preference: 1.0 with both buffer days free (0.5 + 0.3 + 0.2)
-    [Fact]
-    public async Task MatchAsync_WithLanguagePreference_ScoresOnePointZeroWithBufferBonus()
-    {
-        var db = TestDbContextFactory.Create();
-        var (_, booking) = SeedBooking(db, theme: "Cultural", languagePreference: "English",
-            startDate: new DateOnly(2026, 10, 10),
-            endDate: new DateOnly(2026, 10, 15));
-        var guide = SeedGuide(db, name: "Janindu", specializations: new[] { "Cultural" }, languages: new[] { "English" });
-
-        var sut = CreateSut(db);
-        var result = await sut.MatchAsync(booking.Id);
-
-        Assert.Equal(guide.Id, result.GuideId);
-        Assert.Equal(1.0, result.MatchScore);
-        Assert.Contains("speaks English", result.Reasoning);
-        Assert.Contains("with free buffer days", result.Reasoning);
-    }
-
-    // 21. Scoring with language preference: 0.8 without buffer days bonus (0.5 + 0.3)
-    [Fact]
-    public async Task MatchAsync_WithLanguagePreference_ScoresZeroPointEightWithoutBufferBonus()
-    {
-        var db = TestDbContextFactory.Create();
-        var (_, booking) = SeedBooking(db, theme: "Cultural", languagePreference: "English",
-            startDate: new DateOnly(2026, 10, 10),
-            endDate: new DateOnly(2026, 10, 15));
-        var guide = SeedGuide(db, name: "Janindu", specializations: new[] { "Cultural" }, languages: new[] { "English" });
-
-        // Block buffer day before
-        db.GuideAvailabilities.Add(new GuideAvailability
-        {
-            GuideId = guide.Id,
-            Date = new DateOnly(2026, 10, 9),
-            IsAvailable = false
-        });
-        await db.SaveChangesAsync();
-
-        var sut = CreateSut(db);
-        var result = await sut.MatchAsync(booking.Id);
-
-        Assert.Equal(guide.Id, result.GuideId);
-        Assert.Equal(0.8, result.MatchScore);
-        Assert.Contains("speaks English", result.Reasoning);
-        Assert.Contains("without free buffer days", result.Reasoning);
-    }
-
-    // 22. No-match result still returns Guid.Empty and 0 score when language fails
-    [Fact]
-    public async Task MatchAsync_NoMatchingLanguageGuide_ReturnsGuidEmptyAndZeroScore()
-    {
-        var db = TestDbContextFactory.Create();
-        var (_, booking) = SeedBooking(db, theme: "Cultural", languagePreference: "Japanese");
-        SeedGuide(db, name: "Janindu", specializations: new[] { "Cultural" }, languages: new[] { "English" });
-
-        var sut = CreateSut(db);
-        var result = await sut.MatchAsync(booking.Id);
-
-        Assert.Equal(Guid.Empty, result.GuideId);
-        Assert.Equal(0, result.MatchScore);
-        Assert.Contains("Japanese", result.Reasoning);
     }
 
     private class ThrowingGuideAvailabilityService : IGuideAvailabilityService
