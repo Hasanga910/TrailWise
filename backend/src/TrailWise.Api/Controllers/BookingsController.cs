@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
-using TrailWise.Api.Contracts.Guides;
 using TrailWise.Api.Contracts.Itineraries;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
