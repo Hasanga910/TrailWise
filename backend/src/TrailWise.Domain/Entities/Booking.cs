@@ -18,7 +18,12 @@ public class Booking : BaseEntity
     public DateOnly EndDate { get; set; }
     public decimal BudgetPerPerson { get; set; }
     public string? SpecialRequests { get; set; }
+    public string? LanguagePreference { get; set; }
     public BookingStatus Status { get; set; } = BookingStatus.Requested;
+
+    public bool Attended { get; set; } = false;
+    public bool Completed { get; set; } = false;
+    public string? GuideNotes { get; set; }
 
     public ICollection<BookingAddOn> BookingAddOns { get; set; } = new List<BookingAddOn>();
     public ICollection<GuideAvailability> GuideAvailabilities { get; set; } = new List<GuideAvailability>();

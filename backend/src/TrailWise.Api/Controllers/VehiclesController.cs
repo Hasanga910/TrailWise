@@ -94,9 +94,19 @@ public class VehiclesController : ControllerBase
             return BadRequest(new { errors = new[] { "Capacity must be at least 1." } });
         }
 
+        var normalizedRegistrationNumber = request.RegistrationNumber.Trim().ToUpperInvariant();
+
+        var registrationExists = await _db.Vehicles.AnyAsync(
+            v => v.RegistrationNumber == normalizedRegistrationNumber, ct);
+        if (registrationExists)
+        {
+            return Conflict(new { errors = new[] { $"A vehicle with registration number '{normalizedRegistrationNumber}' already exists." } });
+        }
+
         var vehicle = new Vehicle
         {
             Type = request.Type,
+            RegistrationNumber = normalizedRegistrationNumber,
             Capacity = request.Capacity,
             HasAC = request.HasAC,
             SeatConfiguration = string.IsNullOrWhiteSpace(request.SeatConfiguration) ? string.Empty : request.SeatConfiguration.Trim(),

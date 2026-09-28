@@ -17,8 +17,10 @@ import { UserManagementIndexPage } from './pages/admin/UserManagementIndexPage';
 import { AgentWorkflowPage } from './pages/ops/AgentWorkflowPage';
 import { OpsBookingsPage } from './pages/ops/OpsBookingsPage';
 import { OpsDashboardPage } from './pages/ops/OpsDashboardPage';
+import { OpsDiscountsPage } from './pages/ops/OpsDiscountsPage';
 import { OpsPackagesPage } from './pages/ops/OpsPackagesPage';
 import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
+import { OpsReportsPage } from './pages/ops/OpsReportsPage';
 import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
 import { MyBookingsPage } from './pages/traveler/MyBookingsPage';
 import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
@@ -30,6 +32,9 @@ import { FleetAssignmentsPage } from './pages/fleet/FleetAssignmentsPage';
 import { FleetBookingsPage } from './pages/fleet/FleetBookingsPage';
 import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
 import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
+import { GuideAvailabilityPage } from './pages/guides/GuideAvailabilityPage';
+import { AssignedToursPage } from './pages/guides/AssignedToursPage';
+import { TourDetailPage } from './pages/guides/TourDetailPage';
 
 function App() {
   return (
@@ -44,6 +49,33 @@ function App() {
           <ProtectedRoute>
             <PortalFallbackPage />
           </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/guides/availability"
+        element={
+          <RequireRole allowedRoles={['OperationsManager', 'FleetCoordinator', 'TourGuide']}>
+            <GuideAvailabilityPage />
+          </RequireRole>
+        }
+      />
+
+      <Route
+        path="/guides/my-tours"
+        element={
+          <RequireRole allowedRoles={['TourGuide']}>
+            <AssignedToursPage />
+          </RequireRole>
+        }
+      />
+
+      <Route
+        path="/guides/my-tours/:bookingId"
+        element={
+          <RequireRole allowedRoles={['TourGuide']}>
+            <TourDetailPage />
+          </RequireRole>
         }
       />
 
@@ -72,6 +104,8 @@ function App() {
       >
         <Route index element={<OpsDashboardPage />} />
         <Route path="packages" element={<OpsPackagesPage />} />
+        <Route path="discounts" element={<OpsDiscountsPage />} />
+        <Route path="reports" element={<OpsReportsPage />} />
         <Route path="bookings" element={<OpsBookingsPage />} />
         <Route path="bookings/:bookingId/workflow" element={<AgentWorkflowPage />} />
         <Route path="profile" element={<OpsProfileSettingsPage />} />

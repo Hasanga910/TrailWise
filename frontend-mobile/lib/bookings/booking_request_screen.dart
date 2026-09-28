@@ -209,6 +209,9 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                   maxLength: 1000,
                   decoration: const InputDecoration(
                     labelText: 'Special requests (optional)',
+                    helperText: 'This note is processed by an AI service to help plan your trip. '
+                        'Avoid including sensitive personal or payment details.',
+                    helperMaxLines: 3,
                   ),
                 ),
                 const SizedBox(height: 16),

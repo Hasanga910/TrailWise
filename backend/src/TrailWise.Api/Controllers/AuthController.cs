@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Infrastructure.Services;
 
@@ -32,6 +33,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("LoginRateLimiter")]
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request, CancellationToken ct)
     {
         var result = await _authService.LoginAsync(request.Email, request.Password, ct);

@@ -1,14 +1,18 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
+using TrailWise.Api.Contracts.Guides;
+using TrailWise.Api.Contracts.Itineraries;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
 
@@ -22,15 +26,25 @@ public class BookingsController : ControllerBase
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 50;
     private const int MaxSpecialRequestsLength = 1000;
+    private const int MaxLanguagePreferenceLength = 100;
 
     private readonly TrailWiseDbContext _db;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IItineraryService _itineraryService;
+    private readonly IAuditLogService _auditLogService;
     private readonly ILogger<BookingsController> _logger;
 
-    public BookingsController(TrailWiseDbContext db, IServiceScopeFactory scopeFactory, ILogger<BookingsController> logger)
+    public BookingsController(
+        TrailWiseDbContext db,
+        IServiceScopeFactory scopeFactory,
+        IItineraryService itineraryService,
+        IAuditLogService auditLogService,
+        ILogger<BookingsController> logger)
     {
         _db = db;
         _scopeFactory = scopeFactory;
+        _itineraryService = itineraryService;
+        _auditLogService = auditLogService;
         _logger = logger;
     }
 
@@ -68,6 +82,7 @@ public class BookingsController : ControllerBase
             EndDate = request.EndDate,
             BudgetPerPerson = request.BudgetPerPerson,
             SpecialRequests = string.IsNullOrWhiteSpace(request.SpecialRequests) ? null : request.SpecialRequests.Trim(),
+            LanguagePreference = string.IsNullOrWhiteSpace(request.LanguagePreference) ? null : request.LanguagePreference.Trim(),
             // Large-group bookings (see BookingDto.IsLargeGroup) intentionally stay Requested here.
             // Routing them to PendingApproval is the future approval workflow/agent's responsibility,
             // not this endpoint's — there is currently no workflow that can move a booking back out
@@ -291,6 +306,456 @@ public class BookingsController : ControllerBase
         return Ok(BookingDto.FromEntity(booking));
     }
 
+    [HttpPatch("{id:guid}/decision")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<BookingDto>> Decide(Guid id, BookingDecisionRequest request, CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (!BookingStatusTransitions.CanDecide(booking.Status))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: $"This booking is already {booking.Status} and cannot be decided again.");
+        }
+
+        var performedBy = GetUserId();
+        if (performedBy is null)
+        {
+            return Unauthorized();
+        }
+
+        booking.Status = request.Decision == BookingDecision.Approve
+            ? BookingStatus.Confirmed
+            : BookingStatus.Cancelled;
+
+        var run = await _db.AgentWorkflowRuns
+            .Where(r => r.BookingId == booking.Id)
+            .OrderByDescending(r => r.StartedAt)
+            .FirstOrDefaultAsync(ct);
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            if (run is not null)
+            {
+                // "Completed" here means the workflow run itself is finished, not that the
+                // booking was approved — both an approve and a reject conclude the run, they
+                // just leave the booking in different final statuses.
+                run.Status = "Completed";
+                run.CompletedAt = DateTimeOffset.UtcNow;
+
+                _db.AgentStepLogs.Add(new AgentStepLog
+                {
+                    WorkflowRunId = run.Id,
+                    AgentName = "manager_decision",
+                    InputJson = JsonSerializer.Serialize(
+                        new { decision = request.Decision.ToString(), request.Notes },
+                        AgentJsonOptions.Default),
+                    OutputJson = JsonSerializer.Serialize(
+                        new { newStatus = booking.Status.ToString() },
+                        AgentJsonOptions.Default),
+                    DurationMs = 0,
+                });
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: request.Decision == BookingDecision.Approve ? "BookingApproved" : "BookingRejected",
+                performedBy: performedBy.Value,
+                details: new { decision = request.Decision.ToString(), request.Notes },
+                ct: ct);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        return Ok(BookingDto.FromEntity(booking));
+    }
+
+    [HttpPatch("{id:guid}/complete")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<BookingDto>> Complete(Guid id, CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (!BookingStatusTransitions.CanComplete(booking.Status))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: $"This booking is {booking.Status} and cannot be marked completed.");
+        }
+
+        var performedBy = GetUserId();
+        if (performedBy is null)
+        {
+            return Unauthorized();
+        }
+
+        booking.Status = BookingStatus.Completed;
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: "BookingCompleted",
+                performedBy: performedBy.Value,
+                ct: ct);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        return Ok(BookingDto.FromEntity(booking));
+    }
+
+    [HttpPatch("{id:guid}/cancel")]
+    public async Task<ActionResult<BookingDto>> Cancel(Guid id, CancelBookingRequest request, CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var callerId = GetUserId();
+        var isOwner = callerId.HasValue && booking.TravelerId == callerId.Value;
+        var isManager = User.IsInRole("Admin") || User.IsInRole("OperationsManager");
+
+        if (!isOwner && !isManager)
+        {
+            return Forbid();
+        }
+
+        if (!BookingStatusTransitions.CanCancel(booking.Status))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: $"This booking is {booking.Status} and cannot be cancelled.");
+        }
+
+        if (!isManager && booking.StartDate <= DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "This booking has already started or finished and cannot be self-cancelled.");
+        }
+
+        booking.Status = BookingStatus.Cancelled;
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: isManager ? "BookingCancelledByStaff" : "BookingCancelledByTraveler",
+                performedBy: callerId,
+                details: new { request.Reason },
+                ct: ct);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        return Ok(BookingDto.FromEntity(booking));
+    }
+
+    [HttpPatch("{id:guid}/guide-notes")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<ActionResult<AssignedTourDto>> UpdateGuideNotes(
+        Guid id,
+        UpdateGuideTourRequest request,
+        CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides
+            .AsNoTracking()
+            .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+        if (guide is null)
+        {
+            return Forbid();
+        }
+
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+                .ThenInclude(p => p.Locations)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var isAssigned = await _db.GuideAvailabilities
+            .AnyAsync(a => a.GuideId == guide.Id && a.AssignedBookingId == id, ct);
+
+        if (!isAssigned)
+        {
+            return Forbid();
+        }
+
+        if (request.Notes?.Length > 2000)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("notes", "Guide notes cannot exceed 2000 characters.") }
+            });
+        }
+
+        booking.Attended = request.Attended;
+        booking.Completed = request.Completed;
+        booking.GuideNotes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("TourGuide {GuideId} updated booking {BookingId}: Attended={Attended}, Completed={Completed}",
+            guide.Id, booking.Id, booking.Attended, booking.Completed);
+
+        return Ok(AssignedTourDto.FromEntity(booking, guide));
+    }
+
+    [HttpGet("{id:guid}/itinerary")]
+    public async Task<ActionResult<IReadOnlyList<ItineraryStepDto>>> GetItinerary(Guid id, CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var booking = await _db.Bookings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var isManager = User.IsInRole("OperationsManager") || User.IsInRole("Admin");
+        var isOwner = booking.TravelerId == currentUserId.Value;
+
+        var isAssignedGuide = false;
+        if (!isManager && !isOwner && User.IsInRole("TourGuide"))
+        {
+            var guide = await _db.Guides
+                .AsNoTracking()
+                .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+            if (guide is not null)
+            {
+                isAssignedGuide = await _db.GuideAvailabilities
+                    .AnyAsync(a => a.GuideId == guide.Id && a.AssignedBookingId == id, ct);
+            }
+        }
+
+        if (!isManager && !isOwner && !isAssignedGuide)
+        {
+            return Forbid();
+        }
+
+        var steps = await _itineraryService.GetItineraryAsync(id, ct);
+        return Ok(steps.Select(ItineraryStepDto.FromEntity).ToList());
+    }
+
+    [HttpPost("{id:guid}/itinerary")]
+    [Authorize(Roles = "OperationsManager,TourGuide,Admin")]
+    public async Task<ActionResult<IReadOnlyList<ItineraryStepDto>>> SetItinerary(
+        Guid id,
+        SetItineraryRequest request,
+        CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var booking = await _db.Bookings
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        if (booking.Status != BookingStatus.Confirmed)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("status", "Itineraries can only be created for confirmed bookings.") }
+            });
+        }
+
+        var isManager = User.IsInRole("OperationsManager") || User.IsInRole("Admin");
+        if (!isManager)
+        {
+            if (User.IsInRole("TourGuide"))
+            {
+                var guide = await _db.Guides
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+                if (guide is null)
+                {
+                    return Forbid();
+                }
+
+                var isAssigned = await _db.GuideAvailabilities
+                    .AnyAsync(a => a.GuideId == guide.Id && a.AssignedBookingId == id, ct);
+
+                if (!isAssigned)
+                {
+                    return Forbid();
+                }
+            }
+            else
+            {
+                return Forbid();
+            }
+        }
+
+        if (request?.Steps is null)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("steps", "Steps list cannot be null.") }
+            });
+        }
+
+        var errors = new List<FieldValidationError>();
+
+        for (var i = 0; i < request.Steps.Count; i++)
+        {
+            var step = request.Steps[i];
+            if (step.DayNumber <= 0)
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].dayNumber", "Day number must be greater than 0."));
+            }
+
+            if (string.IsNullOrWhiteSpace(step.Activity))
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].activity", "Activity is required."));
+            }
+            else if (step.Activity.Trim().Length > 300)
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].activity", "Activity cannot exceed 300 characters."));
+            }
+
+            if (string.IsNullOrWhiteSpace(step.Location))
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].location", "Location is required."));
+            }
+            else if (step.Location.Trim().Length > 300)
+            {
+                errors.Add(new FieldValidationError($"steps[{i}].location", "Location cannot exceed 300 characters."));
+            }
+        }
+
+        var duplicateSchedule = request.Steps
+            .GroupBy(s => (s.DayNumber, s.StartTime))
+            .FirstOrDefault(g => g.Count() > 1);
+
+        if (duplicateSchedule is not null)
+        {
+            errors.Add(new FieldValidationError("steps", $"Duplicate step scheduled for Day {duplicateSchedule.Key.DayNumber} at {duplicateSchedule.Key.StartTime}."));
+        }
+
+        if (errors.Count > 0)
+        {
+            return BadRequest(new { errors });
+        }
+
+        var newSteps = request.Steps.Select(s => new ItineraryStep
+        {
+            DayNumber = s.DayNumber,
+            Activity = s.Activity.Trim(),
+            Location = s.Location.Trim(),
+            StartTime = s.StartTime
+        });
+
+        var savedSteps = await _itineraryService.SetItineraryAsync(id, newSteps, ct);
+
+        _logger.LogInformation("Itinerary updated for booking {BookingId} with {Count} steps", id, savedSteps.Count);
+
+        return Ok(savedSteps.Select(ItineraryStepDto.FromEntity).ToList());
+    }
+
     private static List<FieldValidationError> Validate(CreateBookingRequest request, PackageTier tier)
     {
         var errors = new List<FieldValidationError>();
@@ -333,6 +798,13 @@ public class BookingsController : ControllerBase
             errors.Add(new FieldValidationError(
                 "specialRequests",
                 $"Special requests cannot exceed {MaxSpecialRequestsLength} characters."));
+        }
+
+        if (request.LanguagePreference?.Length > MaxLanguagePreferenceLength)
+        {
+            errors.Add(new FieldValidationError(
+                "languagePreference",
+                $"Language preference cannot exceed {MaxLanguagePreferenceLength} characters."));
         }
 
         return errors;

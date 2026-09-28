@@ -5,6 +5,7 @@ namespace TrailWise.Domain.Entities;
 public class Vehicle : BaseEntity
 {
     public VehicleType Type { get; set; }
+    public string RegistrationNumber { get; set; } = string.Empty;
     public int Capacity { get; set; }
     public bool HasAC { get; set; }
     public string SeatConfiguration { get; set; } = string.Empty;

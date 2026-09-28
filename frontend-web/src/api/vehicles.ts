@@ -7,6 +7,7 @@ export type VehicleMaintenanceStatus = 'Available' | 'UnderMaintenance' | 'OutOf
 export interface VehicleDto {
   id: string;
   type: VehicleType;
+  registrationNumber: string;
   capacity: number;
   hasAC: boolean;
   seatConfiguration: string;
@@ -17,6 +18,7 @@ export interface VehicleDto {
 
 export interface CreateVehicleRequest {
   type: VehicleType;
+  registrationNumber: string;
   capacity: number;
   hasAC: boolean;
   seatConfiguration?: string;

@@ -131,5 +131,23 @@ public static class DbSeeder
             db.TourPackages.AddRange(culturalPackage, hillCountryPackage, coastalPackage);
             await db.SaveChangesAsync(ct);
         }
+
+        if (!await db.Discounts.AnyAsync(ct))
+        {
+            db.Discounts.AddRange(
+                new Discount
+                {
+                    Description = "Group discount (10+ people)",
+                    PercentageOff = 10m,
+                    MinGroupSize = 10
+                },
+                new Discount
+                {
+                    Description = "Large group discount (15+ people)",
+                    PercentageOff = 15m,
+                    MinGroupSize = 15
+                });
+            await db.SaveChangesAsync(ct);
+        }
     }
 }
