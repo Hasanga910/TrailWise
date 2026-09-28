@@ -30,6 +30,8 @@ import { FleetProfileSettingsPage } from './pages/fleet/FleetProfileSettingsPage
 import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
 import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
 import { GuideAvailabilityPage } from './pages/guides/GuideAvailabilityPage';
+import { AssignedToursPage } from './pages/guides/AssignedToursPage';
+import { TourDetailPage } from './pages/guides/TourDetailPage';
 
 function App() {
   return (
@@ -52,6 +54,24 @@ function App() {
         element={
           <RequireRole allowedRoles={['OperationsManager', 'FleetCoordinator', 'TourGuide']}>
             <GuideAvailabilityPage />
+          </RequireRole>
+        }
+      />
+
+      <Route
+        path="/guides/my-tours"
+        element={
+          <RequireRole allowedRoles={['TourGuide']}>
+            <AssignedToursPage />
+          </RequireRole>
+        }
+      />
+
+      <Route
+        path="/guides/my-tours/:bookingId"
+        element={
+          <RequireRole allowedRoles={['TourGuide']}>
+            <TourDetailPage />
           </RequireRole>
         }
       />

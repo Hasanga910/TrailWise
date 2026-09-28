@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as bookingsApi from '../../api/bookings';
 import type { BookingDto, PagedResult } from '../../api/bookings';
+import * as itinerariesApi from '../../api/itineraries';
 import { MyBookingsPage } from './MyBookingsPage';
 
 function sampleBooking(overrides: Partial<BookingDto> = {}): BookingDto {
@@ -156,5 +157,39 @@ describe('MyBookingsPage', () => {
 
     await waitFor(() => expect(cancelSpy).toHaveBeenCalledWith('booking-1', 'Change of plans'));
     await waitFor(() => expect(screen.getByText('Cancelled', { selector: 'span' })).toBeInTheDocument());
+  });
+
+  it('shows the itinerary when View Itinerary is clicked for a confirmed booking', async () => {
+    vi.spyOn(bookingsApi, 'getMyBookings').mockResolvedValue({
+      items: [sampleBooking({ status: 'Confirmed' })],
+      totalCount: 1,
+      page: 1,
+      pageSize: 10,
+    });
+    const getItinerarySpy = vi.spyOn(itinerariesApi, 'getItinerary').mockResolvedValue([
+      { id: 'step-1', bookingId: 'booking-1', dayNumber: 1, activity: 'Temple visit', location: 'Kandy', startTime: '09:00:00' },
+    ]);
+
+    renderPage();
+    await screen.findByText(/Cultural Triangle Explorer/);
+
+    await userEvent.click(screen.getByRole('button', { name: /view itinerary/i }));
+
+    await waitFor(() => expect(getItinerarySpy).toHaveBeenCalledWith('booking-1'));
+    expect(await screen.findByText(/Temple visit/)).toBeInTheDocument();
+  });
+
+  it('does not show a View Itinerary button for a non-confirmed booking', async () => {
+    vi.spyOn(bookingsApi, 'getMyBookings').mockResolvedValue({
+      items: [sampleBooking({ status: 'Requested' })],
+      totalCount: 1,
+      page: 1,
+      pageSize: 10,
+    });
+
+    renderPage();
+    await screen.findByText(/Cultural Triangle Explorer/);
+
+    expect(screen.queryByRole('button', { name: /view itinerary/i })).not.toBeInTheDocument();
   });
 });
