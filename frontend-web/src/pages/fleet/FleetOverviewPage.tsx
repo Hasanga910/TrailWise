@@ -1,5 +1,5 @@
 import { FleetManager } from '../../components/fleet/FleetManager';
 
-export function FleetManagementPage() {
+export function FleetOverviewPage() {
   return <FleetManager />;
 }
