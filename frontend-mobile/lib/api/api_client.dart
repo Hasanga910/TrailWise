@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../models/assigned_tour.dart';
+import '../models/itinerary_step.dart';
 
 class FieldError {
   final String field;
@@ -94,6 +95,17 @@ class ApiClient {
       'completed': completed,
       'notes': notes,
     });
+  }
+
+  Future<List<ItineraryStep>> getItinerary(String bookingId) async {
+    final response = await get('/api/bookings/$bookingId/itinerary');
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(ItineraryStep.fromJson)
+          .toList();
+    }
+    return [];
   }
 
 

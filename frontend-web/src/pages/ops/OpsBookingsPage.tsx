@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/apiClient';
 import {
@@ -9,6 +9,9 @@ import {
   type BookingStatus,
   type BookingSummaryDto,
 } from '../../api/bookings';
+import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
+import { ItineraryEditor } from '../../components/itinerary/ItineraryEditor';
+import { ItineraryList } from '../../components/itinerary/ItineraryList';
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
   Requested: 'bg-slate-100 text-slate-600',
@@ -42,6 +45,34 @@ export function OpsBookingsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
+
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+  const [itineraryCache, setItineraryCache] = useState<Record<string, ItineraryStepDto[]>>({});
+  const [itineraryLoadingId, setItineraryLoadingId] = useState<string | null>(null);
+  const [itineraryErrors, setItineraryErrors] = useState<Record<string, string>>({});
+  const [editingItineraryId, setEditingItineraryId] = useState<string | null>(null);
+
+  function toggleItinerary(bookingId: string) {
+    if (expandedBookingId === bookingId) {
+      setExpandedBookingId(null);
+      setEditingItineraryId(null);
+      return;
+    }
+    setExpandedBookingId(bookingId);
+    if (itineraryCache[bookingId]) {
+      return;
+    }
+    setItineraryLoadingId(bookingId);
+    getItinerary(bookingId)
+      .then((steps) => setItineraryCache((prev) => ({ ...prev, [bookingId]: steps })))
+      .catch((err) =>
+        setItineraryErrors((prev) => ({
+          ...prev,
+          [bookingId]: extractErrorMessage(err, 'Could not load the itinerary.'),
+        })),
+      )
+      .finally(() => setItineraryLoadingId(null));
+  }
 
   function load() {
     getAllBookings()
@@ -164,71 +195,121 @@ export function OpsBookingsPage() {
                 const canComplete = booking.status === 'Confirmed';
                 const canCancel = CANCELLABLE_STATUSES.includes(booking.status);
 
+                const isExpanded = expandedBookingId === booking.id;
+
                 return (
-                  <tr key={booking.id} className="transition hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{booking.travelerName}</td>
-                    <td className="px-4 py-3 text-slate-600">{booking.packageName}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[booking.status]}`}
-                      >
-                        {booking.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{booking.createdAt}</td>
-                    <td className="px-4 py-3 text-slate-600">{booking.startDate}</td>
-                    <td className="px-4 py-3 text-slate-600">{booking.groupSize}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        {canDecide && (
-                          <>
-                            <button
-                              type="button"
-                              disabled={isActioning}
-                              onClick={() => handleApprove(booking.id)}
-                              className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isActioning}
-                              onClick={() => setPrompt({ kind: 'reject', bookingId: booking.id, text: '' })}
-                              className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {canComplete && (
-                          <button
-                            type="button"
-                            disabled={isActioning}
-                            onClick={() => handleComplete(booking.id)}
-                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            Mark Completed
-                          </button>
-                        )}
-                        {canCancel && (
-                          <button
-                            type="button"
-                            disabled={isActioning}
-                            onClick={() => setPrompt({ kind: 'cancel', bookingId: booking.id, text: '' })}
-                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                        <Link
-                          to={`/ops/bookings/${booking.id}/workflow`}
-                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  <Fragment key={booking.id}>
+                    <tr className="transition hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-slate-900">{booking.travelerName}</td>
+                      <td className="px-4 py-3 text-slate-600">{booking.packageName}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[booking.status]}`}
                         >
-                          View agent workflow
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
+                          {booking.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{booking.createdAt}</td>
+                      <td className="px-4 py-3 text-slate-600">{booking.startDate}</td>
+                      <td className="px-4 py-3 text-slate-600">{booking.groupSize}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          {canDecide && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={isActioning}
+                                onClick={() => handleApprove(booking.id)}
+                                className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isActioning}
+                                onClick={() => setPrompt({ kind: 'reject', bookingId: booking.id, text: '' })}
+                                className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {canComplete && (
+                            <button
+                              type="button"
+                              disabled={isActioning}
+                              onClick={() => handleComplete(booking.id)}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Mark Completed
+                            </button>
+                          )}
+                          {canCancel && (
+                            <button
+                              type="button"
+                              disabled={isActioning}
+                              onClick={() => setPrompt({ kind: 'cancel', bookingId: booking.id, text: '' })}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                          {booking.status === 'Confirmed' && (
+                            <button
+                              type="button"
+                              onClick={() => toggleItinerary(booking.id)}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            >
+                              {isExpanded ? 'Hide Itinerary' : 'Itinerary'}
+                            </button>
+                          )}
+                          <Link
+                            to={`/ops/bookings/${booking.id}/workflow`}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            View agent workflow
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr key={`${booking.id}-itinerary`}>
+                        <td colSpan={7} className="border-t border-slate-100 bg-slate-50 px-4 py-4">
+                          {itineraryLoadingId === booking.id && (
+                            <div className="h-12 animate-pulse rounded-lg bg-white" />
+                          )}
+                          {itineraryErrors[booking.id] && (
+                            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                              {itineraryErrors[booking.id]}
+                            </p>
+                          )}
+                          {itineraryCache[booking.id] && editingItineraryId !== booking.id && (
+                            <div className="space-y-3">
+                              <ItineraryList steps={itineraryCache[booking.id]} />
+                              <button
+                                type="button"
+                                onClick={() => setEditingItineraryId(booking.id)}
+                                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-white"
+                              >
+                                {itineraryCache[booking.id].length > 0 ? 'Edit Itinerary' : 'Set Itinerary'}
+                              </button>
+                            </div>
+                          )}
+                          {itineraryCache[booking.id] && editingItineraryId === booking.id && (
+                            <ItineraryEditor
+                              bookingId={booking.id}
+                              initialSteps={itineraryCache[booking.id]}
+                              onSaved={(saved) => {
+                                setItineraryCache((prev) => ({ ...prev, [booking.id]: saved }));
+                                setEditingItineraryId(null);
+                              }}
+                              onCancel={() => setEditingItineraryId(null)}
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
