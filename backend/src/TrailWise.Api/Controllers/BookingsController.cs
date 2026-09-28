@@ -162,7 +162,7 @@ public class BookingsController : ControllerBase
         }
     }
 
-    [HttpGet]
+    [HttpGet("paged")]
     [Authorize(Roles = "Admin,OperationsManager,FleetCoordinator")]
     public async Task<ActionResult<PagedResult<BookingDto>>> GetAll(
         BookingStatus? status,

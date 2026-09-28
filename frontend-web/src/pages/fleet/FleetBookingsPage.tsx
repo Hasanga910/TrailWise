@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { extractErrorMessage } from '../../api/apiClient';
-import { getAllBookings, type BookingDto } from '../../api/bookings';
+import { getPagedBookings, type BookingDto } from '../../api/bookings';
 import { BookingsIcon } from '../../components/admin/icons';
 
 export function FleetBookingsPage() {
@@ -12,7 +12,7 @@ export function FleetBookingsPage() {
 
   function loadBookings() {
     setError(null);
-    getAllBookings({ pageSize: 50 })
+    getPagedBookings({ pageSize: 50 })
       .then((res) => setBookings(res.items))
       .catch((err) => setError(extractErrorMessage(err, 'Failed to load bookings.')))
       .finally(() => setLoading(false));

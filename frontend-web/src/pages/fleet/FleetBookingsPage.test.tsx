@@ -29,7 +29,7 @@ const mockBookings: bookingsApi.BookingDto[] = [
 describe('FleetBookingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(bookingsApi, 'getAllBookings').mockResolvedValue({
+    vi.spyOn(bookingsApi, 'getPagedBookings').mockResolvedValue({
       items: mockBookings,
       totalCount: 1,
       page: 1,

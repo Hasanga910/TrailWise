@@ -69,8 +69,8 @@ export async function getMyBookings(params: GetMyBookingsParams = {}): Promise<P
   return response.data;
 }
 
-export async function getAllBookings(params: GetMyBookingsParams = {}): Promise<PagedResult<BookingDto>> {
-  const response = await apiClient.get<PagedResult<BookingDto>>('/api/bookings', { params });
+export async function getPagedBookings(params: GetMyBookingsParams = {}): Promise<PagedResult<BookingDto>> {
+  const response = await apiClient.get<PagedResult<BookingDto>>('/api/bookings/paged', { params });
   return response.data;
 }
 

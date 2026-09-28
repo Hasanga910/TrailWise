@@ -14,7 +14,7 @@ import {
   type VehicleMaintenanceStatus,
   type VehicleType,
 } from '../../api/vehicles';
-import { getAllBookings, type BookingDto } from '../../api/bookings';
+import { getPagedBookings, type BookingDto } from '../../api/bookings';
 import { BookingsIcon, PlusCircleIcon, TruckIcon } from '../admin/icons';
 
 // Status badge helper styling
@@ -176,7 +176,7 @@ export function FleetManager() {
     Promise.all([
       getVehicles(),
       getDrivers().catch(() => [] as DriverDto[]),
-      getAllBookings({ pageSize: 20 }).catch(() => ({ items: [] as BookingDto[] })),
+      getPagedBookings({ pageSize: 20 }).catch(() => ({ items: [] as BookingDto[], totalCount: 0, page: 1, pageSize: 20 })),
     ])
       .then(([vehiclesRes, driversRes, bookingsRes]) => {
         setVehicles(vehiclesRes);
@@ -559,8 +559,6 @@ export function FleetManager() {
         </div>
       )}
 
-<<<<<<< HEAD
-      {/* Main Content Area: Vehicle Inventory & Integrated Bookings Reference Panel */}
       {/* Main Content Area: Vehicle Inventory & Integrated Bookings Reference Panel */}
       <div className="flex flex-col xl:flex-row gap-5 items-start">
         {/* Vehicles Table Container */}
@@ -577,240 +575,125 @@ export function FleetManager() {
               <BookingsIcon className="h-4 w-4 text-brand-600" />
               {showBookingsPanel ? 'Hide Bookings Queue' : 'Show Bookings Queue'}
             </button>
-=======
-      {!loading && filteredVehicles && filteredVehicles.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-3.5 py-3">Vehicle</th>
-                  <th className="px-3.5 py-3">Registration No.</th>
-                  <th className="px-3 py-3">Capacity</th>
-                  <th className="px-3 py-3">AC</th>
-                  <th className="px-3 py-3">Layout</th>
-                  <th className="px-3.5 py-3">Status</th>
-                  <th className="px-3.5 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredVehicles.map((vehicle) => (
-                  <tr key={vehicle.id} className="transition hover:bg-slate-50/80">
-                    <td className="px-3.5 py-3 font-medium text-slate-900 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <VehicleTypeBadge type={vehicle.type} />
-                        <span className="text-xs text-slate-400 font-mono">
-                          #{vehicle.id.substring(0, 8)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-3.5 py-3 font-mono text-xs font-semibold text-slate-700 whitespace-nowrap">
-                      {vehicle.registrationNumber}
-                    </td>
-                    <td className="px-3 py-3 text-slate-700 whitespace-nowrap">
-                      <span className="font-semibold text-slate-900">{vehicle.capacity}</span> seats
-                    </td>
-                    <td className="px-3 py-3 text-slate-600 whitespace-nowrap">
-                      {vehicle.hasAC ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-teal-500" />
-                          AC
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-400">Non-AC</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-slate-600 font-mono text-xs whitespace-nowrap">
-                      {vehicle.seatConfiguration || 'Standard'}
-                    </td>
-                    <td className="px-3.5 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <StatusBadge status={vehicle.maintenanceStatus} />
-                        {/* Inline status switcher */}
-                        <select
-                          disabled={updatingVehicleId === vehicle.id}
-                          value={vehicle.maintenanceStatus}
-                          onChange={(e) =>
-                            handleStatusChange(
-                              vehicle.id,
-                              e.target.value as VehicleMaintenanceStatus,
-                            )
-                          }
-                          aria-label={`Change status for vehicle ${vehicle.id.substring(0, 8)}`}
-                          className="rounded border border-slate-200 bg-white py-0.5 px-1 text-xs text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        >
-                          <option value="Available">Available</option>
-                          <option value="UnderMaintenance">Maintenance</option>
-                          <option value="OutOfService">Out of Service</option>
-                        </select>
-                      </div>
-                    </td>
-                    <td className="px-3.5 py-3 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCheckingVehicle(vehicle);
-                            setAvailResult(null);
-                            setAvailError(null);
-                            const today = new Date().toISOString().split('T')[0];
-                            setAvailFrom(today);
-                            setAvailTo(today);
-                          }}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
-                        >
-                          Check Availability
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReservingVehicle(vehicle);
-                            setReserveError(null);
-                            setReserveSuccess(null);
-                            const today = new Date().toISOString().split('T')[0];
-                            setReserveStartDate(today);
-                            setReserveEndDate(today);
-                          }}
-                          className="rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-100"
-                        >
-                          Allocate
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDeleteVehicleError(null);
-                            setDeletingVehicle(vehicle);
-                          }}
-                          className="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
->>>>>>> origin/dev
           </div>
 
           {!loading && filteredVehicles && filteredVehicles.length > 0 && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <table className="w-full text-left text-xs sm:text-sm table-auto">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2.5">Vehicle</th>
-                    <th className="px-2.5 py-2.5">Capacity</th>
-                    <th className="px-2.5 py-2.5">Features</th>
-                    <th className="px-2.5 py-2.5">Status</th>
-                    <th className="px-3 py-2.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredVehicles.map((vehicle) => (
-                    <tr key={vehicle.id} className="transition hover:bg-slate-50/80">
-                      <td className="px-3 py-2.5 font-medium text-slate-900">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <VehicleTypeBadge type={vehicle.type} />
-                          <span className="text-[11px] text-slate-400 font-mono">
-                            #{vehicle.id.substring(0, 8)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-2.5 py-2.5 text-slate-700">
-                        <span className="font-bold text-slate-900">{vehicle.capacity}</span>{' '}
-                        <span className="text-slate-500 text-xs">seats</span>
-                      </td>
-                      <td className="px-2.5 py-2.5 text-slate-600 text-xs">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-3.5 py-3">Vehicle</th>
+                      <th className="px-3.5 py-3">Registration No.</th>
+                      <th className="px-3 py-3">Capacity</th>
+                      <th className="px-3 py-3">AC</th>
+                      <th className="px-3 py-3">Layout</th>
+                      <th className="px-3.5 py-3">Status</th>
+                      <th className="px-3.5 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredVehicles.map((vehicle) => (
+                      <tr key={vehicle.id} className="transition hover:bg-slate-50/80">
+                        <td className="px-3.5 py-3 font-medium text-slate-900 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <VehicleTypeBadge type={vehicle.type} />
+                            <span className="text-xs text-slate-400 font-mono">
+                              #{vehicle.id.substring(0, 8)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3.5 py-3 font-mono text-xs font-semibold text-slate-700 whitespace-nowrap">
+                          {vehicle.registrationNumber}
+                        </td>
+                        <td className="px-3 py-3 text-slate-700 whitespace-nowrap">
+                          <span className="font-semibold text-slate-900">{vehicle.capacity}</span> seats
+                        </td>
+                        <td className="px-3 py-3 text-slate-600 whitespace-nowrap">
                           {vehicle.hasAC ? (
-                            <span className="inline-flex items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 border border-teal-200">
-                              <span className="h-1 w-1 rounded-full bg-teal-500" />
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700">
+                              <span className="h-1.5 w-1.5 rounded-full bg-teal-500" />
                               AC
                             </span>
                           ) : (
-                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
-                              Non-AC
-                            </span>
+                            <span className="text-xs text-slate-400">Non-AC</span>
                           )}
-                          {vehicle.seatConfiguration && (
-                            <span className="text-[11px] text-slate-400 font-mono hidden md:inline">
-                              {vehicle.seatConfiguration}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2.5 py-2.5">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                          <StatusBadge status={vehicle.maintenanceStatus} />
-                          <select
-                            disabled={updatingVehicleId === vehicle.id}
-                            value={vehicle.maintenanceStatus}
-                            onChange={(e) =>
-                              handleStatusChange(
-                                vehicle.id,
-                                e.target.value as VehicleMaintenanceStatus,
-                              )
-                            }
-                            aria-label={`Change status for vehicle ${vehicle.id.substring(0, 8)}`}
-                            className="rounded border border-slate-200 bg-white py-0.5 px-1 text-[11px] text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-brand-500 max-w-[100px]"
-                          >
-                            <option value="Available">Available</option>
-                            <option value="UnderMaintenance">Maintenance</option>
-                            <option value="OutOfService">Out of Svc</option>
-                          </select>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <div className="inline-flex items-center justify-end gap-1 flex-wrap">
-                          <button
-                            type="button"
-                            aria-label="Check Availability"
-                            title="Check availability for specific dates"
-                            onClick={() => {
-                              setCheckingVehicle(vehicle);
-                              setAvailResult(null);
-                              setAvailError(null);
-                              const today = new Date().toISOString().split('T')[0];
-                              setAvailFrom(today);
-                              setAvailTo(today);
-                            }}
-                            className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-100"
-                          >
-                            Check
-                          </button>
-                          <button
-                            type="button"
-                            title="Allocate vehicle to a booking"
-                            onClick={() => {
-                              setReservingVehicle(vehicle);
-                              setReserveError(null);
-                              setReserveSuccess(null);
-                              const today = new Date().toISOString().split('T')[0];
-                              setReserveStartDate(today);
-                              setReserveEndDate(today);
-                            }}
-                            className="rounded bg-brand-600 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-brand-700"
-                          >
-                            Allocate
-                          </button>
-                          <button
-                            type="button"
-                            title="Remove vehicle from fleet"
-                            onClick={() => {
-                              setDeleteVehicleError(null);
-                              setDeletingVehicle(vehicle);
-                            }}
-                            className="rounded border border-red-200 bg-white px-1.5 py-1 text-[11px] font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                        <td className="px-3 py-3 text-slate-600 font-mono text-xs whitespace-nowrap">
+                          {vehicle.seatConfiguration || 'Standard'}
+                        </td>
+                        <td className="px-3.5 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <StatusBadge status={vehicle.maintenanceStatus} />
+                            {/* Inline status switcher */}
+                            <select
+                              disabled={updatingVehicleId === vehicle.id}
+                              value={vehicle.maintenanceStatus}
+                              onChange={(e) =>
+                                handleStatusChange(
+                                  vehicle.id,
+                                  e.target.value as VehicleMaintenanceStatus,
+                                )
+                              }
+                              aria-label={`Change status for vehicle ${vehicle.id.substring(0, 8)}`}
+                              className="rounded border border-slate-200 bg-white py-0.5 px-1 text-xs text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                              <option value="Available">Available</option>
+                              <option value="UnderMaintenance">Maintenance</option>
+                              <option value="OutOfService">Out of Service</option>
+                            </select>
+                          </div>
+                        </td>
+                        <td className="px-3.5 py-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              aria-label="Check Availability"
+                              title="Check availability for specific dates"
+                              onClick={() => {
+                                setCheckingVehicle(vehicle);
+                                setAvailResult(null);
+                                setAvailError(null);
+                                const today = new Date().toISOString().split('T')[0];
+                                setAvailFrom(today);
+                                setAvailTo(today);
+                              }}
+                              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
+                            >
+                              Check Availability
+                            </button>
+                            <button
+                              type="button"
+                              title="Allocate vehicle to a booking"
+                              onClick={() => {
+                                setReservingVehicle(vehicle);
+                                setReserveError(null);
+                                setReserveSuccess(null);
+                                const today = new Date().toISOString().split('T')[0];
+                                setReserveStartDate(today);
+                                setReserveEndDate(today);
+                              }}
+                              className="rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-100"
+                            >
+                              Allocate
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeleteVehicleError(null);
+                                setDeletingVehicle(vehicle);
+                              }}
+                              className="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
