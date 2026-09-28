@@ -25,6 +25,8 @@ public interface IFleetReservationService
 {
     Task<bool> IsVehicleAvailableAsync(Guid vehicleId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default);
 
+    Task<bool> IsDriverAvailableAsync(Guid driverId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default);
+
     Task<ReservationResult> ReserveVehicleAsync(
         Guid vehicleId,
         Guid driverId,
@@ -32,4 +34,6 @@ public interface IFleetReservationService
         DateOnly startDate,
         DateOnly endDate,
         CancellationToken ct = default);
+
+    Task<int> ReleaseBookingAssignmentsAsync(Guid bookingId, CancellationToken ct = default);
 }

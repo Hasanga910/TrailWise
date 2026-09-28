@@ -35,6 +35,7 @@ services:
       AdminSeed__Email: ${ADMIN_SEED_EMAIL:-admin@trailwise.local}
       AdminSeed__Password: ${ADMIN_SEED_PASSWORD:-ChangeMe123!}
       Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN}
+      Cors__AllowedOrigins__1: ${CORS_ALLOWED_ORIGIN_FLUTTER:-http://localhost:5000}
       Llm__Enabled: ${LLM_ENABLED:-false}
       Llm__ApiKey: ${GROQ_API_KEY}
     ports:

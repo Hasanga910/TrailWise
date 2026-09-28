@@ -1,23 +1,22 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { extractErrorMessage } from '../../api/apiClient';
 import {
+  checkDriverAvailability,
   checkVehicleAvailability,
-  createDriver,
-  createVehicle,
-  deleteVehicle,
   getDrivers,
   getVehicles,
   reserveVehicle,
-  updateVehicleMaintenanceStatus,
   type DriverDto,
   type VehicleDto,
   type VehicleMaintenanceStatus,
   type VehicleType,
 } from '../../api/vehicles';
-import { getPagedBookings, type BookingDto } from '../../api/bookings';
-import { BookingsIcon, PlusCircleIcon, TruckIcon } from '../admin/icons';
+import { decideBooking, getPagedBookings, type BookingDto } from '../../api/bookings';
+import { getAgentWorkflow, type AgentWorkflowDto } from '../../api/agentWorkflows';
+import { BookingsIcon, TruckIcon } from '../admin/icons';
+import { Link } from 'react-router-dom';
 
-// Status badge helper styling
+// Exported badge helpers
 export function StatusBadge({ status }: { status: VehicleMaintenanceStatus }) {
   switch (status) {
     case 'Available':
@@ -50,7 +49,6 @@ export function StatusBadge({ status }: { status: VehicleMaintenanceStatus }) {
   }
 }
 
-// Vehicle Type badge helper styling
 export function VehicleTypeBadge({ type }: { type: VehicleType }) {
   const styles: Record<VehicleType, string> = {
     Van: 'bg-brand-50 text-brand-700 border-brand-200',
@@ -68,36 +66,41 @@ export function VehicleTypeBadge({ type }: { type: VehicleType }) {
   );
 }
 
-// Booking status badge helper for allocation workflow
 export function BookingStatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'NeedsManualReview':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200 animate-pulse">
+        <span className="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700 border border-rose-200 animate-pulse">
           Needs Review
+        </span>
+      );
+    case 'PlanProposed':
+      return (
+        <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-700 border border-purple-200">
+          ✨ Plan Proposed
         </span>
       );
     case 'PendingApproval':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200">
-          Pending
+        <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200">
+          Pending Approval
         </span>
       );
     case 'Requested':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200">
+        <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 border border-blue-200">
           Requested
         </span>
       );
     case 'Confirmed':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+        <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
           Confirmed
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+        <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
           {status}
         </span>
       );
@@ -105,1208 +108,840 @@ export function BookingStatusBadge({ status }: { status: string }) {
 }
 
 export function FleetManager() {
-  // State for vehicles and drivers
   const [vehicles, setVehicles] = useState<VehicleDto[] | null>(null);
   const [drivers, setDrivers] = useState<DriverDto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [listError, setListError] = useState<string | null>(null);
-
-  // Filters
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterAC, setFilterAC] = useState<string>('all');
-  const [filterMinCap, setFilterMinCap] = useState<string>('');
-  const [filterRegistration, setFilterRegistration] = useState<string>('');
-
-  // Add Vehicle Form State
-  const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
-  const [newType, setNewType] = useState<VehicleType>('Van');
-  const [newRegistrationNumber, setNewRegistrationNumber] = useState<string>('');
-  const [newCapacity, setNewCapacity] = useState<number>(7);
-  const [newHasAC, setNewHasAC] = useState<boolean>(true);
-  const [newSeatConfig, setNewSeatConfig] = useState<string>('2-2-3');
-  const [newStatus, setNewStatus] = useState<VehicleMaintenanceStatus>('Available');
-  const [createVehicleError, setCreateVehicleError] = useState<string | null>(null);
-  const [creatingVehicle, setCreatingVehicle] = useState(false);
-
-  // Status Change State
-  const [updatingVehicleId, setUpdatingVehicleId] = useState<string | null>(null);
-
-  // Check Availability State
-  const [checkingVehicle, setCheckingVehicle] = useState<VehicleDto | null>(null);
-  const [availFrom, setAvailFrom] = useState('');
-  const [availTo, setAvailTo] = useState('');
-  const [availResult, setAvailResult] = useState<{
-    isAvailable: boolean;
-    reason?: string | null;
-  } | null>(null);
-  const [availLoading, setAvailLoading] = useState(false);
-  const [availError, setAvailError] = useState<string | null>(null);
-
-  // Reservation / Allocation Form State
-  const [reservingVehicle, setReservingVehicle] = useState<VehicleDto | null>(null);
-  const [bookingId, setBookingId] = useState('');
-  const [driverId, setDriverId] = useState('');
-  const [reserveStartDate, setReserveStartDate] = useState('');
-  const [reserveEndDate, setReserveEndDate] = useState('');
-  const [reserveError, setReserveError] = useState<string | null>(null);
-  const [reserveSuccess, setReserveSuccess] = useState<string | null>(null);
-  const [reserving, setReserving] = useState(false);
-
-  // Register Driver State
-  const [showDriverModal, setShowDriverModal] = useState(false);
-  const [driverName, setDriverName] = useState('');
-  const [driverLicense, setDriverLicense] = useState('');
-  const [driverContact, setDriverContact] = useState('');
-  const [driverError, setDriverError] = useState<string | null>(null);
-  const [creatingDriver, setCreatingDriver] = useState(false);
-
-  // Delete Vehicle State
-  const [deletingVehicle, setDeletingVehicle] = useState<VehicleDto | null>(null);
-  const [deleteVehicleError, setDeleteVehicleError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Bookings Panel State
   const [bookings, setBookings] = useState<BookingDto[]>([]);
-  const [showBookingsPanel, setShowBookingsPanel] = useState(true);
-  const [bookingQueueFilter, setBookingQueueFilter] = useState<'needs_action' | 'all'>('needs_action');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Active queue tab filter: NeedsManualReview (main priority), PlanProposed, PendingApproval, Requested, All
+  const [queueTab, setQueueTab] = useState<'NeedsManualReview' | 'PlanProposed' | 'PendingApproval' | 'Requested' | 'All'>('NeedsManualReview');
+
+  // Currently selected booking for smart allocation or review
+  const [selectedBooking, setSelectedBooking] = useState<BookingDto | null>(null);
+
+  // Smart vehicle availability cache for the selected booking's date window: vehicleId -> { isAvailable: boolean, reason?: string }
+  const [availabilityMap, setAvailabilityMap] = useState<Record<string, { isAvailable: boolean; reason?: string | null }>>({});
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+
+  // Smart driver availability cache for the selected booking's date window: driverId -> { isAvailable: boolean, reason?: string }
+  const [driverAvailabilityMap, setDriverAvailabilityMap] = useState<Record<string, { isAvailable: boolean; reason?: string | null }>>({});
+  const [checkingDriverAvailability, setCheckingDriverAvailability] = useState(false);
+
+  // Filters for Smart Vehicle Match list
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string>('all');
+  const [minSeatsFilter, setMinSeatsFilter] = useState<string>('');
+
+  // Agent proposed plan inspection for PlanProposed bookings
+  const [workflowPlan, setWorkflowPlan] = useState<AgentWorkflowDto | null>(null);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
+
+  // Allocation modal state
+  const [allocatingVehicle, setAllocatingVehicle] = useState<VehicleDto | null>(null);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [allocating, setAllocating] = useState(false);
+  const [allocationError, setAllocationError] = useState<string | null>(null);
+  const [allocationSuccess, setAllocationSuccess] = useState<string | null>(null);
+
+  // Plan approval state
+  const [approving, setApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
 
   function loadData() {
-    setListError(null);
+    setError(null);
     Promise.all([
       getVehicles(),
       getDrivers().catch(() => [] as DriverDto[]),
-      getPagedBookings({ pageSize: 20 }).catch(() => ({ items: [] as BookingDto[], totalCount: 0, page: 1, pageSize: 20 })),
+      getPagedBookings({ pageSize: 50 }).catch(() => ({ items: [] as BookingDto[], totalCount: 0, page: 1, pageSize: 50 })),
     ])
-      .then(([vehiclesRes, driversRes, bookingsRes]) => {
-        setVehicles(vehiclesRes);
-        setDrivers(driversRes);
-        setBookings(bookingsRes.items || []);
+      .then(([vehRes, driverRes, bookRes]) => {
+        setVehicles(vehRes);
+        setDrivers(driverRes);
+        const bItems = bookRes.items || [];
+        setBookings(bItems);
+
+        // Keep or auto-select first priority booking if none selected
+        if (!selectedBooking && bItems.length > 0) {
+          const priority = bItems.find((b) => b.status === 'NeedsManualReview') ||
+            bItems.find((b) => b.status === 'PlanProposed') ||
+            bItems.find((b) => b.status === 'PendingApproval') ||
+            bItems.find((b) => b.status === 'Requested') ||
+            bItems[0];
+          setSelectedBooking(priority);
+        } else if (selectedBooking) {
+          const updated = bItems.find((b) => b.id === selectedBooking.id);
+          if (updated) setSelectedBooking(updated);
+        }
       })
-      .catch((err) => {
-        setListError(extractErrorMessage(err, 'Failed to load fleet information.'));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      .catch((err) => setError(extractErrorMessage(err, 'Failed to load fleet and booking data.')))
+      .finally(() => setLoading(false));
   }
 
   useEffect(() => {
     loadData();
   }, []);
 
-  // Handle vehicle creation
-  async function handleCreateVehicle(e: FormEvent) {
-    e.preventDefault();
-    setCreateVehicleError(null);
-    setCreatingVehicle(true);
-    try {
-      await createVehicle({
-        type: newType,
-        registrationNumber: newRegistrationNumber.trim().toUpperCase(),
-        capacity: Number(newCapacity),
-        hasAC: newHasAC,
-        seatConfiguration: newSeatConfig,
-        maintenanceStatus: newStatus,
-      });
-      setShowAddVehicleModal(false);
-      // Reset form
-      setNewType('Van');
-      setNewRegistrationNumber('');
-      setNewCapacity(7);
-      setNewHasAC(true);
-      setNewSeatConfig('2-2-3');
-      setNewStatus('Available');
-      await loadData();
-    } catch (err) {
-      setCreateVehicleError(extractErrorMessage(err, 'Could not create vehicle.'));
-    } finally {
-      setCreatingVehicle(false);
+  // When selectedBooking changes, perform smart date-window availability checks against all vehicles
+  useEffect(() => {
+    if (!selectedBooking || !vehicles || vehicles.length === 0) {
+      setAvailabilityMap({});
+      return;
     }
-  }
 
-  // Handle Maintenance Status Update
-  async function handleStatusChange(id: string, newMaintenanceStatus: VehicleMaintenanceStatus) {
-    setUpdatingVehicleId(id);
-    try {
-      await updateVehicleMaintenanceStatus(id, { status: newMaintenanceStatus });
-      setVehicles((prev) =>
-        prev
-          ? prev.map((v) => (v.id === id ? { ...v, maintenanceStatus: newMaintenanceStatus } : v))
-          : null,
-      );
-    } catch (err) {
-      alert(extractErrorMessage(err, 'Could not update maintenance status.'));
-    } finally {
-      setUpdatingVehicleId(null);
-    }
-  }
+    let isMounted = true;
+    setCheckingAvailability(true);
 
-  // Handle Availability Check
-  async function handleCheckAvailability(e: FormEvent) {
-    e.preventDefault();
-    if (!checkingVehicle) return;
-    setAvailLoading(true);
-    setAvailError(null);
-    setAvailResult(null);
-
-    try {
-      const res = await checkVehicleAvailability(checkingVehicle.id, availFrom, availTo);
-      setAvailResult({ isAvailable: res.isAvailable, reason: res.reason });
-    } catch (err) {
-      setAvailError(extractErrorMessage(err, 'Failed to verify availability.'));
-    } finally {
-      setAvailLoading(false);
-    }
-  }
-
-  // Handle Driver Registration
-  async function handleCreateDriver(e: FormEvent) {
-    e.preventDefault();
-    setDriverError(null);
-    setCreatingDriver(true);
-    try {
-      const created = await createDriver({
-        name: driverName.trim(),
-        licenseNumber: driverLicense.trim(),
-        contactInfo: driverContact.trim(),
-      });
-      setDrivers((prev) => [...prev, created]);
-      setDriverName('');
-      setDriverLicense('');
-      setDriverContact('');
-      setShowDriverModal(false);
-    } catch (err) {
-      setDriverError(extractErrorMessage(err, 'Could not register driver.'));
-    } finally {
-      setCreatingDriver(false);
-    }
-  }
-
-  // Handle Vehicle Reservation
-  async function handleReserve(e: FormEvent) {
-    e.preventDefault();
-    if (!reservingVehicle) return;
-    setReserveError(null);
-    setReserveSuccess(null);
-    setReserving(true);
-
-    try {
-      await reserveVehicle(reservingVehicle.id, {
-        bookingId: bookingId.trim(),
-        driverId: driverId.trim(),
-        startDate: reserveStartDate,
-        endDate: reserveEndDate,
-      });
-      setReserveSuccess(
-        `Vehicle ${reservingVehicle.type} successfully assigned to booking ${bookingId}!`,
-      );
-      // Reset form fields
-      setBookingId('');
-      setDriverId('');
-      setReserveStartDate('');
-      setReserveEndDate('');
-      await loadData();
-    } catch (err) {
-      setReserveError(extractErrorMessage(err, 'Failed to allocate vehicle reservation.'));
-    } finally {
-      setReserving(false);
-    }
-  }
-
-  // Handle Vehicle Deletion
-  async function handleDeleteVehicle() {
-    if (!deletingVehicle) return;
-    setDeleteVehicleError(null);
-    setIsDeleting(true);
-    try {
-      await deleteVehicle(deletingVehicle.id);
-      setDeletingVehicle(null);
-      await loadData();
-    } catch (err) {
-      setDeleteVehicleError(extractErrorMessage(err, 'Failed to delete vehicle.'));
-    } finally {
-      setIsDeleting(false);
-    }
-  }
-
-  // Filtered vehicles
-  const filteredVehicles = vehicles?.filter((v) => {
-    if (filterType !== 'all' && v.type !== filterType) return false;
-    if (filterStatus !== 'all' && v.maintenanceStatus !== filterStatus) return false;
-    if (filterAC !== 'all') {
-      const wantsAC = filterAC === 'yes';
-      if (v.hasAC !== wantsAC) return false;
-    }
-    if (filterMinCap) {
-      const minCap = parseInt(filterMinCap, 10);
-      if (!isNaN(minCap) && v.capacity < minCap) return false;
-    }
-    if (filterRegistration) {
-      if (!v.registrationNumber.toLowerCase().includes(filterRegistration.trim().toLowerCase())) {
-        return false;
+    const promises = vehicles.map(async (veh) => {
+      try {
+        const res = await checkVehicleAvailability(veh.id, selectedBooking.startDate, selectedBooking.endDate);
+        return { id: veh.id, isAvailable: res.isAvailable, reason: res.reason };
+      } catch {
+        return { id: veh.id, isAvailable: false, reason: 'Availability check error' };
       }
-    }
-    return true;
-  });
+    });
 
-  // Filtered bookings for the queue panel
-  const displayedBookings = bookings.filter((b) => {
-    if (bookingQueueFilter === 'needs_action') {
-      return (
-        b.status === 'NeedsManualReview' ||
-        b.status === 'PendingApproval' ||
-        b.status === 'Requested'
+    Promise.all(promises).then((results) => {
+      if (!isMounted) return;
+      const map: Record<string, { isAvailable: boolean; reason?: string | null }> = {};
+      results.forEach((r) => {
+        map[r.id] = { isAvailable: r.isAvailable, reason: r.reason };
+      });
+      setAvailabilityMap(map);
+      setCheckingAvailability(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedBooking, vehicles]);
+
+  // When selectedBooking changes, perform smart date-window availability checks against all drivers
+  useEffect(() => {
+    if (!selectedBooking || !drivers || drivers.length === 0) {
+      setDriverAvailabilityMap({});
+      return;
+    }
+
+    let isMounted = true;
+    setCheckingDriverAvailability(true);
+
+    const promises = drivers.map(async (drv) => {
+      try {
+        const res = await checkDriverAvailability(drv.id, selectedBooking.startDate, selectedBooking.endDate);
+        return { id: drv.id, isAvailable: res.isAvailable, reason: res.reason };
+      } catch {
+        return { id: drv.id, isAvailable: false, reason: 'Availability check error' };
+      }
+    });
+
+    Promise.all(promises).then((results) => {
+      if (!isMounted) return;
+      const map: Record<string, { isAvailable: boolean; reason?: string | null }> = {};
+      results.forEach((r) => {
+        map[r.id] = { isAvailable: r.isAvailable, reason: r.reason };
+      });
+      setDriverAvailabilityMap(map);
+      setCheckingDriverAvailability(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedBooking, drivers]);
+
+  // When selectedBooking is in PlanProposed status, load its agent workflow details
+  useEffect(() => {
+    if (!selectedBooking || selectedBooking.status !== 'PlanProposed') {
+      setWorkflowPlan(null);
+      return;
+    }
+
+    setWorkflowLoading(true);
+    getAgentWorkflow(selectedBooking.id)
+      .then((data) => setWorkflowPlan(data))
+      .catch(() => setWorkflowPlan(null))
+      .finally(() => setWorkflowLoading(false));
+  }, [selectedBooking]);
+
+  // Approve & Confirm PlanProposed booking
+  async function handleApprovePlan() {
+    if (!selectedBooking) return;
+    setApproving(true);
+    setApprovalError(null);
+    try {
+      await decideBooking(selectedBooking.id, { decision: 'Approve' });
+      loadData();
+    } catch (err) {
+      setApprovalError(extractErrorMessage(err, 'Failed to approve plan.'));
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  // Handle manual vehicle allocation
+  async function handleConfirmAllocation(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedBooking || !allocatingVehicle || !selectedDriverId) return;
+
+    // Capacity validation check
+    if (selectedBooking.groupSize > allocatingVehicle.capacity) {
+      setAllocationError(
+        `Group size (${selectedBooking.groupSize}) exceeds vehicle capacity (${allocatingVehicle.capacity}). Assignment blocked.`
       );
+      return;
     }
-    return true;
+
+    setAllocating(true);
+    setAllocationError(null);
+    setAllocationSuccess(null);
+
+    try {
+      await reserveVehicle(allocatingVehicle.id, {
+        bookingId: selectedBooking.id,
+        driverId: selectedDriverId,
+        startDate: selectedBooking.startDate,
+        endDate: selectedBooking.endDate,
+      });
+
+      setAllocationSuccess(`Successfully allocated ${allocatingVehicle.type} to booking!`);
+      setTimeout(() => {
+        setAllocatingVehicle(null);
+        setSelectedDriverId('');
+        setAllocationSuccess(null);
+        loadData();
+      }, 1200);
+    } catch (err) {
+      setAllocationError(extractErrorMessage(err, 'Failed to allocate vehicle.'));
+    } finally {
+      setAllocating(false);
+    }
+  }
+
+  // Filter bookings for queue
+  const queueBookings = bookings.filter((b) => {
+    if (queueTab === 'All') return true;
+    return b.status === queueTab;
   });
 
-  const inputClass =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-  const labelClass = 'block mb-1 text-xs font-semibold text-slate-600';
+  // Operational metrics
+  const needsReviewCount = bookings.filter((b) => b.status === 'NeedsManualReview').length;
+  const planProposedCount = bookings.filter((b) => b.status === 'PlanProposed').length;
+  const pendingApprovalCount = bookings.filter((b) => b.status === 'PendingApproval').length;
+  const requestedCount = bookings.filter((b) => b.status === 'Requested').length;
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-gradient-to-br from-brand-50 via-white to-slate-50 p-6 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
+      {/* Header Banner */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
             <TruckIcon className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="font-heading text-xl font-bold text-slate-900">Fleet &amp; Transport</h1>
+            <h1 className="font-heading text-xl font-bold text-slate-900">
+              Fleet &amp; Transport Workspace
+            </h1>
             <p className="text-sm text-slate-500">
-              Manage vehicle inventory, maintenance status, availability checks, and transport assignments.
+              Operational dispatch, conflict-free smart vehicle allocation, and agent proposal approval.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setDriverError(null);
-              setShowDriverModal(true);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        <div className="flex items-center gap-3">
+          <Link
+            to="/fleet/vehicles"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
           >
-            <PlusCircleIcon className="h-4 w-4 text-slate-500" />
-            Add Driver
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setCreateVehicleError(null);
-              setShowAddVehicleModal(true);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+            <TruckIcon className="h-4 w-4 text-slate-400" />
+            Manage Vehicles
+          </Link>
+          <Link
+            to="/fleet/assignments"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition"
           >
-            <PlusCircleIcon className="h-4 w-4" />
-            Add Vehicle
-          </button>
+            View All Schedules
+          </Link>
         </div>
       </div>
 
-      {/* Quick Fleet Metrics */}
-      {vehicles && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Fleet</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{vehicles.length}</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Available</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-700">
-              {vehicles.filter((v) => v.maintenanceStatus === 'Available').length}
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Maintenance</p>
-            <p className="mt-1 text-2xl font-bold text-amber-700">
-              {vehicles.filter((v) => v.maintenanceStatus === 'UnderMaintenance').length}
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">Out of Service</p>
-            <p className="mt-1 text-2xl font-bold text-rose-700">
-              {vehicles.filter((v) => v.maintenanceStatus === 'OutOfService').length}
-            </p>
-          </div>
+      {error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700 shadow-sm">
+          {error}
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="min-w-36 flex-1">
-            <label htmlFor="filter-vehicle-type" className={labelClass}>Vehicle Type</label>
-            <select
-              id="filter-vehicle-type"
-              aria-label="Filter by Vehicle Type"
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className={inputClass}
-            >
-              <option value="all">All Types</option>
-              <option value="Van">Van</option>
-              <option value="Coach">Coach</option>
-              <option value="SUV">SUV</option>
-            </select>
-          </div>
+      {/* Main Workspace Layout */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+        {/* Left Column: Operational Allocation Queue (5 cols) */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BookingsIcon className="h-5 w-5 text-brand-600" />
+                <h2 className="font-heading text-base font-bold text-slate-900">Allocation Queue</h2>
+              </div>
+              <span className="text-xs font-semibold text-slate-500">{bookings.length} Bookings</span>
+            </div>
 
-          <div className="min-w-36 flex-1">
-            <label className={labelClass}>Status</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className={inputClass}
-            >
-              <option value="all">All Statuses</option>
-              <option value="Available">Available</option>
-              <option value="UnderMaintenance">Under Maintenance</option>
-              <option value="OutOfService">Out of Service</option>
-            </select>
-          </div>
-
-          <div className="min-w-32 flex-1">
-            <label className={labelClass}>Air Conditioning</label>
-            <select
-              value={filterAC}
-              onChange={(e) => setFilterAC(e.target.value)}
-              className={inputClass}
-            >
-              <option value="all">All</option>
-              <option value="yes">AC Required</option>
-              <option value="no">Non-AC</option>
-            </select>
-          </div>
-
-          <div className="min-w-32 flex-1">
-            <label className={labelClass}>Min Capacity</label>
-            <input
-              type="number"
-              placeholder="e.g. 6"
-              min={1}
-              value={filterMinCap}
-              onChange={(e) => setFilterMinCap(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="min-w-36 flex-1">
-            <label htmlFor="filter-registration-number" className={labelClass}>Registration No.</label>
-            <input
-              id="filter-registration-number"
-              type="text"
-              placeholder="e.g. WP-CAB-1234"
-              value={filterRegistration}
-              onChange={(e) => setFilterRegistration(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          {(filterType !== 'all' ||
-            filterStatus !== 'all' ||
-            filterAC !== 'all' ||
-            filterMinCap !== '' ||
-            filterRegistration !== '') && (
-            <div className="flex items-end">
+            {/* Queue Filter Tabs */}
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-100 p-1 text-xs font-medium sm:grid-cols-4">
               <button
                 type="button"
-                onClick={() => {
-                  setFilterType('all');
-                  setFilterStatus('all');
-                  setFilterAC('all');
-                  setFilterMinCap('');
-                  setFilterRegistration('');
-                }}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
-              >
-                Clear Filters
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Error alert */}
-      {listError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-          {listError}
-        </div>
-      )}
-
-      {/* Loading Skeleton */}
-      {loading && !vehicles && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
-          ))}
-        </div>
-      )}
-
-      {/* Vehicle Roster Table */}
-      {!loading && filteredVehicles && filteredVehicles.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-          <TruckIcon className="mx-auto h-10 w-10 text-slate-400" />
-          <h3 className="mt-3 font-heading text-base font-semibold text-slate-900">
-            No vehicles match criteria
-          </h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Try adjusting your search filters or click "Add Vehicle" to register a new vehicle.
-          </p>
-        </div>
-      )}
-
-      {/* Main Content Area: Vehicle Inventory & Integrated Bookings Reference Panel */}
-      <div className="flex flex-col xl:flex-row gap-5 items-start">
-        {/* Vehicles Table Container */}
-        <div className="flex-1 w-full min-w-0 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-800">
-              Vehicle Inventory ({filteredVehicles?.length ?? 0})
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowBookingsPanel((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              <BookingsIcon className="h-4 w-4 text-brand-600" />
-              {showBookingsPanel ? 'Hide Bookings Queue' : 'Show Bookings Queue'}
-            </button>
-          </div>
-
-          {!loading && filteredVehicles && filteredVehicles.length > 0 && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <tr>
-                      <th className="px-3.5 py-3">Vehicle</th>
-                      <th className="px-3.5 py-3">Registration No.</th>
-                      <th className="px-3 py-3">Capacity</th>
-                      <th className="px-3 py-3">AC</th>
-                      <th className="px-3 py-3">Layout</th>
-                      <th className="px-3.5 py-3">Status</th>
-                      <th className="px-3.5 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredVehicles.map((vehicle) => (
-                      <tr key={vehicle.id} className="transition hover:bg-slate-50/80">
-                        <td className="px-3.5 py-3 font-medium text-slate-900 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <VehicleTypeBadge type={vehicle.type} />
-                            <span className="text-xs text-slate-400 font-mono">
-                              #{vehicle.id.substring(0, 8)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-3.5 py-3 font-mono text-xs font-semibold text-slate-700 whitespace-nowrap">
-                          {vehicle.registrationNumber}
-                        </td>
-                        <td className="px-3 py-3 text-slate-700 whitespace-nowrap">
-                          <span className="font-semibold text-slate-900">{vehicle.capacity}</span> seats
-                        </td>
-                        <td className="px-3 py-3 text-slate-600 whitespace-nowrap">
-                          {vehicle.hasAC ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700">
-                              <span className="h-1.5 w-1.5 rounded-full bg-teal-500" />
-                              AC
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400">Non-AC</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-slate-600 font-mono text-xs whitespace-nowrap">
-                          {vehicle.seatConfiguration || 'Standard'}
-                        </td>
-                        <td className="px-3.5 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <StatusBadge status={vehicle.maintenanceStatus} />
-                            {/* Inline status switcher */}
-                            <select
-                              disabled={updatingVehicleId === vehicle.id}
-                              value={vehicle.maintenanceStatus}
-                              onChange={(e) =>
-                                handleStatusChange(
-                                  vehicle.id,
-                                  e.target.value as VehicleMaintenanceStatus,
-                                )
-                              }
-                              aria-label={`Change status for vehicle ${vehicle.id.substring(0, 8)}`}
-                              className="rounded border border-slate-200 bg-white py-0.5 px-1 text-xs text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                            >
-                              <option value="Available">Available</option>
-                              <option value="UnderMaintenance">Maintenance</option>
-                              <option value="OutOfService">Out of Service</option>
-                            </select>
-                          </div>
-                        </td>
-                        <td className="px-3.5 py-3 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              aria-label="Check Availability"
-                              title="Check availability for specific dates"
-                              onClick={() => {
-                                setCheckingVehicle(vehicle);
-                                setAvailResult(null);
-                                setAvailError(null);
-                                const today = new Date().toISOString().split('T')[0];
-                                setAvailFrom(today);
-                                setAvailTo(today);
-                              }}
-                              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
-                            >
-                              Check Availability
-                            </button>
-                            <button
-                              type="button"
-                              title="Allocate vehicle to a booking"
-                              onClick={() => {
-                                setReservingVehicle(vehicle);
-                                setReserveError(null);
-                                setReserveSuccess(null);
-                                const today = new Date().toISOString().split('T')[0];
-                                setReserveStartDate(today);
-                                setReserveEndDate(today);
-                              }}
-                              className="rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 transition hover:bg-brand-100"
-                            >
-                              Allocate
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDeleteVehicleError(null);
-                                setDeletingVehicle(vehicle);
-                              }}
-                              className="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Integrated Side Panel: Bookings Queue (Failed/Pending prioritized) */}
-        {showBookingsPanel && (
-          <div className="w-full xl:w-72 shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-1.5">
-                <BookingsIcon className="h-4 w-4 text-brand-600" />
-                <h3 className="font-heading text-sm font-bold text-slate-900">Bookings Queue</h3>
-              </div>
-              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                {displayedBookings.length}
-              </span>
-            </div>
-
-            {/* Filter Toggle: Needs Action vs All */}
-            <div className="flex items-center rounded-lg bg-slate-100 p-0.5 text-xs font-medium text-slate-600">
-              <button
-                type="button"
-                onClick={() => setBookingQueueFilter('needs_action')}
-                className={`flex-1 rounded-md py-1 text-center font-semibold transition ${
-                  bookingQueueFilter === 'needs_action'
-                    ? 'bg-white text-brand-700 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                onClick={() => setQueueTab('NeedsManualReview')}
+                className={`flex flex-col items-center rounded-lg py-1.5 px-1 transition ${
+                  queueTab === 'NeedsManualReview'
+                    ? 'bg-rose-600 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                 }`}
               >
-                Action Needed ({bookings.filter((b) => b.status === 'NeedsManualReview' || b.status === 'PendingApproval' || b.status === 'Requested').length})
+                <span>Needs Review</span>
+                <span className="text-[10px] font-bold">({needsReviewCount})</span>
               </button>
               <button
                 type="button"
-                onClick={() => setBookingQueueFilter('all')}
-                className={`flex-1 rounded-md py-1 text-center font-semibold transition ${
-                  bookingQueueFilter === 'all'
-                    ? 'bg-white text-brand-700 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                onClick={() => setQueueTab('PlanProposed')}
+                className={`flex flex-col items-center rounded-lg py-1.5 px-1 transition ${
+                  queueTab === 'PlanProposed'
+                    ? 'bg-purple-600 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                 }`}
               >
-                All ({bookings.length})
+                <span>Proposed</span>
+                <span className="text-[10px] font-bold">({planProposedCount})</span>
               </button>
-            </div>
-
-            <p className="text-[11px] text-slate-500 leading-tight">
-              Failed AI allocations or pending requests needing manual transport assignment.
-            </p>
-
-            <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-0.5">
-              {displayedBookings.length > 0 ? (
-                displayedBookings.map((b) => (
-                  <div
-                    key={b.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 text-xs space-y-1.5 transition hover:border-brand-200 hover:bg-white"
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-semibold text-slate-900 truncate text-[11px]">
-                        {b.tourPackageName || 'Custom Tour'}
-                      </span>
-                      <BookingStatusBadge status={b.status} />
-                    </div>
-
-                    <div className="flex items-center justify-between text-slate-500 text-[11px]">
-                      <span>{b.startDate} &rarr; {b.endDate}</span>
-                      <span className="rounded bg-brand-50 px-1 py-0.2 text-[10px] font-bold text-brand-700">
-                        {b.groupSize} pax
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                      <span className="font-mono text-[10px] text-slate-400">
-                        #{b.id.slice(0, 8)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBookingId(b.id);
-                          setReserveStartDate(b.startDate);
-                          setReserveEndDate(b.endDate);
-                          const targetVehicle =
-                            vehicles?.find(
-                              (v) =>
-                                v.maintenanceStatus === 'Available' &&
-                                v.capacity >= b.groupSize,
-                            ) || vehicles?.[0];
-                          if (targetVehicle) {
-                            setReservingVehicle(targetVehicle);
-                          }
-                        }}
-                        className="rounded bg-brand-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-brand-700 transition"
-                      >
-                        Allocate Vehicle
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-6 text-slate-400 text-xs">
-                  {bookingQueueFilter === 'needs_action'
-                    ? '🎉 No bookings currently require manual review.'
-                    : 'No bookings found.'}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* MODAL: Add New Vehicle */}
-      {showAddVehicleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <h2 className="font-heading text-lg font-bold text-slate-900">Add Vehicle to Fleet</h2>
               <button
                 type="button"
-                onClick={() => setShowAddVehicleModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                onClick={() => setQueueTab('PendingApproval')}
+                className={`flex flex-col items-center rounded-lg py-1.5 px-1 transition ${
+                  queueTab === 'PendingApproval'
+                    ? 'bg-amber-600 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
               >
-                ✕
+                <span>Pending</span>
+                <span className="text-[10px] font-bold">({pendingApprovalCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueueTab('Requested')}
+                className={`flex flex-col items-center rounded-lg py-1.5 px-1 transition ${
+                  queueTab === 'Requested'
+                    ? 'bg-brand-600 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <span>Requested</span>
+                <span className="text-[10px] font-bold">({requestedCount})</span>
               </button>
             </div>
 
-            {createVehicleError && (
-              <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">
-                {createVehicleError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateVehicle} className="mt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Vehicle Type</label>
-                  <select
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value as VehicleType)}
-                    className={inputClass}
-                  >
-                    <option value="Van">Van</option>
-                    <option value="Coach">Coach</option>
-                    <option value="SUV">SUV</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className={labelClass}>Passenger Capacity</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    required
-                    value={newCapacity}
-                    onChange={(e) => setNewCapacity(Number(e.target.value))}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="new-registration-number" className={labelClass}>Registration Number</label>
-                <input
-                  id="new-registration-number"
-                  type="text"
-                  required
-                  maxLength={20}
-                  placeholder="e.g. WP-CAB-1234"
-                  value={newRegistrationNumber}
-                  onChange={(e) => setNewRegistrationNumber(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>Seat Layout Configuration</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 2-2-3 or 2-2-2-4"
-                  value={newSeatConfig}
-                  onChange={(e) => setNewSeatConfig(e.target.value)}
-                  className={inputClass}
-                />
-                <p className="mt-1 text-xs text-slate-400">
-                  Optional seating rows description for capacity planning.
+            {/* Bookings List */}
+            {loading ? (
+              <div className="py-12 text-center text-xs text-slate-400">Loading queue...</div>
+            ) : queueBookings.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                <p className="text-xs font-semibold text-slate-600">No bookings in this state</p>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {queueTab === 'NeedsManualReview'
+                    ? 'Awesome! No failed AI allocations require intervention.'
+                    : `No bookings currently tagged as ${queueTab}.`}
                 </p>
               </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[560px] overflow-y-auto pr-1">
+                {queueBookings.map((b) => {
+                  const isSelected = selectedBooking?.id === b.id;
+                  return (
+                    <div
+                      key={b.id}
+                      onClick={() => setSelectedBooking(b)}
+                      className={`cursor-pointer rounded-xl border p-3.5 transition text-left ${
+                        isSelected
+                          ? 'border-brand-500 bg-brand-50/40 ring-1 ring-brand-500 shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-heading text-xs font-bold text-slate-900">
+                            {b.tourPackageName || 'Custom Sri Lanka Tour'}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {b.startDate} to {b.endDate}
+                          </p>
+                        </div>
+                        <BookingStatusBadge status={b.status} />
+                      </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Initial Status</label>
-                  <select
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as VehicleMaintenanceStatus)}
-                    className={inputClass}
-                  >
-                    <option value="Available">Available</option>
-                    <option value="UnderMaintenance">Under Maintenance</option>
-                    <option value="OutOfService">Out of Service</option>
-                  </select>
-                </div>
-
-                <div className="flex flex-col justify-center">
-                  <label className="flex items-center gap-2 cursor-pointer mt-4">
-                    <input
-                      type="checkbox"
-                      checked={newHasAC}
-                      onChange={(e) => setNewHasAC(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                    />
-                    <span className="text-sm font-medium text-slate-700">Air Conditioned (AC)</span>
-                  </label>
-                </div>
+                      <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-600">
+                        <span className="font-semibold text-slate-800">
+                          👥 {b.groupSize} Guests
+                        </span>
+                        {b.packageTier?.requiresAC && (
+                          <span className="text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100 font-medium">
+                            ❄️ AC Required
+                          </span>
+                        )}
+                        <span className="font-mono text-slate-400 text-[10px]">
+                          REF: {b.id.slice(0, 8)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddVehicleModal(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creatingVehicle}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-                >
-                  {creatingVehicle ? 'Saving...' : 'Save Vehicle'}
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
-      )}
 
-      {/* MODAL: Check Vehicle Availability */}
-      {checkingVehicle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="font-heading text-lg font-bold text-slate-900">
-                Check Availability: {checkingVehicle.type}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setCheckingVehicle(null)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
+        {/* Right Column: Active Booking Workspace & Smart Vehicle Availability (7 cols) */}
+        <div className="lg:col-span-7 space-y-5">
+          {!selectedBooking ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
+              <TruckIcon className="mx-auto h-12 w-12 text-slate-300" />
+              <h3 className="mt-3 text-sm font-semibold text-slate-700">No Booking Selected</h3>
+              <p className="mt-1 text-xs text-slate-400">
+                Select a booking from the allocation queue on the left to verify vehicle dates and assign transport.
+              </p>
             </div>
-
-            <p className="mt-2 text-xs text-slate-500">
-              Vehicle ID: <span className="font-mono text-slate-700">{checkingVehicle.id}</span>
-            </p>
-
-            <form onSubmit={handleCheckAvailability} className="mt-4 space-y-4">
-              <div>
-                <label className={labelClass}>Start Date (From)</label>
-                <input
-                  type="date"
-                  required
-                  value={availFrom}
-                  onChange={(e) => setAvailFrom(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>End Date (To)</label>
-                <input
-                  type="date"
-                  required
-                  value={availTo}
-                  onChange={(e) => setAvailTo(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              {availError && (
-                <div className="rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700">
-                  {availError}
-                </div>
-              )}
-
-              {availResult && (
-                <div
-                  className={`rounded-lg p-3 text-sm font-medium ${
-                    availResult.isAvailable
-                      ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
-                      : 'border border-rose-200 bg-rose-50 text-rose-800'
-                  }`}
-                >
-                  {availResult.isAvailable ? (
+          ) : (
+            <>
+              {/* Selected Booking Header & Inspection Card */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                      <span>Available for the selected date range!</span>
+                      <h2 className="font-heading text-base font-bold text-slate-900">
+                        {selectedBooking.tourPackageName}
+                      </h2>
+                      <BookingStatusBadge status={selectedBooking.status} />
                     </div>
-                  ) : (
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-rose-500" />
-                        <span className="font-bold">Not Available</span>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Booking ID: <span className="font-mono text-slate-700">{selectedBooking.id}</span>
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs text-right">
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Service Window</span>
+                    <span className="font-bold text-slate-800">
+                      {selectedBooking.startDate} &rarr; {selectedBooking.endDate}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="rounded-lg bg-slate-50 p-2.5">
+                    <span className="text-slate-400 block text-[10px]">Group Size</span>
+                    <span className="font-bold text-slate-800 text-sm">{selectedBooking.groupSize} Guests</span>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-2.5">
+                    <span className="text-slate-400 block text-[10px]">Climate Req.</span>
+                    <span className={`font-bold text-sm ${selectedBooking.packageTier?.requiresAC ? 'text-sky-700' : 'text-slate-700'}`}>
+                      {selectedBooking.packageTier?.requiresAC ? '❄️ AC Required' : 'Standard'}
+                    </span>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-2.5">
+                    <span className="text-slate-400 block text-[10px]">Tier Class</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {selectedBooking.packageTier?.classType || 'Standard'}
+                    </span>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-2.5">
+                    <span className="text-slate-400 block text-[10px]">Budget</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      ${selectedBooking.budgetPerPerson}/pax
+                    </span>
+                  </div>
+                </div>
+
+                {selectedBooking.specialRequests && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-900">
+                    <span className="font-bold">Special Requests: </span>
+                    {selectedBooking.specialRequests}
+                  </div>
+                )}
+              </div>
+
+              {/* Agent Plan Review Card (For PlanProposed state) */}
+              {selectedBooking.status === 'PlanProposed' && (
+                <div className="rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50/60 via-white to-purple-50/30 p-5 shadow-sm space-y-4 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between border-b border-purple-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-700 font-bold text-sm">
+                        AI
+                      </span>
+                      <div>
+                        <h3 className="font-heading text-sm font-bold text-purple-950">
+                          Agent Proposed Plan Review
+                        </h3>
+                        <p className="text-xs text-purple-700">
+                          The multi-agent coordinator formulated this verified allocation. Review and confirm below.
+                        </p>
                       </div>
-                      <p className="mt-1 text-xs opacity-90">{availResult.reason}</p>
+                    </div>
+
+                    <span className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-bold text-purple-800 border border-purple-200">
+                      Ready for Approval
+                    </span>
+                  </div>
+
+                  {workflowLoading ? (
+                    <div className="py-6 text-center text-xs text-purple-600">Loading plan analysis...</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Left: Traveler & Trip Details */}
+                      <div className="rounded-xl border border-purple-200/70 bg-white p-3.5 text-xs space-y-2">
+                        <p className="font-semibold uppercase tracking-wider text-[10px] text-purple-500">
+                          Traveler &amp; Requirements
+                        </p>
+                        <div className="space-y-1 text-slate-700">
+                          <p><span className="text-slate-400">Package:</span> <span className="font-medium text-slate-900">{selectedBooking.tourPackageName}</span></p>
+                          <p><span className="text-slate-400">Dates:</span> <span className="font-medium text-slate-900">{selectedBooking.startDate} to {selectedBooking.endDate}</span></p>
+                          <p><span className="text-slate-400">Party Size:</span> <span className="font-medium text-slate-900">{selectedBooking.groupSize} Guests</span></p>
+                          {selectedBooking.specialRequests && (
+                            <p className="text-purple-800 text-[11px] italic">"{selectedBooking.specialRequests}"</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: Validation & Agent Match */}
+                      <div className="rounded-xl border border-purple-200/70 bg-white p-3.5 text-xs space-y-2">
+                        <p className="font-semibold uppercase tracking-wider text-[10px] text-purple-500">
+                          Validation Checks
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
+                            ✓ No Date Conflicts
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
+                            ✓ Capacity OK: {selectedBooking.groupSize} Guests
+                          </span>
+                          {selectedBooking.packageTier?.requiresAC && (
+                            <span className="inline-flex items-center gap-1 rounded bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 border border-sky-200">
+                              ✓ Climate AC Verified
+                            </span>
+                          )}
+                          <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700 border border-purple-200">
+                            ✓ Budget Feasible
+                          </span>
+                        </div>
+                        {workflowPlan?.summaryText && (
+                          <p className="text-[11px] text-slate-600 mt-2 bg-purple-50/50 p-2 rounded border border-purple-100">
+                            {workflowPlan.summaryText}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
+
+                  {approvalError && (
+                    <div className="rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
+                      {approvalError}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleApprovePlan}
+                      disabled={approving}
+                      className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-600 transition disabled:opacity-50"
+                    >
+                      {approving ? 'Confirming...' : 'Approve & Confirm Plan'}
+                    </button>
+                  </div>
                 </div>
               )}
 
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCheckingVehicle(null)}
-                  className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  disabled={availLoading}
-                  className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-                >
-                  {availLoading ? 'Checking...' : 'Run Query'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Reserve / Allocate Vehicle */}
-      {reservingVehicle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="font-heading text-lg font-bold text-slate-900">
-                Allocate {reservingVehicle.type} ({reservingVehicle.capacity} seats)
-              </h2>
-              <button
-                type="button"
-                onClick={() => setReservingVehicle(null)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
-            </div>
-
-            {reserveError && (
-              <div className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700">
-                {reserveError}
-              </div>
-            )}
-
-            {reserveSuccess && (
-              <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-medium text-emerald-800">
-                {reserveSuccess}
-              </div>
-            )}
-
-            <form onSubmit={handleReserve} className="mt-4 space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className={labelClass}>Booking ID (GUID)</label>
-                  {bookings.length > 0 && (
-                    <span className="text-[11px] text-brand-600 font-semibold">
-                      {bookings.length} active bookings available
+              {/* Smart Vehicle Availability Roster for the Selected Dates */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-heading text-sm font-bold text-slate-900">
+                      Smart Vehicle Match &amp; Availability
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Real-time conflict verification for {selectedBooking.startDate} to {selectedBooking.endDate}.
+                    </p>
+                  </div>
+                  {checkingAvailability && (
+                    <span className="text-xs font-medium text-brand-600 animate-pulse">
+                      Checking schedule conflicts...
                     </span>
                   )}
                 </div>
-                {bookings.length > 0 && (
-                  <select
-                    value={bookingId}
-                    onChange={(e) => {
-                      const selected = bookings.find((b) => b.id === e.target.value);
-                      setBookingId(e.target.value);
-                      if (selected) {
-                        setReserveStartDate(selected.startDate);
-                        setReserveEndDate(selected.endDate);
-                      }
-                    }}
-                    className={`${inputClass} mb-2 bg-brand-50/40 border-brand-200 text-slate-800`}
-                  >
-                    <option value="">Select from active bookings (auto-fills dates)...</option>
-                    {/* Prioritize Needs Review, Pending, Requested */}
-                    {[...bookings]
-                      .sort((a, b) => {
-                        const priority: Record<string, number> = {
-                          NeedsManualReview: 1,
-                          PendingApproval: 2,
-                          Requested: 3,
-                          Confirmed: 4,
-                        };
-                        return (priority[a.status] || 5) - (priority[b.status] || 5);
+
+                {/* Filter bar for Smart Vehicle Match list */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Filter by Vehicle Type</label>
+                    <select
+                      value={vehicleTypeFilter}
+                      onChange={(e) => setVehicleTypeFilter(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none"
+                    >
+                      <option value="all">All Vehicle Types</option>
+                      <option value="Van">Van</option>
+                      <option value="Coach">Coach</option>
+                      <option value="SUV">SUV</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Filter by Min Seats / Capacity</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 8 seats"
+                      value={minSeatsFilter}
+                      onChange={(e) => setMinSeatsFilter(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {!vehicles || vehicles.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-6 text-center">No vehicles in fleet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {vehicles
+                      .filter((veh) => {
+                        if (vehicleTypeFilter !== 'all' && veh.type !== vehicleTypeFilter) return false;
+                        if (minSeatsFilter.trim() && veh.capacity < Number(minSeatsFilter)) return false;
+                        return true;
                       })
-                      .map((b) => (
-                        <option key={b.id} value={b.id}>
-                          [{b.status}] {b.tourPackageName || 'Package'} ({b.groupSize} pax) | {b.startDate} to {b.endDate}
-                        </option>
-                      ))}
-                  </select>
+                      .map((veh) => {
+                        const avail = availabilityMap[veh.id];
+                        const isFree = avail ? avail.isAvailable : false;
+                        const hasCapacity = veh.capacity >= selectedBooking.groupSize;
+                        const isMaintenanceBlocked = veh.maintenanceStatus !== 'Available';
+                        const canAssign = isFree && hasCapacity && !isMaintenanceBlocked;
+
+                        return (
+                          <div
+                            key={veh.id}
+                            className={`rounded-xl border p-4 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                              canAssign
+                                ? 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-xs'
+                                : 'border-slate-200 bg-slate-50/70 opacity-60'
+                            }`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <VehicleTypeBadge type={veh.type} />
+                                <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                  {veh.registrationNumber || 'REG-PENDING'}
+                                </span>
+                                <span className="text-xs font-semibold text-slate-700">
+                                  {veh.capacity} Seats
+                                </span>
+                                {veh.hasAC && (
+                                  <span className="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100">
+                                    AC
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Detailed Conflict or Availability Tags */}
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                {isMaintenanceBlocked ? (
+                                  <span className="text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                    {veh.maintenanceStatus === 'UnderMaintenance'
+                                      ? 'Under Maintenance'
+                                      : 'Out of Service'}
+                                  </span>
+                                ) : isFree ? (
+                                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    ✓ Available for these dates
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                    ✕ Unavailable for these dates (Existing Assignment)
+                                  </span>
+                                )}
+
+                                {!hasCapacity && (
+                                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                    ⚠️ Capacity Shortfall ({veh.capacity} seats &lt; {selectedBooking.groupSize} pax)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="sm:text-right shrink-0">
+                              <button
+                                type="button"
+                                disabled={!canAssign}
+                                onClick={() => {
+                                  setAllocationError(null);
+                                  setAllocationSuccess(null);
+                                  setSelectedDriverId('');
+                                  setAllocatingVehicle(veh);
+                                }}
+                                className={`rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
+                                  canAssign
+                                    ? 'bg-brand-600 text-white hover:bg-brand-500'
+                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                }`}
+                              >
+                                Assign Vehicle
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
                 )}
-                {/* Warning if vehicle capacity is less than group size */}
-                {(() => {
-                  const selected = bookings.find((b) => b.id === bookingId);
-                  if (selected && reservingVehicle && selected.groupSize > reservingVehicle.capacity) {
-                    return (
-                      <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-                        ⚠️ Capacity Warning: Group has {selected.groupSize} guests, but this {reservingVehicle.type} only seats {reservingVehicle.capacity}. Consider allocating a Coach or multiple vehicles.
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-                <input
-                  type="text"
-                  required
-                  placeholder="Or enter Booking GUID (e.g. 3fa85f64-5717-4562-b3fc-2c963f66afa6)"
-                  value={bookingId}
-                  onChange={(e) => setBookingId(e.target.value)}
-                  className={inputClass}
-                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Manual Allocation Modal with Smart Driver Conflict Detection */}
+      {allocatingVehicle && selectedBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-150">
+            <h2 className="font-heading text-lg font-bold text-slate-900">
+              Confirm Vehicle &amp; Driver Allocation
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Assign {allocatingVehicle.type} ({allocatingVehicle.registrationNumber}) to{' '}
+              {selectedBooking.tourPackageName}.
+            </p>
+
+            {allocationError && (
+              <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
+                {allocationError}
+              </div>
+            )}
+
+            {allocationSuccess && (
+              <div className="mt-3 rounded-lg bg-emerald-50 p-2.5 text-xs text-emerald-800 border border-emerald-200">
+                {allocationSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmAllocation} className="mt-4 space-y-4">
+              <div className="rounded-xl bg-slate-50 p-3 text-xs space-y-1.5 border border-slate-200">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Booking Dates:</span>
+                  <span className="font-bold text-slate-800">
+                    {selectedBooking.startDate} to {selectedBooking.endDate}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Party Size:</span>
+                  <span className="font-bold text-slate-800">
+                    {selectedBooking.groupSize} Guests
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Vehicle Capacity:</span>
+                  <span className="font-bold text-emerald-700">
+                    {allocatingVehicle.capacity} Seats (Fit OK)
+                  </span>
+                </div>
               </div>
 
               <div>
-                <label className={labelClass}>Assigned Driver</label>
-                {drivers.length > 0 ? (
-                  <select
-                    required
-                    value={driverId}
-                    onChange={(e) => setDriverId(e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">Select a driver...</option>
-                    {drivers.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.licenseNumber})
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Assign Driver (Conflict-Free Verification) *
+                  </label>
+                  {checkingDriverAvailability && (
+                    <span className="text-[11px] text-brand-600 animate-pulse">
+                      Checking driver schedules...
+                    </span>
+                  )}
+                </div>
+
+                {drivers.length === 0 ? (
+                  <p className="text-xs text-rose-600">
+                    No drivers registered. Please register a driver in Drivers Roster first.
+                  </p>
                 ) : (
-                  <div>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Enter Driver ID (GUID)"
-                      value={driverId}
-                      onChange={(e) => setDriverId(e.target.value)}
-                      className={inputClass}
-                    />
-                    <p className="mt-1 text-xs text-amber-600">
-                      No drivers registered in list. You can enter a Driver GUID directly or register
-                      one with "Add Driver".
-                    </p>
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {drivers.map((d) => {
+                      const avail = driverAvailabilityMap[d.id];
+                      // If still checking or undefined, consider available or check status
+                      const isFree = avail ? avail.isAvailable : true;
+                      const isSelected = selectedDriverId === d.id;
+
+                      return (
+                        <div
+                          key={d.id}
+                          onClick={() => {
+                            if (isFree) {
+                              setSelectedDriverId(d.id);
+                            }
+                          }}
+                          className={`rounded-xl border p-3 text-xs transition flex items-center justify-between ${
+                            !isFree
+                              ? 'border-slate-200 bg-slate-50/70 opacity-50 cursor-not-allowed'
+                              : isSelected
+                              ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500 cursor-pointer'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 cursor-pointer'
+                          }`}
+                        >
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900">{d.name}</span>
+                              <span className="font-mono text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                {d.licenseNumber}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500">{d.contactInfo || 'No contact provided'}</p>
+                            <div>
+                              {isFree ? (
+                                <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 text-[10px]">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  Available for these dates
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 font-semibold text-rose-700 text-[10px]">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                                  Unavailable for these dates (Booked)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <input
+                              type="radio"
+                              name="assignedDriver"
+                              value={d.id}
+                              disabled={!isFree}
+                              checked={isSelected}
+                              onChange={() => isFree && setSelectedDriverId(d.id)}
+                              className="h-4 w-4 border-slate-300 text-brand-600 focus:ring-brand-500 disabled:opacity-40"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Start Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={reserveStartDate}
-                    onChange={(e) => setReserveStartDate(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>End Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={reserveEndDate}
-                    onChange={(e) => setReserveEndDate(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
+              <div className="mt-6 flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setReservingVehicle(null)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Done
-                </button>
-                <button
-                  type="submit"
-                  disabled={reserving}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-                >
-                  {reserving ? 'Assigning...' : 'Confirm Allocation'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Add Driver */}
-      {showDriverModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="font-heading text-lg font-bold text-slate-900">Register Driver</h2>
-              <button
-                type="button"
-                onClick={() => setShowDriverModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
-            </div>
-
-            {driverError && (
-              <div className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700">
-                {driverError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateDriver} className="mt-4 space-y-4">
-              <div>
-                <label className={labelClass}>Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. John Doe"
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>Driver License Number</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. B-98765432"
-                  value={driverLicense}
-                  onChange={(e) => setDriverLicense(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>Contact Info</label>
-                <input
-                  type="text"
-                  placeholder="Phone number or email"
-                  value={driverContact}
-                  onChange={(e) => setDriverContact(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowDriverModal(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  onClick={() => setAllocatingVehicle(null)}
+                  disabled={allocating}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={creatingDriver}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                  disabled={allocating || !selectedDriverId}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition disabled:opacity-50"
                 >
-                  {creatingDriver ? 'Registering...' : 'Register Driver'}
+                  {allocating ? 'Allocating...' : 'Confirm Allocation'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Delete Vehicle Confirmation */}
-      {deletingVehicle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h2 className="font-heading text-lg font-bold text-slate-900">
-              Delete Vehicle #{deletingVehicle.id.substring(0, 8)}
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Are you sure you want to remove this <strong>{deletingVehicle.type}</strong> ({deletingVehicle.capacity} seats) from the fleet? Any dependent reservations and assignments will be deleted. This cannot be undone.
-            </p>
-
-            {deleteVehicleError && (
-              <div className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700">
-                {deleteVehicleError}
-              </div>
-            )}
-
-            <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setDeletingVehicle(null)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleDeleteVehicle}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
-              >
-                {isDeleting ? 'Deleting...' : 'Yes, Delete Vehicle'}
-              </button>
-            </div>
           </div>
         </div>
       )}

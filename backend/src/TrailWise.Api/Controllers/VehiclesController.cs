@@ -193,6 +193,7 @@ public class VehiclesController : ControllerBase
             .Include(a => a.Vehicle)
             .Include(a => a.Driver)
             .Include(a => a.Booking)
+                .ThenInclude(b => b.Traveler)
             .AsNoTracking()
             .OrderByDescending(a => a.StartDate)
             .ToListAsync(ct);
@@ -211,7 +212,10 @@ public class VehiclesController : ControllerBase
             a.UpdatedAt,
             a.Vehicle?.Type,
             a.Vehicle?.Capacity,
-            a.Vehicle?.HasAC
+            a.Vehicle?.HasAC,
+            a.Vehicle?.RegistrationNumber,
+            a.Booking?.Status,
+            a.Booking?.Traveler != null ? a.Booking.Traveler.Name : null
         )).ToList();
 
         return Ok(dtos);
@@ -222,6 +226,7 @@ public class VehiclesController : ControllerBase
     public async Task<ActionResult<VehicleAssignmentDetailDto>> GetAssignmentByBookingId(Guid bookingId, CancellationToken ct)
     {
         var booking = await _db.Bookings
+            .Include(b => b.Traveler)
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == bookingId, ct);
 
@@ -265,7 +270,10 @@ public class VehiclesController : ControllerBase
             assignment.UpdatedAt,
             assignment.Vehicle?.Type,
             assignment.Vehicle?.Capacity,
-            assignment.Vehicle?.HasAC
+            assignment.Vehicle?.HasAC,
+            assignment.Vehicle?.RegistrationNumber,
+            booking.Status,
+            booking.Traveler != null ? booking.Traveler.Name : null
         );
 
         return Ok(dto);

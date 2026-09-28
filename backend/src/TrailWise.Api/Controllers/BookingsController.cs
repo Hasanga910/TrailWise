@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
+using TrailWise.Api.Contracts.Guides;
 using TrailWise.Api.Contracts.Itineraries;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
@@ -20,7 +21,7 @@ namespace TrailWise.Api.Controllers;
 [Authorize]
 public class BookingsController : ControllerBase
 {
-    private const string ManagerRoles = "OperationsManager,Admin";
+    private const string ManagerRoles = "OperationsManager,FleetCoordinator,Admin";
     private const int MaxAdvanceBookingDays = 365;
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 50;
@@ -472,7 +473,7 @@ public class BookingsController : ControllerBase
 
         var callerId = GetUserId();
         var isOwner = callerId.HasValue && booking.TravelerId == callerId.Value;
-        var isManager = User.IsInRole("Admin") || User.IsInRole("OperationsManager");
+        var isManager = User.IsInRole("Admin") || User.IsInRole("OperationsManager") || User.IsInRole("FleetCoordinator");
 
         if (!isOwner && !isManager)
         {
@@ -501,6 +502,16 @@ public class BookingsController : ControllerBase
 
         try
         {
+            var assignments = await _db.VehicleAssignments
+                .Where(a => a.BookingId == booking.Id)
+                .ToListAsync(ct);
+
+            if (assignments.Count > 0)
+            {
+                _db.VehicleAssignments.RemoveRange(assignments);
+                _logger.LogInformation("Released {Count} vehicle assignments for cancelled booking {BookingId}.", assignments.Count, booking.Id);
+            }
+
             await _db.SaveChangesAsync(ct);
 
             await _auditLogService.LogAsync(
@@ -508,7 +519,7 @@ public class BookingsController : ControllerBase
                 entityId: booking.Id,
                 action: isManager ? "BookingCancelledByStaff" : "BookingCancelledByTraveler",
                 performedBy: callerId,
-                details: new { request.Reason },
+                details: new { request.Reason, ReleasedVehicleAssignments = assignments.Count },
                 ct: ct);
 
             if (transaction is not null)

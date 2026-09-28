@@ -182,9 +182,9 @@ class TransportInfoCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.emerald.shade50,
+                    color: Colors.teal.shade50,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.emerald.shade300, width: 1),
+                    border: Border.all(color: Colors.teal.shade300, width: 1),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -193,7 +193,7 @@ class TransportInfoCard extends StatelessWidget {
                         width: 7,
                         height: 7,
                         decoration: BoxDecoration(
-                          color: Colors.emerald.shade600,
+                          color: Colors.teal.shade600,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -201,7 +201,7 @@ class TransportInfoCard extends StatelessWidget {
                       Text(
                         'Allocated',
                         style: TextStyle(
-                          color: Colors.emerald.shade800,
+                          color: Colors.teal.shade800,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),

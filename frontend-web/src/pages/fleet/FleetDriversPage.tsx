@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { extractErrorMessage } from '../../api/apiClient';
-import { createDriver, getDrivers, type DriverDto } from '../../api/vehicles';
+import { createDriver, deleteDriver, getDrivers, updateDriver, type DriverDto } from '../../api/vehicles';
 import { IdCardIcon, PlusCircleIcon } from '../../components/admin/icons';
 
 export function FleetDriversPage() {
@@ -18,6 +18,19 @@ export function FleetDriversPage() {
   const [contactInfo, setContactInfo] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  // Edit Driver Modal
+  const [editingDriver, setEditingDriver] = useState<DriverDto | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editLicenseNumber, setEditLicenseNumber] = useState('');
+  const [editContactInfo, setEditContactInfo] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
+
+  // Delete Driver Modal
+  const [deletingDriver, setDeletingDriver] = useState<DriverDto | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   function loadDrivers() {
     setError(null);
@@ -50,6 +63,49 @@ export function FleetDriversPage() {
       setCreateError(extractErrorMessage(err, 'Failed to register driver.'));
     } finally {
       setCreating(false);
+    }
+  }
+
+  function startEdit(driver: DriverDto) {
+    setEditingDriver(driver);
+    setEditName(driver.name);
+    setEditLicenseNumber(driver.licenseNumber);
+    setEditContactInfo(driver.contactInfo || '');
+    setEditError(null);
+  }
+
+  async function handleUpdateDriver(e: FormEvent) {
+    e.preventDefault();
+    if (!editingDriver) return;
+    setEditError(null);
+    setUpdating(true);
+    try {
+      await updateDriver(editingDriver.id, {
+        name: editName.trim(),
+        licenseNumber: editLicenseNumber.trim(),
+        contactInfo: editContactInfo.trim(),
+      });
+      setEditingDriver(null);
+      loadDrivers();
+    } catch (err) {
+      setEditError(extractErrorMessage(err, 'Failed to update driver.'));
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleDeleteDriver() {
+    if (!deletingDriver) return;
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      await deleteDriver(deletingDriver.id);
+      setDeletingDriver(null);
+      loadDrivers();
+    } catch (err) {
+      setDeleteError(extractErrorMessage(err, 'Failed to delete driver.'));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -149,6 +205,7 @@ export function FleetDriversPage() {
                   <th className="px-4 py-3.5">Contact Number</th>
                   <th className="px-4 py-3.5">Status</th>
                   <th className="px-4 py-3.5">Registered Date</th>
+                  <th className="px-4 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -179,6 +236,27 @@ export function FleetDriversPage() {
                     </td>
                     <td className="px-4 py-3.5 text-xs text-slate-400 whitespace-nowrap">
                       {driver.createdAt ? new Date(driver.createdAt).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(driver)}
+                          className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 hover:text-brand-600"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeletingDriver(driver);
+                          }}
+                          className="rounded-md border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-600 shadow-xs transition hover:bg-rose-50 hover:text-rose-700"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -261,6 +339,114 @@ export function FleetDriversPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Driver Modal */}
+      {editingDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="font-heading text-lg font-bold text-slate-900">Update Driver Details</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Modify the driver name, license number, or phone contact information.
+            </p>
+
+            <form onSubmit={handleUpdateDriver} className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Full Name</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Sunil Perera"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600">License Number</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. B-8492019"
+                  value={editLicenseNumber}
+                  onChange={(e) => setEditLicenseNumber(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Contact Number</label>
+                <input
+                  type="tel"
+                  placeholder="e.g. +94 77 123 4567"
+                  value={editContactInfo}
+                  onChange={(e) => setEditContactInfo(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              {editError && (
+                <div className="rounded-lg bg-rose-50 p-3 text-xs font-medium text-rose-700">
+                  {editError}
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingDriver(null)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-60"
+                >
+                  {updating ? 'Saving...' : 'Update Driver'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Driver Confirmation Modal */}
+      {deletingDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="font-heading text-lg font-bold text-slate-900">Delete Driver</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Are you sure you want to remove <strong className="text-slate-900">{deletingDriver.name}</strong> ({deletingDriver.licenseNumber}) from the fleet roster?
+            </p>
+
+            {deleteError && (
+              <div className="mt-3 rounded-lg bg-rose-50 p-3 text-xs font-medium text-rose-700">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingDriver(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDeleteDriver}
+                className="rounded-lg bg-rose-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-60"
+              >
+                {deleting ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

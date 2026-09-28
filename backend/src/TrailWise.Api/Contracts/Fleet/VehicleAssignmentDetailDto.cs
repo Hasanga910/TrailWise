@@ -16,4 +16,7 @@ public record VehicleAssignmentDetailDto(
     DateTimeOffset UpdatedAt,
     VehicleType? VehicleType = null,
     int? Capacity = null,
-    bool? HasAC = null);
+    bool? HasAC = null,
+    string? RegistrationNumber = null,
+    BookingStatus? BookingStatus = null,
+    string? TravelerName = null);

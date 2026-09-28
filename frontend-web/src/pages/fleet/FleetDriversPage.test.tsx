@@ -61,4 +61,54 @@ describe('FleetDriversPage', () => {
       contactInfo: '',
     });
   });
+
+  it('opens update driver modal and edits existing driver', async () => {
+    const updateSpy = vi.spyOn(vehiclesApi, 'updateDriver').mockResolvedValue({
+      id: 'd1-uuid',
+      name: 'Sunil Silva Updated',
+      licenseNumber: 'B-12345678-UPD',
+      contactInfo: '+94 77 999 8888',
+      createdAt: '2026-09-01T00:00:00Z',
+      updatedAt: '2026-09-02T00:00:00Z',
+    });
+
+    const user = userEvent.setup();
+    render(<FleetDriversPage />);
+
+    const editBtn = await screen.findByRole('button', { name: /^edit$/i });
+    await user.click(editBtn);
+
+    expect(screen.getByRole('heading', { name: /update driver details/i })).toBeInTheDocument();
+
+    const nameInput = screen.getByDisplayValue('Sunil Silva');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Sunil Silva Updated');
+
+    const saveBtn = screen.getByRole('button', { name: /update driver/i });
+    await user.click(saveBtn);
+
+    expect(updateSpy).toHaveBeenCalledWith('d1-uuid', {
+      name: 'Sunil Silva Updated',
+      licenseNumber: 'B-12345678',
+      contactInfo: '+94 77 123 4567',
+    });
+  });
+
+  it('opens delete confirmation modal and deletes driver', async () => {
+    const deleteSpy = vi.spyOn(vehiclesApi, 'deleteDriver').mockResolvedValue();
+
+    const user = userEvent.setup();
+    render(<FleetDriversPage />);
+
+    const deleteBtn = await screen.findByRole('button', { name: /^delete$/i });
+    await user.click(deleteBtn);
+
+    expect(screen.getByRole('heading', { name: /delete driver/i })).toBeInTheDocument();
+    expect(screen.getByText(/are you sure you want to remove/i)).toBeInTheDocument();
+
+    const confirmBtn = screen.getByRole('button', { name: /confirm delete/i });
+    await user.click(confirmBtn);
+
+    expect(deleteSpy).toHaveBeenCalledWith('d1-uuid');
+  });
 });

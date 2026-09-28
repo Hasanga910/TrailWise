@@ -5,7 +5,7 @@ namespace TrailWise.Domain.Entities;
 public static class BookingStatusTransitions
 {
     public static bool CanDecide(BookingStatus current) =>
-        current is BookingStatus.PendingApproval or BookingStatus.NeedsManualReview;
+        current is BookingStatus.PendingApproval or BookingStatus.NeedsManualReview or BookingStatus.PlanProposed;
 
     public static bool CanComplete(BookingStatus current) =>
         current is BookingStatus.Confirmed;

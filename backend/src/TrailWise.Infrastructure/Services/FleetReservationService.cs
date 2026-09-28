@@ -41,6 +41,30 @@ public class FleetReservationService : IFleetReservationService
         return !hasConflict;
     }
 
+    public async Task<bool> IsDriverAvailableAsync(Guid driverId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default)
+    {
+        if (startDate > endDate)
+        {
+            return false;
+        }
+
+        var driverExists = await _db.Drivers
+            .AsNoTracking()
+            .AnyAsync(d => d.Id == driverId, ct);
+
+        if (!driverExists)
+        {
+            return false;
+        }
+
+        // Inclusive overlap check for driver assignment: a.StartDate <= endDate && startDate <= a.EndDate
+        var hasConflict = await _db.VehicleAssignments
+            .AsNoTracking()
+            .AnyAsync(a => a.DriverId == driverId && a.StartDate <= endDate && startDate <= a.EndDate, ct);
+
+        return !hasConflict;
+    }
+
     public async Task<ReservationResult> ReserveVehicleAsync(
         Guid vehicleId,
         Guid driverId,
@@ -153,5 +177,23 @@ public class FleetReservationService : IFleetReservationService
             _logger.LogError(ex, "Error reserving vehicle {VehicleId} for booking {BookingId}.", vehicleId, bookingId);
             throw;
         }
+    }
+
+    public async Task<int> ReleaseBookingAssignmentsAsync(Guid bookingId, CancellationToken ct = default)
+    {
+        var assignments = await _db.VehicleAssignments
+            .Where(a => a.BookingId == bookingId)
+            .ToListAsync(ct);
+
+        if (assignments.Count == 0)
+        {
+            return 0;
+        }
+
+        _db.VehicleAssignments.RemoveRange(assignments);
+        var removedCount = await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Released {Count} vehicle assignments for cancelled booking {BookingId}.", assignments.Count, bookingId);
+        return assignments.Count;
     }
 }

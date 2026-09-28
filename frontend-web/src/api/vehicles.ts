@@ -37,6 +37,14 @@ export interface VehicleAvailabilityResponse {
   reason?: string | null;
 }
 
+export interface DriverAvailabilityResponse {
+  driverId: string;
+  from: string;
+  to: string;
+  isAvailable: boolean;
+  reason?: string | null;
+}
+
 export interface ReserveVehicleRequest {
   bookingId: string;
   driverId: string;
@@ -67,6 +75,12 @@ export interface VehicleAssignmentDetailDto {
   endDate: string;
   createdAt: string;
   updatedAt: string;
+  vehicleType?: VehicleType;
+  capacity?: number;
+  hasAC?: boolean;
+  registrationNumber?: string;
+  bookingStatus?: string;
+  travelerName?: string;
 }
 
 export interface DriverDto {
@@ -79,6 +93,12 @@ export interface DriverDto {
 }
 
 export interface CreateDriverRequest {
+  name: string;
+  licenseNumber: string;
+  contactInfo?: string;
+}
+
+export interface UpdateDriverRequest {
   name: string;
   licenseNumber: string;
   contactInfo?: string;
@@ -160,6 +180,20 @@ export async function getDrivers(): Promise<DriverDto[]> {
 }
 
 /**
+ * Check if a driver is available for a given date range
+ */
+export async function checkDriverAvailability(
+  id: string,
+  from: string,
+  to: string,
+): Promise<DriverAvailabilityResponse> {
+  const response = await apiClient.get<DriverAvailabilityResponse>(`/api/drivers/${id}/availability`, {
+    params: { from, to },
+  });
+  return response.data;
+}
+
+/**
  * Fetch all vehicle assignments with related details
  */
 export async function getVehicleAssignments(): Promise<VehicleAssignmentDetailDto[]> {
@@ -173,6 +207,21 @@ export async function getVehicleAssignments(): Promise<VehicleAssignmentDetailDt
 export async function createDriver(request: CreateDriverRequest): Promise<DriverDto> {
   const response = await apiClient.post<DriverDto>('/api/drivers', request);
   return response.data;
+}
+
+/**
+ * Update an existing driver
+ */
+export async function updateDriver(id: string, request: UpdateDriverRequest): Promise<DriverDto> {
+  const response = await apiClient.put<DriverDto>(`/api/drivers/${id}`, request);
+  return response.data;
+}
+
+/**
+ * Delete a driver from the roster
+ */
+export async function deleteDriver(id: string): Promise<void> {
+  await apiClient.delete(`/api/drivers/${id}`);
 }
 
 /**
