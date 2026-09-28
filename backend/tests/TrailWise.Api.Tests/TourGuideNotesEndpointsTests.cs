@@ -307,6 +307,266 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
         Assert.Equal("Check via assigned tours endpoint", tour.GuideNotes);
     }
 
+    [Fact]
+    public async Task Test11_AssignedTourGuide_CanClearExistingNote_PreservesAttendedCompleted()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Clear Notes");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Clear Note Tour", new DateOnly(2026, 11, 1));
+
+        // First set a note with Attended=true, Completed=false
+        var setupResponse = await guideClient.PatchAsJsonAsync(
+            $"/api/bookings/{booking.Id}/guide-notes",
+            new UpdateGuideTourRequest
+            {
+                Attended = true,
+                Completed = false,
+                Notes = "Existing note to be cleared"
+            });
+        Assert.Equal(HttpStatusCode.OK, setupResponse.StatusCode);
+
+        // Now clear note by sending Notes = null (or empty)
+        var clearResponse = await guideClient.PatchAsJsonAsync(
+            $"/api/bookings/{booking.Id}/guide-notes",
+            new UpdateGuideTourRequest
+            {
+                Attended = true,
+                Completed = false,
+                Notes = null
+            });
+
+        Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
+        var dto = await clearResponse.Content.ReadFromJsonAsync<AssignedTourDto>(JsonOptions);
+        Assert.NotNull(dto);
+        Assert.Null(dto.GuideNotes);
+        Assert.True(dto.Attended);
+        Assert.False(dto.Completed);
+
+        // Verify in database
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var dbBooking = await db.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == booking.Id);
+        Assert.NotNull(dbBooking);
+        Assert.Null(dbBooking.GuideNotes);
+        Assert.True(dbBooking.Attended);
+        Assert.False(dbBooking.Completed);
+    }
+
+    [Fact]
+    public async Task Test12_AnotherTourGuide_CannotClearNote()
+    {
+        var admin = await AdminClientAsync();
+        var (guide1Client, guide1UserId) = await TourGuideClientAsync(admin);
+        var guide1 = await CreateGuideAsync(admin, guide1UserId, "Guide Assigned Clear");
+
+        var (guide2Client, guide2UserId) = await TourGuideClientAsync(admin);
+        await CreateGuideAsync(admin, guide2UserId, "Guide Rogue Clear");
+
+        var booking = await SeedAssignedBookingAsync(guide1.Id, "Protected Note Tour", new DateOnly(2026, 11, 3));
+
+        // Set note
+        await guide1Client.PatchAsJsonAsync(
+            $"/api/bookings/{booking.Id}/guide-notes",
+            new UpdateGuideTourRequest
+            {
+                Attended = true,
+                Completed = false,
+                Notes = "Guide 1 confidential note"
+            });
+
+        // Guide 2 attempts to clear
+        var clearResponse = await guide2Client.PatchAsJsonAsync(
+            $"/api/bookings/{booking.Id}/guide-notes",
+            new UpdateGuideTourRequest
+            {
+                Attended = true,
+                Completed = false,
+                Notes = null
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, clearResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Test13_AssignedTourGuide_CanStartTour_PopulatesTourStartedAt()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Lifecycle 1");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Lifecycle Tour 1", new DateOnly(2026, 11, 5));
+
+        var startResponse = await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.OK, startResponse.StatusCode);
+
+        var dto = await startResponse.Content.ReadFromJsonAsync<AssignedTourDto>(JsonOptions);
+        Assert.NotNull(dto);
+        Assert.NotNull(dto.TourStartedAt);
+        Assert.Null(dto.TourEndedAt);
+
+        // Verify in database
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var dbBooking = await db.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == booking.Id);
+        Assert.NotNull(dbBooking);
+        Assert.NotNull(dbBooking.TourStartedAt);
+        Assert.Null(dbBooking.TourEndedAt);
+    }
+
+    [Fact]
+    public async Task Test14_StartTour_Twice_ReturnsBadRequest()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Lifecycle 2");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Lifecycle Tour 2", new DateOnly(2026, 11, 7));
+
+        var start1 = await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.OK, start1.StatusCode);
+
+        var start2 = await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.BadRequest, start2.StatusCode);
+    }
+
+    [Fact]
+    public async Task Test15_EndTour_BeforeStart_ReturnsBadRequest()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Lifecycle 3");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Lifecycle Tour 3", new DateOnly(2026, 11, 9));
+
+        var endResponse = await guideClient.PostAsync($"/api/bookings/{booking.Id}/end-tour", null);
+        Assert.Equal(HttpStatusCode.BadRequest, endResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Test16_AssignedTourGuide_CanEndStartedTour_PopulatesTourEndedAtAndSetsCompleted()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Lifecycle 4");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Lifecycle Tour 4", new DateOnly(2026, 11, 11));
+
+        // Start tour
+        var startResponse = await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.OK, startResponse.StatusCode);
+
+        // End tour
+        var endResponse = await guideClient.PostAsync($"/api/bookings/{booking.Id}/end-tour", null);
+        Assert.Equal(HttpStatusCode.OK, endResponse.StatusCode);
+
+        var dto = await endResponse.Content.ReadFromJsonAsync<AssignedTourDto>(JsonOptions);
+        Assert.NotNull(dto);
+        Assert.NotNull(dto.TourStartedAt);
+        Assert.NotNull(dto.TourEndedAt);
+        Assert.True(dto.Completed);
+
+        // Verify in database
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var dbBooking = await db.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == booking.Id);
+        Assert.NotNull(dbBooking);
+        Assert.NotNull(dbBooking.TourStartedAt);
+        Assert.NotNull(dbBooking.TourEndedAt);
+        Assert.True(dbBooking.Completed);
+    }
+
+    [Fact]
+    public async Task Test17_EndTour_Twice_ReturnsBadRequest()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Lifecycle 5");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Lifecycle Tour 5", new DateOnly(2026, 11, 13));
+
+        await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        var end1 = await guideClient.PostAsync($"/api/bookings/{booking.Id}/end-tour", null);
+        Assert.Equal(HttpStatusCode.OK, end1.StatusCode);
+
+        var end2 = await guideClient.PostAsync($"/api/bookings/{booking.Id}/end-tour", null);
+        Assert.Equal(HttpStatusCode.BadRequest, end2.StatusCode);
+    }
+
+    [Fact]
+    public async Task Test18_AnotherTourGuide_CannotStartOrEndTour_ReturnsForbidden()
+    {
+        var admin = await AdminClientAsync();
+        var (guide1Client, guide1UserId) = await TourGuideClientAsync(admin);
+        var guide1 = await CreateGuideAsync(admin, guide1UserId, "Guide Assigned Lifecycle");
+
+        var (guide2Client, guide2UserId) = await TourGuideClientAsync(admin);
+        await CreateGuideAsync(admin, guide2UserId, "Guide Rogue Lifecycle");
+
+        var booking = await SeedAssignedBookingAsync(guide1.Id, "Lifecycle Isolation Tour", new DateOnly(2026, 11, 15));
+
+        // Guide 2 attempts to start
+        var start2 = await guide2Client.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.Forbidden, start2.StatusCode);
+
+        // Guide 1 starts
+        await guide1Client.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+
+        // Guide 2 attempts to end
+        var end2 = await guide2Client.PostAsync($"/api/bookings/{booking.Id}/end-tour", null);
+        Assert.Equal(HttpStatusCode.Forbidden, end2.StatusCode);
+    }
+
+    [Fact]
+    public async Task Test19_StartOrEndTour_NonexistentBooking_ReturnsNotFound()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        await CreateGuideAsync(admin, guideUserId, "Guide 404 Lifecycle");
+
+        var ghostId = Guid.NewGuid();
+        var startRes = await guideClient.PostAsync($"/api/bookings/{ghostId}/start-tour", null);
+        Assert.Equal(HttpStatusCode.NotFound, startRes.StatusCode);
+
+        var endRes = await guideClient.PostAsync($"/api/bookings/{ghostId}/end-tour", null);
+        Assert.Equal(HttpStatusCode.NotFound, endRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task Test20_StartTour_UnconfirmedBooking_ReturnsBadRequest()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Status Check");
+
+        Booking requestedBooking;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            requestedBooking = await SeedBookingWithPackageAsync(
+                db,
+                "Requested Tour",
+                "Cultural",
+                new[] { "Colombo" },
+                new DateOnly(2026, 11, 17),
+                new DateOnly(2026, 11, 19));
+
+            requestedBooking.Status = BookingStatus.Requested;
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                GuideId = guide.Id,
+                Date = new DateOnly(2026, 11, 17),
+                IsAvailable = false,
+                AssignedBookingId = requestedBooking.Id
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var startRes = await guideClient.PostAsync($"/api/bookings/{requestedBooking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.BadRequest, startRes.StatusCode);
+    }
+
     #region Helpers
 
     private async Task<Booking> SeedAssignedBookingAsync(Guid guideId, string packageName, DateOnly startDate)

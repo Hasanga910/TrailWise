@@ -155,6 +155,19 @@ class _AssignedTourCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = BookingStatus.color(tour.status);
 
+    final String lifecycleLabel;
+    final Color lifecycleColor;
+    if (tour.tourEndedAt != null) {
+      lifecycleLabel = 'Completed';
+      lifecycleColor = Colors.green;
+    } else if (tour.tourStartedAt != null) {
+      lifecycleLabel = 'In Progress';
+      lifecycleColor = Colors.deepOrange;
+    } else {
+      lifecycleLabel = 'Not Started';
+      lifecycleColor = Colors.blueGrey;
+    }
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
@@ -198,21 +211,57 @@ class _AssignedTourCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Theme Chip / Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.teal.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                tour.theme,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.teal,
+            // Badges Row: Theme and Lifecycle
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    tour.theme,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.teal,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: lifecycleColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: lifecycleColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        tour.tourEndedAt != null
+                            ? Icons.check_circle_outline
+                            : (tour.tourStartedAt != null
+                                ? Icons.play_circle_outline
+                                : Icons.schedule),
+                        size: 13,
+                        color: lifecycleColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        lifecycleLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: lifecycleColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
 

@@ -14,6 +14,8 @@ class AssignedTour {
   final bool attended;
   final bool completed;
   final String? guideNotes;
+  final DateTime? tourStartedAt;
+  final DateTime? tourEndedAt;
 
   AssignedTour({
     required this.bookingId,
@@ -31,6 +33,8 @@ class AssignedTour {
     this.attended = false,
     this.completed = false,
     this.guideNotes,
+    this.tourStartedAt,
+    this.tourEndedAt,
   });
 
   factory AssignedTour.fromJson(Map<String, dynamic> json) => AssignedTour(
@@ -52,6 +56,12 @@ class AssignedTour {
         attended: (json['attended'] as bool?) ?? false,
         completed: (json['completed'] as bool?) ?? false,
         guideNotes: json['guideNotes'] as String?,
+        tourStartedAt: json['tourStartedAt'] != null
+            ? DateTime.tryParse(json['tourStartedAt'] as String)
+            : null,
+        tourEndedAt: json['tourEndedAt'] != null
+            ? DateTime.tryParse(json['tourEndedAt'] as String)
+            : null,
       );
 
   AssignedTour copyWith({
@@ -70,6 +80,9 @@ class AssignedTour {
     bool? attended,
     bool? completed,
     String? guideNotes,
+    bool clearGuideNotes = false,
+    DateTime? tourStartedAt,
+    DateTime? tourEndedAt,
   }) {
     return AssignedTour(
       bookingId: bookingId ?? this.bookingId,
@@ -86,7 +99,9 @@ class AssignedTour {
       guideName: guideName ?? this.guideName,
       attended: attended ?? this.attended,
       completed: completed ?? this.completed,
-      guideNotes: guideNotes ?? this.guideNotes,
+      guideNotes: clearGuideNotes ? null : (guideNotes ?? this.guideNotes),
+      tourStartedAt: tourStartedAt ?? this.tourStartedAt,
+      tourEndedAt: tourEndedAt ?? this.tourEndedAt,
     );
   }
 }

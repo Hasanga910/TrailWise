@@ -96,6 +96,16 @@ class ApiClient {
     });
   }
 
+  Future<AssignedTour> startTour(String bookingId) async {
+    final response = await post('/api/bookings/$bookingId/start-tour', {});
+    return AssignedTour.fromJson(response);
+  }
+
+  Future<AssignedTour> endTour(String bookingId) async {
+    final response = await post('/api/bookings/$bookingId/end-tour', {});
+    return AssignedTour.fromJson(response);
+  }
+
 
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
     final uri = Uri.parse('$baseUrl$path');
