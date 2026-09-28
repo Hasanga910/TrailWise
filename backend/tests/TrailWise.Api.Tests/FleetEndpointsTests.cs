@@ -456,6 +456,34 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     }
 
     [Fact]
+    public async Task CreateDriver_DuplicateLicenseNumber_ReturnsConflictWithErrorMessage()
+    {
+        var fleetCoordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
+        var license = $"B-DUP-{Guid.NewGuid():N}"[..15];
+
+        // 1. First registration succeeds
+        var firstRes = await fleetCoordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        {
+            Name = "First Driver",
+            LicenseNumber = license,
+            ContactInfo = "+94771112222"
+        });
+        firstRes.EnsureSuccessStatusCode();
+
+        // 2. Second registration with same license (even lowercase) must return 409 Conflict
+        var secondRes = await fleetCoordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        {
+            Name = "Second Driver",
+            LicenseNumber = license.ToLowerInvariant(),
+            ContactInfo = "+94773334444"
+        });
+        Assert.Equal(HttpStatusCode.Conflict, secondRes.StatusCode);
+
+        var content = await secondRes.Content.ReadAsStringAsync();
+        Assert.Contains("Driver License Number already exists", content);
+    }
+
+    [Fact]
     public async Task CheckDriverAvailability_ReturnsTrue_AndFalseWhenConflicted()
     {
         var adminClient = await AdminClientAsync();

@@ -105,6 +105,14 @@ public class DriversController : ControllerBase
             return BadRequest(new { errors = new[] { "Driver license number is required." } });
         }
 
+        var normalizedLicenseNumber = licenseNumber.ToUpperInvariant();
+        var licenseExists = await _db.Drivers.AnyAsync(
+            d => d.LicenseNumber.ToUpper() == normalizedLicenseNumber, ct);
+        if (licenseExists)
+        {
+            return Conflict(new { errors = new[] { "Driver License Number already exists." } });
+        }
+
         var driver = new Driver
         {
             Name = name,
@@ -142,6 +150,14 @@ public class DriversController : ControllerBase
         if (string.IsNullOrWhiteSpace(licenseNumber))
         {
             return BadRequest(new { errors = new[] { "Driver license number is required." } });
+        }
+
+        var normalizedLicenseNumber = licenseNumber.ToUpperInvariant();
+        var duplicateExists = await _db.Drivers.AnyAsync(
+            d => d.Id != id && d.LicenseNumber.ToUpper() == normalizedLicenseNumber, ct);
+        if (duplicateExists)
+        {
+            return Conflict(new { errors = new[] { "Driver License Number already exists." } });
         }
 
         driver.Name = name;

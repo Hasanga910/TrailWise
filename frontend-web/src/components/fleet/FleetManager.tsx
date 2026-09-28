@@ -131,6 +131,7 @@ export function FleetManager() {
   // Filters for Smart Vehicle Match list
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState<string>('all');
   const [minSeatsFilter, setMinSeatsFilter] = useState<string>('');
+  const [onlyAvailableVehicles, setOnlyAvailableVehicles] = useState<boolean>(false);
 
   // Agent proposed plan inspection for PlanProposed bookings
   const [workflowPlan, setWorkflowPlan] = useState<AgentWorkflowDto | null>(null);
@@ -672,44 +673,89 @@ export function FleetManager() {
                 </div>
 
                 {/* Filter bar for Smart Vehicle Match list */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs">
-                  <div>
-                    <label className="block text-slate-600 font-semibold mb-1">Filter by Vehicle Type</label>
-                    <select
-                      value={vehicleTypeFilter}
-                      onChange={(e) => setVehicleTypeFilter(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none"
-                    >
-                      <option value="all">All Vehicle Types</option>
-                      <option value="Van">Van</option>
-                      <option value="Coach">Coach</option>
-                      <option value="SUV">SUV</option>
-                    </select>
+                <div className="space-y-3 rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">Filter by Vehicle Type</label>
+                      <select
+                        value={vehicleTypeFilter}
+                        onChange={(e) => setVehicleTypeFilter(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none"
+                      >
+                        <option value="all">All Vehicle Types</option>
+                        <option value="Van">Van</option>
+                        <option value="Coach">Coach</option>
+                        <option value="SUV">SUV</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-semibold mb-1">Filter by Min Seats / Capacity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="e.g. 8 seats"
+                        value={minSeatsFilter}
+                        onChange={(e) => setMinSeatsFilter(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-slate-600 font-semibold mb-1">Filter by Min Seats / Capacity</label>
-                    <input
-                      type="number"
-                      min="1"
-                      placeholder="e.g. 8 seats"
-                      value={minSeatsFilter}
-                      onChange={(e) => setMinSeatsFilter(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none"
-                    />
+
+                  {/* Single Availability Filter Checkbox */}
+                  <div className="flex items-center gap-3 pt-1 border-t border-slate-200/80">
+                    <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={onlyAvailableVehicles}
+                        onChange={(e) => setOnlyAvailableVehicles(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                      />
+                      <span className="text-slate-700 font-medium">
+                        Show only available vehicles
+                      </span>
+                    </label>
                   </div>
                 </div>
 
-                {!vehicles || vehicles.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-6 text-center">No vehicles in fleet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {vehicles
-                      .filter((veh) => {
-                        if (vehicleTypeFilter !== 'all' && veh.type !== vehicleTypeFilter) return false;
-                        if (minSeatsFilter.trim() && veh.capacity < Number(minSeatsFilter)) return false;
-                        return true;
-                      })
-                      .map((veh) => {
+                {(() => {
+                  const vehicleList = vehicles || [];
+                  const filteredVehicles = vehicleList.filter((veh) => {
+                    if (vehicleTypeFilter !== 'all' && veh.type !== vehicleTypeFilter) return false;
+                    if (minSeatsFilter.trim() && veh.capacity < Number(minSeatsFilter)) return false;
+
+                    const avail = availabilityMap[veh.id];
+                    const isFree = avail ? avail.isAvailable : false;
+                    const hasCapacity = veh.capacity >= selectedBooking.groupSize;
+                    const isMaintenanceBlocked = veh.maintenanceStatus !== 'Available';
+                    const canAssign = isFree && hasCapacity && !isMaintenanceBlocked;
+
+                    // When ticked/marked: show only vehicles that are free of schedule conflicts, meet capacity, and not in maintenance
+                    // When unticked/unmarked: show all vehicles (both available and unavailable/faded)
+                    if (onlyAvailableVehicles && !canAssign) {
+                      return false;
+                    }
+
+                    return true;
+                  });
+
+                  if (!vehicles || vehicles.length === 0) {
+                    return <p className="text-xs text-slate-400 py-6 text-center">No vehicles in fleet.</p>;
+                  }
+
+                  if (filteredVehicles.length === 0) {
+                    return (
+                      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500 bg-slate-50/50">
+                        <p className="font-semibold text-slate-700">No vehicles match the selected criteria.</p>
+                        <p className="mt-1 text-slate-400">
+                          Try adjusting your vehicle type, minimum seats, or unchecking the "Show only available vehicles" filter.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {filteredVehicles.map((veh) => {
                         const avail = availabilityMap[veh.id];
                         const isFree = avail ? avail.isAvailable : false;
                         const hasCapacity = veh.capacity >= selectedBooking.groupSize;
@@ -789,8 +835,9 @@ export function FleetManager() {
                           </div>
                         );
                       })}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
             </>
           )}
