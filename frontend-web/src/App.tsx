@@ -23,6 +23,9 @@ import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
 import { FleetLayout } from './components/fleet/FleetLayout';
 import { FleetManagementPage } from './pages/admin/FleetManagementPage';
 import { FleetProfileSettingsPage } from './pages/fleet/FleetProfileSettingsPage';
+import { FleetDriversPage } from './pages/fleet/FleetDriversPage';
+import { FleetAssignmentsPage } from './pages/fleet/FleetAssignmentsPage';
+import { FleetBookingsPage } from './pages/fleet/FleetBookingsPage';
 import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
 import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
 
@@ -79,6 +82,9 @@ function App() {
         }
       >
         <Route index element={<FleetManagementPage />} />
+        <Route path="drivers" element={<FleetDriversPage />} />
+        <Route path="assignments" element={<FleetAssignmentsPage />} />
+        <Route path="bookings" element={<FleetBookingsPage />} />
         <Route path="profile" element={<FleetProfileSettingsPage />} />
       </Route>
 

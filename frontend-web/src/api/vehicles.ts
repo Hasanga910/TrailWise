@@ -53,6 +53,20 @@ export interface VehicleAssignmentDto {
   updatedAt: string;
 }
 
+export interface VehicleAssignmentDetailDto {
+  id: string;
+  vehicleId: string;
+  vehicleName: string;
+  bookingId: string;
+  driverId: string;
+  driverName: string;
+  driverContact: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DriverDto {
   id: string;
   name: string;
@@ -140,6 +154,14 @@ export async function reserveVehicle(
  */
 export async function getDrivers(): Promise<DriverDto[]> {
   const response = await apiClient.get<DriverDto[]>('/api/drivers');
+  return response.data;
+}
+
+/**
+ * Fetch all vehicle assignments with related details
+ */
+export async function getVehicleAssignments(): Promise<VehicleAssignmentDetailDto[]> {
+  const response = await apiClient.get<VehicleAssignmentDetailDto[]>('/api/vehicles/assignments');
   return response.data;
 }
 

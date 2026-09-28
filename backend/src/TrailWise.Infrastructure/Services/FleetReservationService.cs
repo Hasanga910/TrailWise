@@ -85,10 +85,10 @@ public class FleetReservationService : IFleetReservationService
                 return ReservationResult.Failure("Driver not found.");
             }
 
-            var bookingExists = await _db.Bookings
-                .AnyAsync(b => b.Id == bookingId, ct);
+            var booking = await _db.Bookings
+                .FirstOrDefaultAsync(b => b.Id == bookingId, ct);
 
-            if (!bookingExists)
+            if (booking is null)
             {
                 if (transaction is not null) await transaction.RollbackAsync(ct);
                 return ReservationResult.Failure("Booking not found.");
@@ -124,6 +124,14 @@ public class FleetReservationService : IFleetReservationService
             };
 
             _db.VehicleAssignments.Add(assignment);
+
+            // If the booking was pending approval or required manual intervention, manual vehicle allocation resolves it!
+            if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval)
+            {
+                booking.Status = BookingStatus.Confirmed;
+                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator manual allocation.", bookingId);
+            }
+
             await _db.SaveChangesAsync(ct);
 
             if (transaction is not null)

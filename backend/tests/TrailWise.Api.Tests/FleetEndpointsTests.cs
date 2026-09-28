@@ -284,6 +284,83 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.Equal(HttpStatusCode.NotFound, getRes.StatusCode);
     }
 
+    [Fact]
+    public async Task GetAssignments_ReturnsAssignmentsWithDetails()
+    {
+        var staffClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
+        var res = await staffClient.GetAsync("/api/vehicles/assignments");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAssignmentByBookingId_TravelerCanRetrieveTheirAssignment()
+    {
+        var adminClient = await AdminClientAsync();
+
+        // 1. Create vehicle
+        var vehicleRes = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.Van,
+            Capacity = 8,
+            HasAC = true,
+            SeatConfiguration = "2-2-2-2",
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        });
+        var vehicle = await vehicleRes.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
+
+        // 2. Create driver
+        var driverRes = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        {
+            Name = "Kamal Gunaratne",
+            LicenseNumber = $"B-{Guid.NewGuid():N}",
+            ContactInfo = "+94712345678"
+        });
+        var driver = await driverRes.Content.ReadFromJsonAsync<DriverDto>(JsonOptions);
+
+        // 3. Create booking by traveler
+        var travelerClient = await TravelerClientAsync();
+        var pkgsRes = await adminClient.GetAsync("/api/packages");
+        var packages = await pkgsRes.Content.ReadFromJsonAsync<List<TourPackageDto>>(JsonOptions);
+        var tier = packages![0].Tiers[0];
+
+        var bookingRes = await travelerClient.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 4,
+            StartDate = new DateOnly(2026, 11, 1),
+            EndDate = new DateOnly(2026, 11, 5),
+            BudgetPerPerson = 450m
+        });
+        var booking = await bookingRes.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+
+        // Before assignment: 404
+        var preRes = await travelerClient.GetAsync($"/api/vehicles/assignments/by-booking/{booking!.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, preRes.StatusCode);
+
+        // 4. Reserve vehicle as coordinator/admin
+        var reserveRes = await adminClient.PostAsJsonAsync($"/api/vehicles/{vehicle!.Id}/reservations", new ReserveVehicleRequest
+        {
+            DriverId = driver!.Id,
+            BookingId = booking.Id,
+            StartDate = new DateOnly(2026, 11, 1),
+            EndDate = new DateOnly(2026, 11, 5)
+        });
+        reserveRes.EnsureSuccessStatusCode();
+
+        // 5. Query assignment as the booking's traveler: 200 OK with vehicle & driver details
+        var assignedRes = await travelerClient.GetAsync($"/api/vehicles/assignments/by-booking/{booking.Id}");
+        Assert.Equal(HttpStatusCode.OK, assignedRes.StatusCode);
+
+        var assignment = await assignedRes.Content.ReadFromJsonAsync<VehicleAssignmentDetailDto>(JsonOptions);
+        Assert.NotNull(assignment);
+        Assert.Equal(booking.Id, assignment.BookingId);
+        Assert.Equal("Kamal Gunaratne", assignment.DriverName);
+        Assert.Equal("+94712345678", assignment.DriverContact);
+        Assert.Equal(VehicleType.Van, assignment.VehicleType);
+        Assert.Equal(8, assignment.Capacity);
+        Assert.True(assignment.HasAC);
+    }
+
     private async Task<HttpClient> AdminClientAsync()
     {
         var client = _factory.CreateClient();

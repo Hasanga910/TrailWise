@@ -132,6 +132,62 @@ public class BookingsController : ControllerBase
         }
     }
 
+    [HttpGet]
+    [Authorize(Roles = "Admin,OperationsManager,FleetCoordinator")]
+    public async Task<ActionResult<PagedResult<BookingDto>>> GetAll(
+        BookingStatus? status,
+        DateOnly? from,
+        DateOnly? to,
+        int page = 1,
+        int pageSize = DefaultPageSize,
+        CancellationToken ct = default)
+    {
+        if (from.HasValue && to.HasValue && from.Value > to.Value)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("to", "'to' must be on or after 'from'.") }
+            });
+        }
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
+
+        var query = _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .AsNoTracking();
+
+        if (status.HasValue)
+        {
+            query = query.Where(b => b.Status == status.Value);
+        }
+
+        if (from.HasValue)
+        {
+            query = query.Where(b => b.StartDate >= from.Value);
+        }
+
+        if (to.HasValue)
+        {
+            query = query.Where(b => b.StartDate <= to.Value);
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        var bookings = await query
+            .OrderByDescending(b => b.StartDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return Ok(new PagedResult<BookingDto>(
+            bookings.Select(BookingDto.FromEntity).ToList(),
+            totalCount,
+            page,
+            pageSize));
+    }
+
     [HttpGet("mine")]
     public async Task<ActionResult<PagedResult<BookingDto>>> GetMine(
         BookingStatus? status,
@@ -210,7 +266,7 @@ public class BookingsController : ControllerBase
 
         var travelerId = GetUserId();
         var isOwner = travelerId.HasValue && booking.TravelerId == travelerId.Value;
-        var isManager = User.IsInRole("Admin") || User.IsInRole("OperationsManager");
+        var isManager = User.IsInRole("Admin") || User.IsInRole("OperationsManager") || User.IsInRole("FleetCoordinator");
 
         if (!isOwner && !isManager)
         {
