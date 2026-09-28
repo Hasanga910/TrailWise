@@ -15,6 +15,8 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.Attended).HasDefaultValue(false);
         builder.Property(b => b.Completed).HasDefaultValue(false);
         builder.Property(b => b.GuideNotes).HasMaxLength(2000);
+        builder.Property(b => b.TourStartedAt);
+        builder.Property(b => b.TourEndedAt);
 
         builder.HasOne(b => b.Traveler)
             .WithMany(u => u.Bookings)

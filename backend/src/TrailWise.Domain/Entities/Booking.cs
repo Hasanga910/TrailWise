@@ -24,6 +24,8 @@ public class Booking : BaseEntity
     public bool Attended { get; set; } = false;
     public bool Completed { get; set; } = false;
     public string? GuideNotes { get; set; }
+    public DateTimeOffset? TourStartedAt { get; set; }
+    public DateTimeOffset? TourEndedAt { get; set; }
 
     public ICollection<BookingAddOn> BookingAddOns { get; set; } = new List<BookingAddOn>();
     public ICollection<GuideAvailability> GuideAvailabilities { get; set; } = new List<GuideAvailability>();

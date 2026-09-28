@@ -63,6 +63,8 @@ Map<String, dynamic> _sampleTourJson({
   bool attended = false,
   bool completed = false,
   String? guideNotes,
+  String? tourStartedAt,
+  String? tourEndedAt,
 }) =>
     {
       'bookingId': bookingId,
@@ -80,6 +82,8 @@ Map<String, dynamic> _sampleTourJson({
       'attended': attended,
       'completed': completed,
       'guideNotes': guideNotes,
+      'tourStartedAt': tourStartedAt,
+      'tourEndedAt': tourEndedAt,
     };
 
 void main() {
@@ -298,6 +302,40 @@ void main() {
       expect(find.byType(TourDetailScreen), findsNothing);
       expect(find.text('Cultural Heritage Tour'), findsOneWidget);
       expect(find.text('Attended'), findsOneWidget);
+    });
+
+    testWidgets('11. Assigned tour card renders lifecycle badge (Not Started, In Progress, Completed)', (tester) async {
+      final fake = FakeApiClient(getResponses: {
+        '/api/guides/me/assigned-tours': [
+          _sampleTourJson(
+            bookingId: 'b-1',
+            tourPackageName: 'Not Started Tour',
+            tourStartedAt: null,
+            tourEndedAt: null,
+          ),
+          _sampleTourJson(
+            bookingId: 'b-2',
+            tourPackageName: 'In Progress Tour',
+            tourStartedAt: '2026-10-10T08:00:00Z',
+            tourEndedAt: null,
+          ),
+          _sampleTourJson(
+            bookingId: 'b-3',
+            tourPackageName: 'Completed Tour',
+            tourStartedAt: '2026-10-10T08:00:00Z',
+            tourEndedAt: '2026-10-12T18:00:00Z',
+          ),
+        ],
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        home: AssignedToursScreen(apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Not Started'), findsOneWidget);
+      expect(find.text('In Progress'), findsOneWidget);
+      expect(find.text('Completed'), findsAtLeastNWidgets(1));
     });
   });
 }

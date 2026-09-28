@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
@@ -46,11 +47,14 @@ class ApiClient {
   }
 
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        if (_token != null) 'Authorization': 'Bearer $_token',
-      };
+    'Content-Type': 'application/json',
+    if (_token != null) 'Authorization': 'Bearer $_token',
+  };
 
-  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> post(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
     final response = await http.post(
       Uri.parse('$baseUrl$path'),
       headers: _headers,
@@ -97,6 +101,16 @@ class ApiClient {
     });
   }
 
+  Future<AssignedTour> startTour(String bookingId) async {
+    final response = await post('/api/bookings/$bookingId/start-tour', {});
+    return AssignedTour.fromJson(response);
+  }
+
+  Future<AssignedTour> endTour(String bookingId) async {
+    final response = await post('/api/bookings/$bookingId/end-tour', {});
+    return AssignedTour.fromJson(response);
+  }
+
   Future<List<ItineraryStep>> getItinerary(String bookingId) async {
     final response = await get('/api/bookings/$bookingId/itinerary');
     if (response is List) {
@@ -107,7 +121,6 @@ class ApiClient {
     }
     return [];
   }
-
 
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
     final uri = Uri.parse('$baseUrl$path');
@@ -120,12 +133,16 @@ class ApiClient {
         stringParams[key] = value.toString();
       }
     });
-    return stringParams.isEmpty ? uri : uri.replace(queryParameters: stringParams);
+    return stringParams.isEmpty
+        ? uri
+        : uri.replace(queryParameters: stringParams);
   }
 
   dynamic _decode(http.Response response) {
     final isJson = response.headers['content-type']?.contains('json') ?? false;
-    final decoded = response.body.isNotEmpty && isJson ? jsonDecode(response.body) : null;
+    final decoded = response.body.isNotEmpty && isJson
+        ? jsonDecode(response.body)
+        : null;
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return decoded;
@@ -144,7 +161,11 @@ class ApiClient {
     }
 
     final message = decoded is Map<String, dynamic>
-        ? (decoded['title'] ?? decoded['detail'] ?? decoded['message'] ?? 'Request failed').toString()
+        ? (decoded['title'] ??
+                  decoded['detail'] ??
+                  decoded['message'] ??
+                  'Request failed')
+              .toString()
         : 'Request failed with status ${response.statusCode}';
     throw ApiException(response.statusCode, message);
   }

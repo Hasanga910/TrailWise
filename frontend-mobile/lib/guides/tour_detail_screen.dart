@@ -30,6 +30,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   late final TextEditingController _notesController;
 
   bool _saving = false;
+  bool _lifecycleLoading = false;
   String? _errorMessage;
 
   @override
@@ -47,8 +48,18 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     super.dispose();
   }
 
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    final y = local.year;
+    final m = local.month.toString().padLeft(2, '0');
+    final d = local.day.toString().padLeft(2, '0');
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return '$y-$m-$d $hh:$mm';
+  }
+
   Future<void> _save() async {
-    if (_saving) return;
+    if (_saving || _lifecycleLoading) return;
 
     setState(() {
       _saving = true;
@@ -109,6 +120,180 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           content: Text(message),
           backgroundColor: Colors.red,
         ),
+      );
+    }
+  }
+
+  Future<void> _confirmClearNote() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear Guide Note'),
+        content: const Text('Remove this guide note?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _clearNote();
+    }
+  }
+
+  Future<void> _clearNote() async {
+    if (_saving || _lifecycleLoading) return;
+
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await _apiClient.updateGuideTour(
+        bookingId: _tour.bookingId,
+        attended: _attended,
+        completed: _completed,
+        notes: null,
+      );
+
+      final updatedTour = _tour.copyWith(
+        attended: _attended,
+        completed: _completed,
+        clearGuideNotes: true,
+      );
+
+      if (!mounted) return;
+
+      _notesController.clear();
+      setState(() {
+        _tour = updatedTour;
+        _saving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Guide note cleared.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _errorMessage = e.message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      const message = 'Failed to clear guide note. Please try again.';
+      setState(() {
+        _saving = false;
+        _errorMessage = message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _startTour() async {
+    if (_saving || _lifecycleLoading) return;
+
+    setState(() {
+      _lifecycleLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final updated = await _apiClient.startTour(_tour.bookingId);
+      if (!mounted) return;
+
+      setState(() {
+        _tour = updated;
+        _lifecycleLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tour started successfully.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _lifecycleLoading = false;
+        _errorMessage = e.message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      const message = 'Failed to start tour. Please try again.';
+      setState(() {
+        _lifecycleLoading = false;
+        _errorMessage = message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _endTour() async {
+    if (_saving || _lifecycleLoading) return;
+
+    setState(() {
+      _lifecycleLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final updated = await _apiClient.endTour(_tour.bookingId);
+      if (!mounted) return;
+
+      setState(() {
+        _tour = updated;
+        _completed = true;
+        _lifecycleLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tour ended successfully.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _lifecycleLoading = false;
+        _errorMessage = e.message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      const message = 'Failed to end tour. Please try again.';
+      setState(() {
+        _lifecycleLoading = false;
+        _errorMessage = message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     }
   }
@@ -367,7 +552,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       // Notes text field
                       TextField(
                         controller: _notesController,
-                        enabled: !_saving,
+                        enabled: !_saving && !_lifecycleLoading,
                         maxLines: 4,
                         decoration: const InputDecoration(
                           labelText: 'Guide Notes',
@@ -375,7 +560,26 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           border: OutlineInputBorder(),
                           alignLabelWithHint: true,
                         ),
+                        onChanged: (_) {
+                          setState(() {});
+                        },
                       ),
+                      if ((_tour.guideNotes != null && _tour.guideNotes!.trim().isNotEmpty) ||
+                          _notesController.text.trim().isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: OutlinedButton.icon(
+                            onPressed: (_saving || _lifecycleLoading) ? null : _confirmClearNote,
+                            icon: const Icon(Icons.delete_outline, size: 16),
+                            label: const Text('Clear Note'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red.shade700,
+                              side: BorderSide(color: Colors.red.shade300),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 20),
 
                       // Save button
@@ -383,7 +587,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                         width: double.infinity,
                         height: 48,
                         child: FilledButton(
-                          onPressed: _saving ? null : _save,
+                          onPressed: (_saving || _lifecycleLoading) ? null : _save,
                           child: _saving
                               ? const SizedBox(
                                   width: 22,
@@ -402,6 +606,144 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                 ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Tour Lifecycle Card
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tour Lifecycle',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (_tour.tourEndedAt != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Tour Completed',
+                                    style: TextStyle(
+                                      color: Colors.green.shade900,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (_tour.tourStartedAt != null) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Started at: ${_formatDateTime(_tour.tourStartedAt!)}',
+                                  style: TextStyle(color: Colors.green.shade800, fontSize: 13),
+                                ),
+                              ],
+                              const SizedBox(height: 4),
+                              Text(
+                                'Ended at: ${_formatDateTime(_tour.tourEndedAt!)}',
+                                style: TextStyle(color: Colors.green.shade800, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (_tour.tourStartedAt != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.play_circle_filled, color: Colors.orange.shade700, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Tour Started',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Started at: ${_formatDateTime(_tour.tourStartedAt!)}',
+                                style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: FilledButton(
+                            onPressed: (_lifecycleLoading || _saving) ? null : _endTour,
+                            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+                            child: _lifecycleLoading
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text(
+                                    'End Tour',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  ),
+                          ),
+                        ),
+                      ] else ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: FilledButton(
+                            onPressed: (_lifecycleLoading || _saving) ? null : _startTour,
+                            style: FilledButton.styleFrom(backgroundColor: Colors.teal),
+                            child: _lifecycleLoading
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text(
+                                    'Start Tour',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

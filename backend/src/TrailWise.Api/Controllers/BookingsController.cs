@@ -533,6 +533,139 @@ public class BookingsController : ControllerBase
         return Ok(AssignedTourDto.FromEntity(booking, guide));
     }
 
+    [HttpPost("{id:guid}/start-tour")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<ActionResult<AssignedTourDto>> StartTour(Guid id, CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides
+            .AsNoTracking()
+            .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+        if (guide is null)
+        {
+            return Forbid();
+        }
+
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+                .ThenInclude(p => p.Locations)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var isAssigned = await _db.GuideAvailabilities
+            .AnyAsync(a => a.GuideId == guide.Id && a.AssignedBookingId == id, ct);
+
+        if (!isAssigned)
+        {
+            return Forbid();
+        }
+
+        if (booking.Status != BookingStatus.Confirmed)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("status", "Only confirmed tours can be started.") }
+            });
+        }
+
+        if (booking.TourStartedAt.HasValue)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("tourStartedAt", "Tour has already been started.") }
+            });
+        }
+
+        if (booking.TourEndedAt.HasValue)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("tourEndedAt", "Tour has already been ended.") }
+            });
+        }
+
+        booking.TourStartedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("TourGuide {GuideId} started tour for booking {BookingId} at {StartedAt}",
+            guide.Id, booking.Id, booking.TourStartedAt);
+
+        return Ok(AssignedTourDto.FromEntity(booking, guide));
+    }
+
+    [HttpPost("{id:guid}/end-tour")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<ActionResult<AssignedTourDto>> EndTour(Guid id, CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides
+            .AsNoTracking()
+            .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+        if (guide is null)
+        {
+            return Forbid();
+        }
+
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+                .ThenInclude(p => p.Locations)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var isAssigned = await _db.GuideAvailabilities
+            .AnyAsync(a => a.GuideId == guide.Id && a.AssignedBookingId == id, ct);
+
+        if (!isAssigned)
+        {
+            return Forbid();
+        }
+
+        if (!booking.TourStartedAt.HasValue)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("tourStartedAt", "Tour cannot be ended before it has been started.") }
+            });
+        }
+
+        if (booking.TourEndedAt.HasValue)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("tourEndedAt", "Tour has already been ended.") }
+            });
+        }
+
+        booking.TourEndedAt = DateTimeOffset.UtcNow;
+        booking.Completed = true;
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("TourGuide {GuideId} ended tour for booking {BookingId} at {EndedAt}",
+            guide.Id, booking.Id, booking.TourEndedAt);
+
+        return Ok(AssignedTourDto.FromEntity(booking, guide));
+    }
+
     [HttpGet("{id:guid}/itinerary")]
     public async Task<ActionResult<IReadOnlyList<ItineraryStepDto>>> GetItinerary(Guid id, CancellationToken ct)
     {

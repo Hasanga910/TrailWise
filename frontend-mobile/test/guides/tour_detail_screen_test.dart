@@ -19,6 +19,8 @@ AssignedTour _sampleTour({
   bool attended = false,
   bool completed = false,
   String? guideNotes,
+  DateTime? tourStartedAt,
+  DateTime? tourEndedAt,
 }) =>
     AssignedTour(
       bookingId: bookingId,
@@ -36,6 +38,8 @@ AssignedTour _sampleTour({
       attended: attended,
       completed: completed,
       guideNotes: guideNotes,
+      tourStartedAt: tourStartedAt,
+      tourEndedAt: tourEndedAt,
     );
 
 void main() {
@@ -252,6 +256,234 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Unable to update guide notes at this time.'), findsAtLeastNWidgets(1));
+    });
+
+    testWidgets('9. Clear Note button is hidden when note is null or empty', (tester) async {
+      final fake = FakeApiClient();
+      final tour = _sampleTour(guideNotes: null);
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(OutlinedButton, 'Clear Note'), findsNothing);
+    });
+
+    testWidgets('10. Clear Note button is visible when note exists', (tester) async {
+      final fake = FakeApiClient();
+      final tour = _sampleTour(guideNotes: 'Some existing note');
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(OutlinedButton, 'Clear Note'), findsOneWidget);
+    });
+
+    testWidgets('11. Clear Note confirmation Cancel does not clear note', (tester) async {
+      final fake = FakeApiClient();
+      final tour = _sampleTour(guideNotes: 'Keep this note');
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      // Tap Clear Note to open dialog
+      await tester.ensureVisible(find.widgetWithText(OutlinedButton, 'Clear Note'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Clear Note'));
+      await tester.pumpAndSettle();
+
+      // Verify dialog is shown
+      expect(find.text('Remove this guide note?'), findsOneWidget);
+
+      // Tap Cancel
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      // Note text is still in text field and no patch was sent
+      expect(find.text('Keep this note'), findsOneWidget);
+      expect(fake.patchCalls.isEmpty, isTrue);
+    });
+
+    testWidgets('12. Clear Note confirmation Clear sends API request with notes=null and clears note', (tester) async {
+      final fake = FakeApiClient();
+      final tour = _sampleTour(
+        bookingId: 'b-clear-1',
+        attended: true,
+        completed: false,
+        guideNotes: 'Remove this note',
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      // Tap Clear Note
+      await tester.ensureVisible(find.widgetWithText(OutlinedButton, 'Clear Note'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Clear Note'));
+      await tester.pumpAndSettle();
+
+      // Tap Clear in dialog
+      await tester.tap(find.widgetWithText(FilledButton, 'Clear'));
+      await tester.pumpAndSettle();
+
+      // API called with null notes and preserved attended/completed
+      expect(fake.patchCalls.length, 1);
+      final call = fake.patchCalls.first;
+      expect(call['path'], '/api/bookings/b-clear-1/guide-notes');
+      expect(call['body'], {
+        'attended': true,
+        'completed': false,
+        'notes': null,
+      });
+
+      // SnackBar shown and textfield cleared
+      expect(find.text('Guide note cleared.'), findsOneWidget);
+      expect(find.text('Remove this note'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, 'Clear Note'), findsNothing);
+    });
+
+    testWidgets('13. Start Tour is shown initially and End Tour is hidden', (tester) async {
+      final fake = FakeApiClient();
+      final tour = _sampleTour(tourStartedAt: null, tourEndedAt: null);
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilledButton, 'Start Tour'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'End Tour'), findsNothing);
+      expect(find.text('Tour Started'), findsNothing);
+      expect(find.text('Tour Completed'), findsNothing);
+    });
+
+    testWidgets('14. Tapping Start Tour calls API and UI updates to Tour Started', (tester) async {
+      final startedTime = DateTime.parse('2026-11-01T08:30:00Z');
+      final fake = FakeApiClient(
+        postResponses: {
+          '/api/bookings/b-start-1/start-tour': {
+            'bookingId': 'b-start-1',
+            'startDate': '2026-11-01',
+            'endDate': '2026-11-03',
+            'groupSize': 5,
+            'status': 'Confirmed',
+            'tourPackageId': 'pkg-1',
+            'tourPackageName': 'Sigiriya & Dambulla Explorer',
+            'theme': 'Cultural Heritage',
+            'locations': ['Sigiriya', 'Dambulla'],
+            'specialRequests': null,
+            'guideId': 'g-1',
+            'guideName': 'Nimal Guide',
+            'attended': false,
+            'completed': false,
+            'guideNotes': null,
+            'tourStartedAt': startedTime.toIso8601String(),
+            'tourEndedAt': null,
+          }
+        },
+      );
+
+      final tour = _sampleTour(bookingId: 'b-start-1');
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      // Tap Start Tour
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Start Tour'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Start Tour'));
+      await tester.pumpAndSettle();
+
+      expect(fake.postCalls.length, 1);
+      expect(fake.postCalls.first['path'], '/api/bookings/b-start-1/start-tour');
+
+      expect(find.text('Tour started successfully.'), findsOneWidget);
+      expect(find.text('Tour Started'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'End Tour'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Start Tour'), findsNothing);
+    });
+
+    testWidgets('15. Tapping End Tour calls API and UI updates to Tour Completed', (tester) async {
+      final startedTime = DateTime.parse('2026-11-01T08:30:00Z');
+      final endedTime = DateTime.parse('2026-11-03T17:00:00Z');
+      final fake = FakeApiClient(
+        postResponses: {
+          '/api/bookings/b-end-1/end-tour': {
+            'bookingId': 'b-end-1',
+            'startDate': '2026-11-01',
+            'endDate': '2026-11-03',
+            'groupSize': 5,
+            'status': 'Confirmed',
+            'tourPackageId': 'pkg-1',
+            'tourPackageName': 'Sigiriya & Dambulla Explorer',
+            'theme': 'Cultural Heritage',
+            'locations': ['Sigiriya', 'Dambulla'],
+            'specialRequests': null,
+            'guideId': 'g-1',
+            'guideName': 'Nimal Guide',
+            'attended': true,
+            'completed': true,
+            'guideNotes': null,
+            'tourStartedAt': startedTime.toIso8601String(),
+            'tourEndedAt': endedTime.toIso8601String(),
+          }
+        },
+      );
+
+      final tour = _sampleTour(
+        bookingId: 'b-end-1',
+        tourStartedAt: startedTime,
+        tourEndedAt: null,
+      );
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      // End Tour is visible initially because tour was started
+      expect(find.widgetWithText(FilledButton, 'End Tour'), findsOneWidget);
+
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'End Tour'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'End Tour'));
+      await tester.pumpAndSettle();
+
+      expect(fake.postCalls.length, 1);
+      expect(fake.postCalls.first['path'], '/api/bookings/b-end-1/end-tour');
+
+      expect(find.text('Tour ended successfully.'), findsOneWidget);
+      expect(find.text('Tour Completed'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Start Tour'), findsNothing);
+      expect(find.widgetWithText(FilledButton, 'End Tour'), findsNothing);
+    });
+
+    testWidgets('16. Lifecycle API error shows error message', (tester) async {
+      final fake = FakeApiClient(
+        postError: ApiException(400, 'Tour cannot be started at this time.'),
+      );
+      final tour = _sampleTour(bookingId: 'b-err-1');
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Start Tour'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Start Tour'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tour cannot be started at this time.'), findsAtLeastNWidgets(1));
     });
   });
 }

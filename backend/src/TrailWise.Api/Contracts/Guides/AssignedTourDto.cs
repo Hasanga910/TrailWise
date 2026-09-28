@@ -18,7 +18,9 @@ public record AssignedTourDto(
     string GuideName,
     bool Attended = false,
     bool Completed = false,
-    string? GuideNotes = null)
+    string? GuideNotes = null,
+    DateTimeOffset? TourStartedAt = null,
+    DateTimeOffset? TourEndedAt = null)
 {
     public static AssignedTourDto FromEntity(Booking booking, Guide guide) => new(
         booking.Id,
@@ -35,5 +37,7 @@ public record AssignedTourDto(
         guide.Name,
         booking.Attended,
         booking.Completed,
-        booking.GuideNotes);
+        booking.GuideNotes,
+        booking.TourStartedAt,
+        booking.TourEndedAt);
 }
