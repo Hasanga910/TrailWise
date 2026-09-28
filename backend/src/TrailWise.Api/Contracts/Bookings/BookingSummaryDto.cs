@@ -10,7 +10,9 @@ public record BookingSummaryDto(
     BookingStatus Status,
     DateTimeOffset CreatedAt,
     DateOnly StartDate,
-    int GroupSize)
+    int GroupSize,
+    DateOnly? EndDate = null,
+    string? LanguagePreference = null)
 {
     public static BookingSummaryDto FromEntity(Booking booking) => new(
         booking.Id,
@@ -19,5 +21,7 @@ public record BookingSummaryDto(
         booking.Status,
         booking.CreatedAt,
         booking.StartDate,
-        booking.GroupSize);
+        booking.GroupSize,
+        booking.EndDate,
+        booking.LanguagePreference);
 }

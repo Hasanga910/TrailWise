@@ -56,7 +56,26 @@ export interface BookingSummaryDto {
   status: BookingStatus;
   createdAt: string;
   startDate: string;
+  endDate?: string;
   groupSize: number;
+  languagePreference?: string | null;
+}
+
+export interface AvailableGuideDto {
+  guideId: string;
+  name: string;
+  languages: string[];
+  specializations: string[];
+  contactInfo: string;
+  matchesSpecialization: boolean;
+  matchesLanguage: boolean;
+  notes?: string | null;
+}
+
+export interface AssignGuideResponse {
+  bookingId: string;
+  guideId: string;
+  status: BookingStatus;
 }
 
 export async function createBooking(input: CreateBookingInput): Promise<BookingDto> {
@@ -100,3 +119,16 @@ export async function cancelBooking(id: string, reason?: string): Promise<Bookin
   const response = await apiClient.patch<BookingDto>(`/api/bookings/${id}/cancel`, { reason });
   return response.data;
 }
+
+export async function getAvailableGuidesForBooking(bookingId: string): Promise<AvailableGuideDto[]> {
+  const response = await apiClient.get<AvailableGuideDto[]>(`/api/bookings/${bookingId}/available-guides`);
+  return response.data;
+}
+
+export async function assignGuide(bookingId: string, guideId: string): Promise<AssignGuideResponse> {
+  const response = await apiClient.post<AssignGuideResponse>(`/api/bookings/${bookingId}/assign-guide`, {
+    guideId,
+  });
+  return response.data;
+}
+
