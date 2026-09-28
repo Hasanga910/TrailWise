@@ -24,7 +24,7 @@ export interface SidebarNavItem {
 
 export interface SidebarLayoutProps {
   navItems: SidebarNavItem[];
-  pageTitles: Record<string, string>;
+  pageTitles: Record<string, string> | ((pathname: string) => string);
 }
 
 const COLLAPSE_STORAGE_KEY = 'trailwise_sidebar_collapsed';
@@ -51,7 +51,8 @@ export function SidebarLayout({ navItems, pageTitles }: SidebarLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(readStoredCollapsed);
 
-  const title = pageTitles[location.pathname] ?? 'Dashboard';
+  const title =
+    typeof pageTitles === 'function' ? pageTitles(location.pathname) : (pageTitles[location.pathname] ?? 'Dashboard');
 
   function toggleCollapsed() {
     setCollapsed((prev) => {

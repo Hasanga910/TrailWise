@@ -1,8 +1,10 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Threading.RateLimiting;
 using TrailWise.Infrastructure;
 using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
@@ -10,6 +12,7 @@ using TrailWise.Infrastructure.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 const string CorsPolicyName = "TrailWiseClients";
+const string LoginRateLimiterPolicy = "LoginRateLimiter";
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -72,6 +75,35 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            title = "Too many login attempts. Please wait a minute and try again."
+        }, ct);
+    };
+
+    // Configurable so integration tests (which log in far more than 5 times a minute against a
+    // shared in-memory TestServer "client") can raise the limit via appsettings, without weakening
+    // the real default used in Development/Production.
+    var loginPermitLimit = builder.Configuration.GetValue("RateLimiting:LoginPermitLimit", 5);
+    var loginWindowSeconds = builder.Configuration.GetValue("RateLimiting:LoginWindowSeconds", 60);
+
+    options.AddPolicy(LoginRateLimiterPolicy, context =>
+    {
+        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = loginPermitLimit,
+            Window = TimeSpan.FromSeconds(loginWindowSeconds),
+            QueueLimit = 0
+        });
+    });
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicyName, policy =>
@@ -118,6 +150,7 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 

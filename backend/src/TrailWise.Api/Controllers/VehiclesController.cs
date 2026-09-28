@@ -93,9 +93,19 @@ public class VehiclesController : ControllerBase
             return BadRequest(new { errors = new[] { "Capacity must be at least 1." } });
         }
 
+        var normalizedRegistrationNumber = request.RegistrationNumber.Trim().ToUpperInvariant();
+
+        var registrationExists = await _db.Vehicles.AnyAsync(
+            v => v.RegistrationNumber == normalizedRegistrationNumber, ct);
+        if (registrationExists)
+        {
+            return Conflict(new { errors = new[] { $"A vehicle with registration number '{normalizedRegistrationNumber}' already exists." } });
+        }
+
         var vehicle = new Vehicle
         {
             Type = request.Type,
+            RegistrationNumber = normalizedRegistrationNumber,
             Capacity = request.Capacity,
             HasAC = request.HasAC,
             SeatConfiguration = string.IsNullOrWhiteSpace(request.SeatConfiguration) ? string.Empty : request.SeatConfiguration.Trim(),
@@ -200,5 +210,23 @@ public class VehiclesController : ControllerBase
         }
 
         return Ok(VehicleAssignmentDto.FromEntity(result.Assignment!));
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = FleetCoordinatorOrAdmin)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.Id == id, ct);
+        if (vehicle is null)
+        {
+            return NotFound();
+        }
+
+        _db.Vehicles.Remove(vehicle);
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Vehicle {VehicleId} deleted.", id);
+
+        return NoContent();
     }
 }

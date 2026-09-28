@@ -8,8 +8,9 @@ export function getHomeRouteForRole(role: UserRole): string {
       return '/ops';
     case 'Traveler':
       return '/traveler';
-    case 'TourGuide':
     case 'FleetCoordinator':
+      return '/fleet';
+    case 'TourGuide':
     default:
       return '/portal';
   }
