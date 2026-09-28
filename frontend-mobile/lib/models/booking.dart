@@ -1,4 +1,5 @@
 import 'package_tier.dart';
+import 'vehicle_assignment.dart';
 
 class Booking {
   final String id;
@@ -12,6 +13,7 @@ class Booking {
   final double budgetPerPerson;
   final String status;
   final bool isLargeGroup;
+  final VehicleAssignment? vehicleAssignment;
 
   Booking({
     required this.id,
@@ -25,6 +27,7 @@ class Booking {
     required this.budgetPerPerson,
     required this.status,
     required this.isLargeGroup,
+    this.vehicleAssignment,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -39,5 +42,8 @@ class Booking {
         budgetPerPerson: (json['budgetPerPerson'] as num).toDouble(),
         status: json['status'] as String,
         isLargeGroup: json['isLargeGroup'] as bool,
+        vehicleAssignment: json['vehicleAssignment'] != null
+            ? VehicleAssignment.fromJson(json['vehicleAssignment'] as Map<String, dynamic>)
+            : null,
       );
 }

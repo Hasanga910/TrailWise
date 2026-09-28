@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -17,6 +17,9 @@ namespace TrailWise.Infrastructure.Persistence.db
                 maxLength: 20,
                 nullable: false,
                 defaultValue: "");
+
+            // Backfill existing rows with unique placeholder registration numbers so the UNIQUE index succeeds
+            migrationBuilder.Sql("UPDATE \"Vehicles\" SET \"RegistrationNumber\" = 'WP-REG-' || RIGHT(\"Id\"::text, 8) WHERE \"RegistrationNumber\" = '' OR \"RegistrationNumber\" IS NULL;");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Vehicles_RegistrationNumber",

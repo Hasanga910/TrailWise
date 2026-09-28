@@ -69,6 +69,11 @@ export async function getMyBookings(params: GetMyBookingsParams = {}): Promise<P
   return response.data;
 }
 
+export async function getPagedBookings(params: GetMyBookingsParams = {}): Promise<PagedResult<BookingDto>> {
+  const response = await apiClient.get<PagedResult<BookingDto>>('/api/bookings/paged', { params });
+  return response.data;
+}
+
 export async function getBookingById(id: string): Promise<BookingDto> {
   const response = await apiClient.get<BookingDto>(`/api/bookings/${id}`);
   return response.data;

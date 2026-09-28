@@ -48,3 +48,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# JVM / Crash dumps & logs
+hs_err_pid*.log
+replay_pid*.log
+*.log

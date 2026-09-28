@@ -115,10 +115,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   }
 
   void _openBooking(Booking booking) {
-    if (booking.status == BookingStatus.confirmed) {
-      Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => ItineraryScreen(booking: booking)));
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ItineraryScreen(
+          booking: booking,
+          apiClient: _apiClient,
+        ),
+      ),
+    );
   }
 
   void _openPayment(Booking booking) {
