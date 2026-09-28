@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { extractErrorMessage } from '../../api/apiClient';
 import {
   cancelBooking,
@@ -7,6 +7,8 @@ import {
   type BookingStatus,
   type PagedResult,
 } from '../../api/bookings';
+import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
+import { ItineraryList } from '../../components/itinerary/ItineraryList';
 
 const PAGE_SIZE = 10;
 
@@ -60,6 +62,32 @@ export function MyBookingsPage() {
   const [cancelPrompt, setCancelPrompt] = useState<{ bookingId: string; reason: string } | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+  const [itineraryCache, setItineraryCache] = useState<Record<string, ItineraryStepDto[]>>({});
+  const [itineraryLoadingId, setItineraryLoadingId] = useState<string | null>(null);
+  const [itineraryErrors, setItineraryErrors] = useState<Record<string, string>>({});
+
+  function toggleItinerary(bookingId: string) {
+    if (expandedBookingId === bookingId) {
+      setExpandedBookingId(null);
+      return;
+    }
+    setExpandedBookingId(bookingId);
+    if (itineraryCache[bookingId]) {
+      return;
+    }
+    setItineraryLoadingId(bookingId);
+    getItinerary(bookingId)
+      .then((steps) => setItineraryCache((prev) => ({ ...prev, [bookingId]: steps })))
+      .catch((err) =>
+        setItineraryErrors((prev) => ({
+          ...prev,
+          [bookingId]: extractErrorMessage(err, 'Could not load the itinerary.'),
+        })),
+      )
+      .finally(() => setItineraryLoadingId(null));
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -208,40 +236,62 @@ export function MyBookingsPage() {
         <>
           <div className="space-y-3">
             {result.items.map((booking) => (
-              <div
-                key={booking.id}
-                className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">
-                    {booking.tourPackageName} — {booking.packageTier.classType}
-                  </p>
-                  <p className="mt-0.5 text-sm text-slate-500">
-                    {booking.startDate} to {booking.endDate} · {booking.groupSize} traveler
-                    {booking.groupSize === 1 ? '' : 's'} · ${booking.budgetPerPerson.toFixed(2)}/person budget
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {booking.isLargeGroup && (
-                    <span className="whitespace-nowrap rounded-full bg-accent-500/15 px-2.5 py-0.5 text-xs font-semibold text-accent-700">
-                      Large group
-                    </span>
-                  )}
-                  <span
-                    className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[booking.status]}`}
-                  >
-                    {booking.status}
-                  </span>
-                  {CANCELLABLE_STATUSES.includes(booking.status) && isUpcoming(booking.startDate) && (
-                    <button
-                      type="button"
-                      onClick={() => setCancelPrompt({ bookingId: booking.id, reason: '' })}
-                      className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              <div key={booking.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      {booking.tourPackageName} — {booking.packageTier.classType}
+                    </p>
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      {booking.startDate} to {booking.endDate} · {booking.groupSize} traveler
+                      {booking.groupSize === 1 ? '' : 's'} · ${booking.budgetPerPerson.toFixed(2)}/person budget
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {booking.isLargeGroup && (
+                      <span className="whitespace-nowrap rounded-full bg-accent-500/15 px-2.5 py-0.5 text-xs font-semibold text-accent-700">
+                        Large group
+                      </span>
+                    )}
+                    <span
+                      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[booking.status]}`}
                     >
-                      Cancel Booking
-                    </button>
-                  )}
+                      {booking.status}
+                    </span>
+                    {booking.status === 'Confirmed' && (
+                      <button
+                        type="button"
+                        onClick={() => toggleItinerary(booking.id)}
+                        className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        {expandedBookingId === booking.id ? 'Hide Itinerary' : 'View Itinerary'}
+                      </button>
+                    )}
+                    {CANCELLABLE_STATUSES.includes(booking.status) && isUpcoming(booking.startDate) && (
+                      <button
+                        type="button"
+                        onClick={() => setCancelPrompt({ bookingId: booking.id, reason: '' })}
+                        className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Cancel Booking
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {expandedBookingId === booking.id && (
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    {itineraryLoadingId === booking.id && (
+                      <div className="h-12 animate-pulse rounded-lg bg-slate-100" />
+                    )}
+                    {itineraryErrors[booking.id] && (
+                      <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        {itineraryErrors[booking.id]}
+                      </p>
+                    )}
+                    {itineraryCache[booking.id] && <ItineraryList steps={itineraryCache[booking.id]} />}
+                  </div>
+                )}
               </div>
             ))}
           </div>

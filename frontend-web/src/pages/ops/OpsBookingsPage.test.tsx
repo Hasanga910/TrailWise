@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as bookingsApi from '../../api/bookings';
 import type { BookingDto, BookingSummaryDto } from '../../api/bookings';
+import * as itinerariesApi from '../../api/itineraries';
 import { OpsBookingsPage } from './OpsBookingsPage';
 
 function sampleBooking(overrides: Partial<BookingSummaryDto> = {}): BookingSummaryDto {
@@ -159,5 +160,42 @@ describe('OpsBookingsPage', () => {
     await screen.findByText('Completed');
 
     expect(screen.queryByRole('button', { name: /^cancel$/i })).not.toBeInTheDocument();
+  });
+
+  it('does not show an Itinerary button for a non-confirmed booking', async () => {
+    vi.spyOn(bookingsApi, 'getAllBookings').mockResolvedValue([sampleBooking({ status: 'PendingApproval' })]);
+
+    renderPage();
+    await screen.findByText('PendingApproval');
+
+    expect(screen.queryByRole('button', { name: /^itinerary$/i })).not.toBeInTheDocument();
+  });
+
+  it('expands the itinerary for a confirmed booking and allows setting one', async () => {
+    vi.spyOn(bookingsApi, 'getAllBookings').mockResolvedValue([sampleBooking({ status: 'Confirmed' })]);
+    const getItinerarySpy = vi.spyOn(itinerariesApi, 'getItinerary').mockResolvedValue([]);
+    const setItinerarySpy = vi.spyOn(itinerariesApi, 'setItinerary').mockResolvedValue([
+      { id: 'step-1', bookingId: 'booking-1', dayNumber: 1, activity: 'City tour', location: 'Kandy', startTime: '09:00:00' },
+    ]);
+
+    renderPage();
+    await screen.findByText('Confirmed');
+
+    await userEvent.click(screen.getByRole('button', { name: /^itinerary$/i }));
+    await waitFor(() => expect(getItinerarySpy).toHaveBeenCalledWith('booking-1'));
+
+    await userEvent.click(await screen.findByRole('button', { name: /set itinerary/i }));
+
+    const [activityInput] = screen.getAllByRole('textbox');
+    await userEvent.type(activityInput, 'City tour');
+
+    await userEvent.click(screen.getByRole('button', { name: /save itinerary/i }));
+
+    await waitFor(() =>
+      expect(setItinerarySpy).toHaveBeenCalledWith('booking-1', [
+        { dayNumber: 1, activity: 'City tour', location: '', startTime: '09:00:00' },
+      ]),
+    );
+    expect(await screen.findByText(/City tour/)).toBeInTheDocument();
   });
 });
