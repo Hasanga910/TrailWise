@@ -41,6 +41,6 @@ class Booking {
         budgetPerPerson: (json['budgetPerPerson'] as num).toDouble(),
         status: json['status'] as String,
         isLargeGroup: json['isLargeGroup'] as bool,
-        hasReview: (json['hasReview'] as bool?) ?? false,
+        hasReview: (json['hasReview'] ?? json['HasReview'] ?? false) as bool,
       );
 }

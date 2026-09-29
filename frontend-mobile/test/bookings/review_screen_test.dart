@@ -28,7 +28,7 @@ class RecordingApiClient extends ApiClient {
   }
 }
 
-Booking _fixtureBooking({String status = 'Completed'}) => Booking(
+Booking _fixtureBooking({String status = 'Completed', bool hasReview = false}) => Booking(
       id: 'booking-1',
       travelerId: 'traveler-1',
       tourPackageId: 'pkg-1',
@@ -46,6 +46,7 @@ Booking _fixtureBooking({String status = 'Completed'}) => Booking(
       budgetPerPerson: 250,
       status: status,
       isLargeGroup: false,
+      hasReview: hasReview,
     );
 
 void main() {
@@ -222,6 +223,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Reviews can only be submitted for completed bookings.'), findsOneWidget);
+    expect(find.text('Rate your experience'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Submit Review'), findsNothing);
+    expect(client.postCallCount, 0);
+  });
+
+  testWidgets('9. Completed booking with hasReview=true shows already submitted card, hides review form, makes no POST', (tester) async {
+    final client = RecordingApiClient();
+
+    await tester.pumpWidget(MaterialApp(
+      home: ReviewScreen(booking: _fixtureBooking(status: 'Completed', hasReview: true), apiClient: client),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Review submitted successfully.'), findsOneWidget);
     expect(find.text('Rate your experience'), findsNothing);
     expect(find.widgetWithText(FilledButton, 'Submit Review'), findsNothing);
     expect(client.postCallCount, 0);

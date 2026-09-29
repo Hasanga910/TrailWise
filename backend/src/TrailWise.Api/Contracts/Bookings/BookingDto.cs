@@ -24,17 +24,17 @@ public record BookingDto(
     public const int LargeGroupThreshold = 10;
 
     public static BookingDto FromEntity(Booking booking) => new(
-        booking.Id,
-        booking.TravelerId,
-        booking.TourPackageId,
-        booking.TourPackage.Name,
-        PackageTierDto.FromEntity(booking.PackageTier),
-        booking.GroupSize,
-        booking.StartDate,
-        booking.EndDate,
-        booking.BudgetPerPerson,
-        booking.SpecialRequests,
-        booking.Status,
-        booking.GroupSize > LargeGroupThreshold,
-        booking.Reviews != null && booking.Reviews.Any());
+        Id: booking.Id,
+        TravelerId: booking.TravelerId,
+        TourPackageId: booking.TourPackageId,
+        TourPackageName: booking.TourPackage.Name,
+        PackageTier: PackageTierDto.FromEntity(booking.PackageTier),
+        GroupSize: booking.GroupSize,
+        StartDate: booking.StartDate,
+        EndDate: booking.EndDate,
+        BudgetPerPerson: booking.BudgetPerPerson,
+        SpecialRequests: booking.SpecialRequests,
+        Status: booking.Status,
+        IsLargeGroup: booking.GroupSize > LargeGroupThreshold,
+        HasReview: booking.Reviews != null && booking.Reviews.Any());
 }

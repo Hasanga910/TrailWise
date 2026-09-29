@@ -6,6 +6,8 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
+using TrailWise.Api.Contracts.Bookings;
+using TrailWise.Api.Contracts.Common;
 using TrailWise.Api.Contracts.Packages;
 using TrailWise.Api.Contracts.Reviews;
 using TrailWise.Domain.Entities;
@@ -56,6 +58,50 @@ public class ReviewsEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         Assert.Equal(1, packageReviews.TotalReviews);
         Assert.Equal(5.0, packageReviews.AverageRating);
         Assert.Single(packageReviews.Reviews);
+    }
+
+    [Fact]
+    public async Task CompletedBooking_WithoutReview_ReturnsHasReviewFalse()
+    {
+        var (client, bookingId, _, _) = await SetupBookingAsync(BookingStatus.Completed);
+
+        // Check GET /api/bookings/mine
+        var myBookingsRes = await client.GetFromJsonAsync<PagedResult<BookingDto>>("/api/bookings/mine", JsonOptions);
+        Assert.NotNull(myBookingsRes);
+        var bookingInMine = myBookingsRes!.Items.FirstOrDefault(b => b.Id == bookingId);
+        Assert.NotNull(bookingInMine);
+        Assert.False(bookingInMine.HasReview);
+
+        // Check GET /api/bookings/{id}
+        var getByIdRes = await client.GetFromJsonAsync<BookingDto>($"/api/bookings/{bookingId}", JsonOptions);
+        Assert.NotNull(getByIdRes);
+        Assert.False(getByIdRes.HasReview);
+    }
+
+    [Fact]
+    public async Task CompletedBooking_WithExistingReview_ReturnsHasReviewTrue()
+    {
+        var (client, bookingId, _, _) = await SetupBookingAsync(BookingStatus.Completed);
+
+        // Submit review
+        var response = await client.PostAsJsonAsync($"/api/bookings/{bookingId}/reviews", new
+        {
+            Rating = 5,
+            Comment = "Phenomenal tour experience!"
+        });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        // Check GET /api/bookings/mine
+        var myBookingsRes = await client.GetFromJsonAsync<PagedResult<BookingDto>>("/api/bookings/mine", JsonOptions);
+        Assert.NotNull(myBookingsRes);
+        var bookingInMine = myBookingsRes!.Items.FirstOrDefault(b => b.Id == bookingId);
+        Assert.NotNull(bookingInMine);
+        Assert.True(bookingInMine.HasReview);
+
+        // Check GET /api/bookings/{id}
+        var getByIdRes = await client.GetFromJsonAsync<BookingDto>($"/api/bookings/{bookingId}", JsonOptions);
+        Assert.NotNull(getByIdRes);
+        Assert.True(getByIdRes.HasReview);
     }
 
     [Fact]
