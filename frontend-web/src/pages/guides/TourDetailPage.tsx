@@ -1,11 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/apiClient';
-import { getMyAssignedTours, updateGuideTour, type AssignedTourDto } from '../../api/assignedTours';
+import {
+  getMyAssignedTours,
+  updateGuideTour,
+  type AssignedTourDto,
+} from '../../api/assignedTours';
 import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
 import { useAuth } from '../../auth/AuthContext';
 import { ItineraryEditor } from '../../components/itinerary/ItineraryEditor';
 import { ItineraryList } from '../../components/itinerary/ItineraryList';
+
+function formatDateTime(dtStr?: string | null) {
+  if (!dtStr) return '';
+  const dt = new Date(dtStr);
+  return dt.toLocaleString();
+}
 
 export function TourDetailPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -15,7 +25,6 @@ export function TourDetailPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [attended, setAttended] = useState(false);
-  const [completed, setCompleted] = useState(false);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -36,7 +45,6 @@ export function TourDetailPage() {
         }
         setTour(found);
         setAttended(found.attended);
-        setCompleted(found.completed);
         setNotes(found.guideNotes ?? '');
       })
       .catch((err) => setLoadError(extractErrorMessage(err, 'Could not load this tour.')));
@@ -57,7 +65,6 @@ export function TourDetailPage() {
     try {
       const updated = await updateGuideTour(bookingId, {
         attended,
-        completed,
         notes: notes.trim() ? notes.trim() : null,
       });
       setTour(updated);
@@ -129,6 +136,38 @@ export function TourDetailPage() {
               )}
             </div>
 
+            {/* Tour Lifecycle Card */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="font-heading text-base font-bold text-slate-900">Tour Lifecycle</h3>
+
+              <div className="mt-4">
+                {tour.tourEndedAt ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="font-semibold text-emerald-900">Completed</p>
+                    {tour.tourStartedAt && (
+                      <p className="mt-1 text-xs text-emerald-800">
+                        Started at: {formatDateTime(tour.tourStartedAt)}
+                      </p>
+                    )}
+                    <p className="mt-0.5 text-xs text-emerald-800">
+                      Ended at: {formatDateTime(tour.tourEndedAt)}
+                    </p>
+                  </div>
+                ) : tour.tourStartedAt ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <p className="font-semibold text-amber-900">In Progress</p>
+                    <p className="mt-1 text-xs text-amber-800">
+                      Started at: {formatDateTime(tour.tourStartedAt)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="font-semibold text-slate-700">Not Started</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="font-heading text-base font-bold text-slate-900">Tour Management</h3>
 
@@ -152,15 +191,6 @@ export function TourDetailPage() {
                     className="h-4 w-4 rounded border-slate-300"
                   />
                   Attended
-                </label>
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={completed}
-                    onChange={(e) => setCompleted(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300"
-                  />
-                  Completed
                 </label>
                 <div>
                   <label htmlFor="guide-notes" className="text-xs font-semibold text-slate-500">

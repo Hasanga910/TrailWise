@@ -17,11 +17,13 @@ export interface AssignedTourDto {
   attended: boolean;
   completed: boolean;
   guideNotes: string | null;
+  tourStartedAt?: string | null;
+  tourEndedAt?: string | null;
 }
 
 export interface UpdateGuideTourInput {
   attended: boolean;
-  completed: boolean;
+  completed?: boolean;
   notes?: string | null;
 }
 
@@ -34,3 +36,4 @@ export async function updateGuideTour(bookingId: string, input: UpdateGuideTourI
   const response = await apiClient.patch<AssignedTourDto>(`/api/bookings/${bookingId}/guide-notes`, input);
   return response.data;
 }
+
