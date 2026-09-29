@@ -4,17 +4,30 @@
 !.env.example
 
 # .NET
-backend/**/bin/
-backend/**/obj/
+**/[Bb]in/
+**/[Oo]bj/
+**/TestResults/
 *.user
+*.userosv
+*.userprefs
+*.suo
+*.sln.docstates
 backend/src/TrailWise.Api/wwwroot/uploads/packages/*
 !backend/src/TrailWise.Api/wwwroot/uploads/packages/.gitkeep
 
 # Node / React
-frontend-web/node_modules/
-frontend-web/dist/
+**/node_modules/
+**/dist/
 frontend-web/.vite/
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test & Coverage
+coverage/
+*.lcov
+*.trx
 
 # Flutter / Dart
 frontend-mobile/.dart_tool/
@@ -38,16 +51,22 @@ frontend-mobile/**/android/local.properties
 *$py.class
 *.so
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
 # OS
 .DS_Store
+._*
 Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
 
 # IDE
 .vs/
 .vscode/
 .idea/
 *.swp
+*.swo
 
 # JVM / Crash dumps & logs
 hs_err_pid*.log
