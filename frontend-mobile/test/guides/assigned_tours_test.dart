@@ -184,7 +184,7 @@ void main() {
   });
 
   group('Navigation', () {
-    testWidgets('MainShell displays Assigned Tours tab for TourGuide', (tester) async {
+    testWidgets('MainShell displays Assigned Tours tab for TourGuide and hides Packages/My Bookings', (tester) async {
       final fake = FakeApiClient(getResponses: {
         '/api/guides/me/assigned-tours': <dynamic>[],
         '/api/packages': <dynamic>[],
@@ -205,11 +205,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Dashboard'), findsOneWidget);
       expect(find.text('Assigned Tours'), findsOneWidget);
+      expect(find.text('Packages'), findsNothing);
       expect(find.text('My Bookings'), findsNothing);
     });
 
-    testWidgets('MainShell preserves My Bookings tab for Traveler', (tester) async {
+    testWidgets('MainShell preserves Packages and My Bookings tabs for Traveler and hides Assigned Tours', (tester) async {
       final fake = FakeApiClient(getResponses: {
         '/api/bookings/mine': {
           'items': <dynamic>[],
@@ -235,6 +237,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Dashboard'), findsOneWidget);
+      expect(find.text('Packages'), findsOneWidget);
       expect(find.text('My Bookings'), findsOneWidget);
       expect(find.text('Assigned Tours'), findsNothing);
     });

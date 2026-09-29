@@ -3,14 +3,16 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
+import '../auth/current_user.dart';
 import '../bookings/booking_request_screen.dart';
 import '../models/package_tier.dart';
 import '../models/tour_package.dart';
 
 class PackagesScreen extends StatefulWidget {
-  const PackagesScreen({super.key, this.apiClient});
+  const PackagesScreen({super.key, this.apiClient, this.currentUser});
 
   final ApiClient? apiClient;
+  final CurrentUser? currentUser;
 
   @override
   State<PackagesScreen> createState() => _PackagesScreenState();
@@ -23,6 +25,15 @@ class _PackagesScreenState extends State<PackagesScreen> {
   String? _error;
   bool _loading = true;
 
+  CurrentUser? _getUser() {
+    if (widget.currentUser != null) return widget.currentUser;
+    try {
+      return context.read<AuthProvider>().user;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +41,12 @@ class _PackagesScreenState extends State<PackagesScreen> {
   }
 
   Future<void> _load() async {
+    final user = _getUser();
+    if (user != null && user.role == 'TourGuide') {
+      setState(() => _loading = false);
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -64,6 +81,49 @@ class _PackagesScreenState extends State<PackagesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    CurrentUser? user = widget.currentUser;
+    if (user == null) {
+      try {
+        user = context.watch<AuthProvider>().user;
+      } catch (_) {
+        user = null;
+      }
+    }
+
+    if (user != null && user.role == 'TourGuide') {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Tour Packages')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline, size: 56, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'Access Restricted',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tour packages and booking creation are only available to Travelers.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Go Back'),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Tour Packages')),
       body: _buildBody(),

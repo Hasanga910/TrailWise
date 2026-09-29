@@ -22,34 +22,54 @@ class _MainShellState extends State<MainShell> {
     final user = context.watch<AuthProvider>().user;
     final isTourGuide = user?.role == 'TourGuide';
 
-    final tabs = <Widget>[
-      const HomeScreen(),
-      const PackagesScreen(),
-      if (isTourGuide) const AssignedToursScreen() else const MyBookingsScreen(),
-    ];
+    final tabs = isTourGuide
+        ? const <Widget>[
+            HomeScreen(),
+            AssignedToursScreen(),
+          ]
+        : const <Widget>[
+            HomeScreen(),
+            PackagesScreen(),
+            MyBookingsScreen(),
+          ];
 
-    final destinations = <NavigationDestination>[
-      const NavigationDestination(
-        icon: Icon(Icons.dashboard_outlined),
-        selectedIcon: Icon(Icons.dashboard),
-        label: 'Dashboard',
-      ),
-      const NavigationDestination(
-        icon: Icon(Icons.card_travel_outlined),
-        selectedIcon: Icon(Icons.card_travel),
-        label: 'Packages',
-      ),
-      NavigationDestination(
-        icon: Icon(isTourGuide ? Icons.assignment_outlined : Icons.event_note_outlined),
-        selectedIcon: Icon(isTourGuide ? Icons.assignment : Icons.event_note),
-        label: isTourGuide ? 'Assigned Tours' : 'My Bookings',
-      ),
-    ];
+    final destinations = isTourGuide
+        ? const <NavigationDestination>[
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard),
+              label: 'Dashboard',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.assignment_outlined),
+              selectedIcon: Icon(Icons.assignment),
+              label: 'Assigned Tours',
+            ),
+          ]
+        : const <NavigationDestination>[
+            NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard),
+              label: 'Dashboard',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.card_travel_outlined),
+              selectedIcon: Icon(Icons.card_travel),
+              label: 'Packages',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.event_note_outlined),
+              selectedIcon: Icon(Icons.event_note),
+              label: 'My Bookings',
+            ),
+          ];
+
+    final selectedIndex = _selectedIndex >= destinations.length ? 0 : _selectedIndex;
 
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: tabs),
+      body: IndexedStack(index: selectedIndex, children: tabs),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
+        selectedIndex: selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
         destinations: destinations,
       ),
