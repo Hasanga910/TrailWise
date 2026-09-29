@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:trailwise_mobile/auth/current_user.dart';
 import 'package:trailwise_mobile/packages/packages_screen.dart';
 
 import '../fakes/fake_api_client.dart';
@@ -47,5 +48,28 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No tour packages yet.'), findsOneWidget);
+  });
+
+  testWidgets('PackagesScreen shows Access Restricted when accessed by TourGuide', (tester) async {
+    final fake = FakeApiClient();
+    final guideUser = CurrentUser(
+      id: 'guide-1',
+      name: 'Guide Alpha',
+      email: 'guide@trailwise.com',
+      role: 'TourGuide',
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PackagesScreen(
+        apiClient: fake,
+        currentUser: guideUser,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Access Restricted'), findsOneWidget);
+    expect(find.textContaining('only available to Travelers'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Go Back'), findsOneWidget);
+    expect(find.text('Request'), findsNothing);
   });
 }

@@ -55,6 +55,7 @@ public class BookingsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Traveler")]
     public async Task<ActionResult<BookingDto>> Create(CreateBookingRequest request, CancellationToken ct)
     {
         var travelerId = GetUserId();

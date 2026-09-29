@@ -47,6 +47,44 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
     }
 
     [Fact]
+    public async Task Create_WhenCalledByTourGuide_ReturnsForbidden()
+    {
+        var adminClient = _factory.CreateClient();
+        var adminLoginResponse = await adminClient.PostAsJsonAsync("/api/auth/login", new { Email = "admin@test.local", Password = "TestAdminPass123!" });
+        var adminAuth = await adminLoginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        adminClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminAuth!.Token);
+
+        var guideEmail = $"guide-{Guid.NewGuid():N}@example.com";
+        var createGuideRes = await adminClient.PostAsJsonAsync("/api/auth/admin/users", new
+        {
+            Name = "Tour Guide",
+            Email = guideEmail,
+            Password = "P@ssword123",
+            ContactNumber = "+14155550222",
+            Role = "TourGuide"
+        });
+        createGuideRes.EnsureSuccessStatusCode();
+
+        var guideClient = _factory.CreateClient();
+        var loginResponse = await guideClient.PostAsJsonAsync("/api/auth/login", new { Email = guideEmail, Password = "P@ssword123" });
+        var guideAuth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        guideClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", guideAuth!.Token);
+
+        var tier = await GetFirstTierAsync(guideClient);
+
+        var response = await guideClient.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_WithZeroGroupSize_ReturnsStructuredFieldError()
     {
         var client = await AuthenticatedTravelerAsync();
