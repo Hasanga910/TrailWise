@@ -25,8 +25,11 @@ import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
 import { MyBookingsPage } from './pages/traveler/MyBookingsPage';
 import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
 import { FleetLayout } from './components/fleet/FleetLayout';
-import { FleetManagementPage } from './pages/admin/FleetManagementPage';
+import { FleetOverviewPage } from './pages/fleet/FleetOverviewPage';
 import { FleetProfileSettingsPage } from './pages/fleet/FleetProfileSettingsPage';
+import { FleetDriversPage } from './pages/fleet/FleetDriversPage';
+import { FleetVehiclesPage } from './pages/fleet/FleetVehiclesPage';
+import { FleetAssignmentsPage } from './pages/fleet/FleetAssignmentsPage';
 import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
 import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
 import { GuideAvailabilityPage } from './pages/guides/GuideAvailabilityPage';
@@ -116,7 +119,10 @@ function App() {
           </RequireRole>
         }
       >
-        <Route index element={<FleetManagementPage />} />
+        <Route index element={<FleetOverviewPage />} />
+        <Route path="vehicles" element={<FleetVehiclesPage />} />
+        <Route path="drivers" element={<FleetDriversPage />} />
+        <Route path="assignments" element={<FleetAssignmentsPage />} />
         <Route path="profile" element={<FleetProfileSettingsPage />} />
       </Route>
 
@@ -131,7 +137,6 @@ function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="packages" element={<PackagesOverviewPage />} />
         <Route path="packages/manage" element={<PackageManagementPage />} />
-        <Route path="fleet" element={<FleetManagementPage />} />
         <Route path="staff" element={<UserManagementIndexPage />} />
         <Route path="staff/tour-guides" element={<StaffRolePage role="TourGuide" roleLabel="Tour Guide" />} />
         <Route

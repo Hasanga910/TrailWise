@@ -205,6 +205,17 @@ export function CalendarIcon({ className = base }: IconProps) {
   );
 }
 
+export function IdCardIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="3" y="4" width="18" height="16" rx="2" strokeLinejoin="round" />
+      <circle cx="9" cy="10" r="2.5" />
+      <path d="M6 16c0-1.8 1.5-2.5 3-2.5s3 .7 3 2.5" strokeLinecap="round" />
+      <path d="M14 9h4M14 13h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function ReportsIcon({ className = base }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>

@@ -1,5 +1,5 @@
 import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
-import { DashboardIcon, PackagesIcon, ProfileIcon, TruckIcon, UsersIcon } from './icons';
+import { DashboardIcon, PackagesIcon, ProfileIcon, UsersIcon } from './icons';
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true },
@@ -11,11 +11,6 @@ const NAV_ITEMS: SidebarNavItem[] = [
       { to: '/admin/packages', label: 'Overview', end: true },
       { to: '/admin/packages/manage', label: 'Management' },
     ],
-  },
-  {
-    to: '/admin/fleet',
-    label: 'Fleet Management',
-    icon: TruckIcon,
   },
   {
     to: '/admin/staff',
@@ -34,7 +29,6 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin': 'Dashboard',
   '/admin/packages': 'Packages Overview',
   '/admin/packages/manage': 'Package Management',
-  '/admin/fleet': 'Fleet & Transport Management',
   '/admin/staff': 'User Management',
   '/admin/staff/tour-guides': 'Tour Guides',
   '/admin/staff/operations-managers': 'Operations Managers',

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -184,6 +185,100 @@ public class VehiclesController : ControllerBase
         return Ok(new VehicleAvailabilityResponse(id, from, to, isAvailable, reason));
     }
 
+    [HttpGet("assignments")]
+    [Authorize(Roles = FleetCoordinatorOrAdmin)]
+    public async Task<ActionResult<IReadOnlyList<VehicleAssignmentDetailDto>>> GetAssignments(CancellationToken ct)
+    {
+        var assignments = await _db.VehicleAssignments
+            .Include(a => a.Vehicle)
+            .Include(a => a.Driver)
+            .Include(a => a.Booking)
+                .ThenInclude(b => b.Traveler)
+            .AsNoTracking()
+            .OrderByDescending(a => a.StartDate)
+            .ToListAsync(ct);
+
+        var dtos = assignments.Select(a => new VehicleAssignmentDetailDto(
+            a.Id,
+            a.VehicleId,
+            a.Vehicle != null ? $"{a.Vehicle.Type} ({a.Vehicle.Capacity} seats)" : "Unknown Vehicle",
+            a.BookingId,
+            a.DriverId,
+            a.Driver != null ? a.Driver.Name : "Unknown Driver",
+            a.Driver != null ? a.Driver.ContactInfo : "",
+            a.StartDate,
+            a.EndDate,
+            a.CreatedAt,
+            a.UpdatedAt,
+            a.Vehicle?.Type,
+            a.Vehicle?.Capacity,
+            a.Vehicle?.HasAC,
+            a.Vehicle?.RegistrationNumber,
+            a.Booking?.Status,
+            a.Booking?.Traveler != null ? a.Booking.Traveler.Name : null
+        )).ToList();
+
+        return Ok(dtos);
+    }
+
+    [HttpGet("assignments/by-booking/{bookingId:guid}")]
+    [Authorize]
+    public async Task<ActionResult<VehicleAssignmentDetailDto>> GetAssignmentByBookingId(Guid bookingId, CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.Traveler)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == bookingId, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var travelerId = GetUserId();
+        var isOwner = travelerId.HasValue && booking.TravelerId == travelerId.Value;
+        var isManager = User.IsInRole("Admin") || User.IsInRole("OperationsManager") || User.IsInRole("FleetCoordinator");
+
+        if (!isOwner && !isManager)
+        {
+            return Forbid();
+        }
+
+        var assignment = await _db.VehicleAssignments
+            .Include(a => a.Vehicle)
+            .Include(a => a.Driver)
+            .AsNoTracking()
+            .OrderByDescending(a => a.CreatedAt)
+            .FirstOrDefaultAsync(a => a.BookingId == bookingId, ct);
+
+        if (assignment is null)
+        {
+            return NotFound();
+        }
+
+        var dto = new VehicleAssignmentDetailDto(
+            assignment.Id,
+            assignment.VehicleId,
+            assignment.Vehicle != null ? $"{assignment.Vehicle.Type} ({assignment.Vehicle.Capacity} seats)" : "Unknown Vehicle",
+            assignment.BookingId,
+            assignment.DriverId,
+            assignment.Driver != null ? assignment.Driver.Name : "Unknown Driver",
+            assignment.Driver != null ? assignment.Driver.ContactInfo : "",
+            assignment.StartDate,
+            assignment.EndDate,
+            assignment.CreatedAt,
+            assignment.UpdatedAt,
+            assignment.Vehicle?.Type,
+            assignment.Vehicle?.Capacity,
+            assignment.Vehicle?.HasAC,
+            assignment.Vehicle?.RegistrationNumber,
+            booking.Status,
+            booking.Traveler != null ? booking.Traveler.Name : null
+        );
+
+        return Ok(dto);
+    }
+
     [HttpPost("{id:guid}/reservations")]
     [Authorize(Roles = FleetCoordinatorOrAdmin)]
     public async Task<ActionResult<VehicleAssignmentDto>> Reserve(
@@ -228,5 +323,11 @@ public class VehiclesController : ControllerBase
         _logger.LogInformation("Vehicle {VehicleId} deleted.", id);
 
         return NoContent();
+    }
+
+    private Guid? GetUserId()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return Guid.TryParse(userId, out var id) ? id : null;
     }
 }
