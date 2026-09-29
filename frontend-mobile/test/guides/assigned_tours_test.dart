@@ -263,7 +263,7 @@ void main() {
       expect(find.text('Tour Details'), findsOneWidget);
       expect(find.text('Save Updates'), findsOneWidget);
       expect(find.text('Attended'), findsOneWidget);
-      expect(find.text('Completed'), findsOneWidget);
+      expect(find.text('Completed'), findsNothing);
     });
 
     testWidgets('10. Returning after update refreshes or updates the assigned tours list', (tester) async {

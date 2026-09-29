@@ -91,12 +91,10 @@ class ApiClient {
   Future<void> updateGuideTour({
     required String bookingId,
     required bool attended,
-    required bool completed,
     String? notes,
   }) async {
     await patch('/api/bookings/$bookingId/guide-notes', {
       'attended': attended,
-      'completed': completed,
       'notes': notes,
     });
   }

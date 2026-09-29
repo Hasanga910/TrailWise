@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMyAssignedTours, type AssignedTourDto } from '../../api/assignedTours';
@@ -61,6 +62,7 @@ const sampleTour: AssignedTourDto = {
 describe('AssignedToursPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedGetMyAssignedTours.mockReset();
   });
 
   it('shows an empty state when there are no assigned tours', async () => {
@@ -87,6 +89,7 @@ describe('AssignedToursPage', () => {
   });
 
   it('shows an error state with a retry option when the load fails', async () => {
+    const user = userEvent.setup();
     mockedGetMyAssignedTours.mockRejectedValueOnce(new Error('network error'));
     mockedGetMyAssignedTours.mockResolvedValueOnce([sampleTour]);
     renderPage();
@@ -94,5 +97,26 @@ describe('AssignedToursPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Error Loading Tours')).toBeInTheDocument();
     });
+
+    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    await waitFor(() => {
+      expect(screen.getByText(/Sri Lanka Highlands/)).toBeInTheDocument();
+    });
+  });
+
+  it('renders correct lifecycle badges for Not Started, In Progress, and Completed tours', async () => {
+    const notStartedTour = { ...sampleTour, bookingId: 'b-1', tourStartedAt: null, tourEndedAt: null, completed: false };
+    const inProgressTour = { ...sampleTour, bookingId: 'b-2', tourStartedAt: '2026-05-01T09:00:00Z', tourEndedAt: null, completed: false };
+    const completedTour = { ...sampleTour, bookingId: 'b-3', tourStartedAt: '2026-05-01T09:00:00Z', tourEndedAt: '2026-05-05T18:00:00Z', completed: true };
+
+    mockedGetMyAssignedTours.mockResolvedValue([notStartedTour, inProgressTour, completedTour]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Not Started')).toBeInTheDocument();
+      expect(screen.getByText('In Progress')).toBeInTheDocument();
+      expect(screen.getByText('Completed')).toBeInTheDocument();
+    });
   });
 });
+

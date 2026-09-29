@@ -2,7 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getMyAssignedTours, updateGuideTour, type AssignedTourDto } from '../../api/assignedTours';
+import {
+  getMyAssignedTours,
+  updateGuideTour,
+  type AssignedTourDto,
+} from '../../api/assignedTours';
 import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
 import { AuthContext, type AuthContextValue } from '../../auth/AuthContext';
 import type { CurrentUser } from '../../auth/types';
@@ -87,10 +91,22 @@ describe('TourDetailPage', () => {
     expect(screen.getByText(/Ella, Kandy/)).toBeInTheDocument();
   });
 
-  it('saves attendance, completion and notes', async () => {
+  it('Completed checkbox is absent and Attended control remains', async () => {
+    mockedGetMyAssignedTours.mockResolvedValue([confirmedTour]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Sri Lanka Highlands')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByLabelText('Completed')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Attended')).toBeInTheDocument();
+  });
+
+  it('saves attendance and notes without manual completed', async () => {
     const user = userEvent.setup();
     mockedGetMyAssignedTours.mockResolvedValue([confirmedTour]);
-    mockedUpdateGuideTour.mockResolvedValue({ ...confirmedTour, attended: true, completed: true, guideNotes: 'All good' });
+    mockedUpdateGuideTour.mockResolvedValue({ ...confirmedTour, attended: true, guideNotes: 'All good' });
     renderPage();
 
     await waitFor(() => {
@@ -98,18 +114,64 @@ describe('TourDetailPage', () => {
     });
 
     await user.click(screen.getByLabelText('Attended'));
-    await user.click(screen.getByLabelText('Completed'));
     await user.type(screen.getByLabelText('Guide Notes'), 'All good');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(mockedUpdateGuideTour).toHaveBeenCalledWith('booking-1', {
         attended: true,
-        completed: true,
         notes: 'All good',
       });
     });
     expect(screen.getByText('Tour updates saved.')).toBeInTheDocument();
+  });
+
+  it('renders Not Started status and neither Start Tour nor End Tour button is rendered', async () => {
+    mockedGetMyAssignedTours.mockResolvedValue([confirmedTour]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Not Started')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /start tour/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /end tour/i })).not.toBeInTheDocument();
+  });
+
+  it('renders In Progress status with started at timestamp and no lifecycle action buttons', async () => {
+    mockedGetMyAssignedTours.mockResolvedValue([
+      {
+        ...confirmedTour,
+        tourStartedAt: '2026-05-01T09:00:00Z',
+      },
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('In Progress')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Started at:/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /start tour/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /end tour/i })).not.toBeInTheDocument();
+  });
+
+  it('renders Completed status with started at and ended at timestamps and no lifecycle action buttons', async () => {
+    mockedGetMyAssignedTours.mockResolvedValue([
+      {
+        ...confirmedTour,
+        tourStartedAt: '2026-05-01T09:00:00Z',
+        tourEndedAt: '2026-05-05T18:00:00Z',
+        completed: true,
+      },
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Completed')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Started at:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ended at:/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /start tour/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /end tour/i })).not.toBeInTheDocument();
   });
 
   it('shows the itinerary for a confirmed booking', async () => {

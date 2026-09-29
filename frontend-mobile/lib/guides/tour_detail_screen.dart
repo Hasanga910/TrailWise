@@ -26,7 +26,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   late AssignedTour _tour;
   late bool _attended;
-  late bool _completed;
   late final TextEditingController _notesController;
 
   bool _saving = false;
@@ -38,7 +37,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     super.initState();
     _tour = widget.tour;
     _attended = widget.tour.attended;
-    _completed = widget.tour.completed;
     _notesController = TextEditingController(text: widget.tour.guideNotes ?? '');
   }
 
@@ -73,13 +71,11 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       await _apiClient.updateGuideTour(
         bookingId: _tour.bookingId,
         attended: _attended,
-        completed: _completed,
         notes: notesToSend,
       );
 
       final updatedTour = _tour.copyWith(
         attended: _attended,
-        completed: _completed,
         guideNotes: notesToSend,
       );
 
@@ -161,13 +157,11 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       await _apiClient.updateGuideTour(
         bookingId: _tour.bookingId,
         attended: _attended,
-        completed: _completed,
         notes: null,
       );
 
       final updatedTour = _tour.copyWith(
         attended: _attended,
-        completed: _completed,
         clearGuideNotes: true,
       );
 
@@ -266,7 +260,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
       setState(() {
         _tour = updated;
-        _completed = true;
         _lifecycleLoading = false;
       });
 
@@ -525,25 +518,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                             : (val) {
                                 setState(() {
                                   _attended = val;
-                                });
-                              },
-                      ),
-                      const Divider(height: 1),
-
-                      // Completion switch
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Completed',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: const Text('Mark this tour as completed'),
-                        value: _completed,
-                        onChanged: _saving
-                            ? null
-                            : (val) {
-                                setState(() {
-                                  _completed = val;
                                 });
                               },
                       ),

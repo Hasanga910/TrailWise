@@ -19,6 +19,18 @@ const STATUS_STYLES: Record<BookingStatus, string> = {
   NeedsManualReview: 'bg-red-50 text-red-700',
 };
 
+const LIFECYCLE_STYLES = {
+  Completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  'In Progress': 'bg-amber-50 text-amber-700 border border-amber-200',
+  'Not Started': 'bg-slate-100 text-slate-600 border border-slate-200',
+};
+
+function getLifecycle(tour: AssignedTourDto): 'Completed' | 'In Progress' | 'Not Started' {
+  if (tour.tourEndedAt || tour.completed) return 'Completed';
+  if (tour.tourStartedAt) return 'In Progress';
+  return 'Not Started';
+}
+
 export function AssignedToursPage() {
   const { user, logout } = useAuth();
   const homeRoute = user ? getHomeRouteForRole(user.role) : '/login';
@@ -105,39 +117,42 @@ export function AssignedToursPage() {
 
         {!error && tours !== null && tours.length > 0 && (
           <div className="space-y-3">
-            {tours.map((tour) => (
-              <Link
-                key={tour.bookingId}
-                to={`/guides/my-tours/${tour.bookingId}`}
-                className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">
-                    {tour.tourPackageName} — {tour.theme}
-                  </p>
-                  <p className="mt-0.5 text-sm text-slate-500">
-                    {tour.startDate} to {tour.endDate} · {tour.groupSize} traveler{tour.groupSize === 1 ? '' : 's'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {tour.attended && (
-                    <span className="whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                      Attended
+            {tours.map((tour) => {
+              const lifecycle = getLifecycle(tour);
+              return (
+                <Link
+                  key={tour.bookingId}
+                  to={`/guides/my-tours/${tour.bookingId}`}
+                  className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand-300 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      {tour.tourPackageName} — {tour.theme}
+                    </p>
+                    <p className="mt-0.5 text-sm text-slate-500">
+                      {tour.startDate} to {tour.endDate} · {tour.groupSize} traveler{tour.groupSize === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {tour.attended && (
+                      <span className="whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                        Attended
+                      </span>
+                    )}
+                    <span
+                      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${LIFECYCLE_STYLES[lifecycle]}`}
+                    >
+                      {lifecycle}
                     </span>
-                  )}
-                  {tour.completed && (
-                    <span className="whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                      Completed
+                    <span
+                      className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[tour.status]}`}
+                    >
+                      {tour.status}
                     </span>
-                  )}
-                  <span
-                    className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[tour.status]}`}
-                  >
-                    {tour.status}
-                  </span>
-                </div>
-              </Link>
-            ))}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </main>

@@ -732,7 +732,8 @@ public class BookingsController : ControllerBase
         }
 
         booking.Attended = request.Attended;
-        booking.Completed = request.Completed;
+        // Completed is strictly lifecycle-controlled by EndTour and cannot be manually modified
+        booking.Completed = booking.TourEndedAt.HasValue;
         booking.GuideNotes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
 
         await _db.SaveChangesAsync(ct);
