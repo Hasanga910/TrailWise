@@ -9,6 +9,7 @@ import 'booking_status.dart';
 import 'itinerary_screen.dart';
 import 'payment_status_screen.dart';
 import 'review_screen.dart';
+import '../support/create_support_ticket_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key, this.apiClient});
@@ -138,6 +139,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
   }
 
+  Future<void> _openSupport(Booking booking) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateSupportTicketScreen(
+          apiClient: _apiClient,
+          preselectedBookingId: booking.id,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -226,6 +238,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               onTap: () => _openBooking(result.items[i]),
               onPaymentTap: () => _openPayment(result.items[i]),
               onReviewTap: () => _openReview(result.items[i]),
+              onSupportTap: () => _openSupport(result.items[i]),
             ),
           ),
         ),
@@ -267,12 +280,14 @@ class _BookingCard extends StatelessWidget {
     required this.onTap,
     this.onPaymentTap,
     this.onReviewTap,
+    this.onSupportTap,
   });
 
   final Booking booking;
   final VoidCallback onTap;
   final VoidCallback? onPaymentTap;
   final VoidCallback? onReviewTap;
+  final VoidCallback? onSupportTap;
 
   @override
   Widget build(BuildContext context) {
@@ -311,26 +326,24 @@ class _BookingCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (isConfirmed && onPaymentTap != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+              child: Row(
+                children: [
+                  if (onSupportTap != null)
+                    TextButton.icon(
+                      icon: const Icon(Icons.help_outline, size: 16),
+                      label: const Text('Get Support'),
+                      onPressed: onSupportTap,
+                    ),
+                  const Spacer(),
+                  if (isConfirmed && onPaymentTap != null)
                     OutlinedButton.icon(
                       icon: const Icon(Icons.payment, size: 16),
                       label: const Text('Payment'),
                       onPressed: onPaymentTap,
-                    ),
-                  ],
-                ),
-              )
-            else if (isCompleted)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
+                    )
+                  else if (isCompleted) ...[
                     if (booking.hasReview)
                       OutlinedButton.icon(
                         icon: const Icon(Icons.check_circle_outline, size: 16),
@@ -344,8 +357,9 @@ class _BookingCard extends StatelessWidget {
                         onPressed: onReviewTap,
                       ),
                   ],
-                ),
+                ],
               ),
+            ),
           ],
         ),
       ),

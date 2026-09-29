@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../bookings/my_bookings_screen.dart';
 import '../home/home_screen.dart';
 import '../packages/packages_screen.dart';
+import '../support/support_tickets_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -18,6 +19,7 @@ class _MainShellState extends State<MainShell> {
     HomeScreen(),
     PackagesScreen(),
     MyBookingsScreen(),
+    SupportTicketsScreen(),
   ];
 
   @override
@@ -42,6 +44,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.event_note_outlined),
             selectedIcon: Icon(Icons.event_note),
             label: 'My Bookings',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.support_agent_outlined),
+            selectedIcon: Icon(Icons.support_agent),
+            label: 'Support',
           ),
         ],
       ),

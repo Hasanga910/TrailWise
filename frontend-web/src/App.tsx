@@ -21,6 +21,8 @@ import { OpsPackagesPage } from './pages/ops/OpsPackagesPage';
 import { OpsPaymentsPage } from './pages/ops/OpsPaymentsPage';
 import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
 import { OpsReportsPage } from './pages/ops/OpsReportsPage';
+import { OpsSupportPage } from './pages/ops/OpsSupportPage';
+import { OpsTicketDetailPage } from './pages/ops/OpsTicketDetailPage';
 import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
 import { MyBookingsPage } from './pages/traveler/MyBookingsPage';
 import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
@@ -75,6 +77,8 @@ function App() {
         <Route path="reports" element={<OpsReportsPage />} />
         <Route path="bookings" element={<OpsBookingsPage />} />
         <Route path="bookings/:bookingId/workflow" element={<AgentWorkflowPage />} />
+        <Route path="support" element={<OpsSupportPage />} />
+        <Route path="support/:ticketId" element={<OpsTicketDetailPage />} />
         <Route path="profile" element={<OpsProfileSettingsPage />} />
       </Route>
 
@@ -102,6 +106,8 @@ function App() {
         <Route path="packages" element={<PackagesOverviewPage />} />
         <Route path="packages/manage" element={<PackageManagementPage />} />
         <Route path="payments" element={<OpsPaymentsPage />} />
+        <Route path="support" element={<OpsSupportPage />} />
+        <Route path="support/:ticketId" element={<OpsTicketDetailPage />} />
         <Route path="fleet" element={<FleetManagementPage />} />
         <Route path="staff" element={<UserManagementIndexPage />} />
         <Route path="staff/tour-guides" element={<StaffRolePage role="TourGuide" roleLabel="Tour Guide" />} />

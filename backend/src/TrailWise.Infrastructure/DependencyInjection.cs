@@ -65,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<IOperationsReportService, OperationsReportService>();
         services.AddScoped<IDiscountService, DiscountService>();
         services.AddScoped<IBankSlipStorageService, BankSlipStorageService>();
+        services.AddScoped<ISupportService, SupportService>();
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IBookingLifecycleService, BookingLifecycleService>();
