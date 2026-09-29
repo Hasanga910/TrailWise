@@ -124,8 +124,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     );
   }
 
-  void _openReview(Booking booking) {
-    Navigator.of(context).push(
+  Future<void> _openReview(Booking booking) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ReviewScreen(
           booking: booking,
@@ -133,6 +133,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         ),
       ),
     );
+    if (mounted) {
+      _load();
+    }
   }
 
   @override
@@ -322,17 +325,24 @@ class _BookingCard extends StatelessWidget {
                   ],
                 ),
               )
-            else if (isCompleted && onReviewTap != null)
+            else if (isCompleted)
               Padding(
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.rate_review_outlined, size: 16),
-                      label: const Text('Review'),
-                      onPressed: onReviewTap,
-                    ),
+                    if (booking.hasReview)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text('Reviewed'),
+                        onPressed: null,
+                      )
+                    else if (onReviewTap != null)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.rate_review_outlined, size: 16),
+                        label: const Text('Review'),
+                        onPressed: onReviewTap,
+                      ),
                   ],
                 ),
               ),

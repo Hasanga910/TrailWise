@@ -16,7 +16,8 @@ public record BookingDto(
     decimal BudgetPerPerson,
     string? SpecialRequests,
     BookingStatus Status,
-    bool IsLargeGroup)
+    bool IsLargeGroup,
+    bool HasReview = false)
 {
     // Duplicated by value in TrailWise.Infrastructure.Agents.BookingApprovalEvaluator.LargeGroupThreshold
     // since Infrastructure cannot reference this (Api) project. Keep both in sync if this ever changes.
@@ -34,5 +35,6 @@ public record BookingDto(
         booking.BudgetPerPerson,
         booking.SpecialRequests,
         booking.Status,
-        booking.GroupSize > LargeGroupThreshold);
+        booking.GroupSize > LargeGroupThreshold,
+        booking.Reviews != null && booking.Reviews.Any());
 }

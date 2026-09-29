@@ -5,7 +5,11 @@ import 'package:trailwise_mobile/bookings/my_bookings_screen.dart';
 
 import '../fakes/fake_api_client.dart';
 
-Map<String, dynamic> _bookingJson({String status = 'Requested'}) => {
+Map<String, dynamic> _bookingJson({
+  String status = 'Requested',
+  bool hasReview = false,
+}) =>
+    {
       'id': 'booking-1',
       'travelerId': 'traveler-1',
       'tourPackageId': 'pkg-1',
@@ -23,6 +27,7 @@ Map<String, dynamic> _bookingJson({String status = 'Requested'}) => {
       'budgetPerPerson': 300,
       'status': status,
       'isLargeGroup': false,
+      'hasReview': hasReview,
     };
 
 void main() {
@@ -57,5 +62,67 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No bookings match your filters.'), findsOneWidget);
+  });
+
+  group('16. Review Action Availability on My Bookings', () {
+    testWidgets('Completed + not reviewed displays active Review button', (tester) async {
+      final fake = FakeApiClient(getResponses: {
+        '/api/bookings/mine': {
+          'items': [_bookingJson(status: 'Completed', hasReview: false)],
+          'totalCount': 1,
+          'page': 1,
+          'pageSize': 10,
+        },
+      });
+
+      await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+      await tester.pumpAndSettle();
+
+      final reviewButton = find.widgetWithText(OutlinedButton, 'Review');
+      expect(reviewButton, findsOneWidget);
+      // Button is enabled
+      final btnWidget = tester.widget<OutlinedButton>(reviewButton);
+      expect(btnWidget.enabled, isTrue);
+    });
+
+    testWidgets('Completed + already reviewed displays disabled Reviewed button', (tester) async {
+      final fake = FakeApiClient(getResponses: {
+        '/api/bookings/mine': {
+          'items': [_bookingJson(status: 'Completed', hasReview: true)],
+          'totalCount': 1,
+          'page': 1,
+          'pageSize': 10,
+        },
+      });
+
+      await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+      await tester.pumpAndSettle();
+
+      final reviewedButton = find.widgetWithText(OutlinedButton, 'Reviewed');
+      expect(reviewedButton, findsOneWidget);
+      // Button is disabled
+      final btnWidget = tester.widget<OutlinedButton>(reviewedButton);
+      expect(btnWidget.enabled, isFalse);
+    });
+
+    testWidgets('Non-completed bookings do not display Review or Reviewed button', (tester) async {
+      final fake = FakeApiClient(getResponses: {
+        '/api/bookings/mine': {
+          'items': [
+            _bookingJson(status: 'Requested', hasReview: false),
+            _bookingJson(status: 'Confirmed', hasReview: false),
+          ],
+          'totalCount': 2,
+          'page': 1,
+          'pageSize': 10,
+        },
+      });
+
+      await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(OutlinedButton, 'Review'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, 'Reviewed'), findsNothing);
+    });
   });
 }

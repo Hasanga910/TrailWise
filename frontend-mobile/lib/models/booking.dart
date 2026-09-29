@@ -12,6 +12,7 @@ class Booking {
   final double budgetPerPerson;
   final String status;
   final bool isLargeGroup;
+  final bool hasReview;
 
   Booking({
     required this.id,
@@ -25,6 +26,7 @@ class Booking {
     required this.budgetPerPerson,
     required this.status,
     required this.isLargeGroup,
+    this.hasReview = false,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -39,5 +41,6 @@ class Booking {
         budgetPerPerson: (json['budgetPerPerson'] as num).toDouble(),
         status: json['status'] as String,
         isLargeGroup: json['isLargeGroup'] as bool,
+        hasReview: (json['hasReview'] as bool?) ?? false,
       );
 }

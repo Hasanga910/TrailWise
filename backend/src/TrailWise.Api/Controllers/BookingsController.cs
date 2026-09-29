@@ -183,6 +183,7 @@ public class BookingsController : ControllerBase
         var query = _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .Where(b => b.TravelerId == travelerId.Value);
 
         if (status.HasValue)
@@ -222,6 +223,7 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
@@ -249,6 +251,7 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
