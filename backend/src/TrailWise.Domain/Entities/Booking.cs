@@ -19,6 +19,9 @@ public class Booking : BaseEntity
     public decimal BudgetPerPerson { get; set; }
     public string? SpecialRequests { get; set; }
     public BookingStatus Status { get; set; } = BookingStatus.Requested;
+    public DateTimeOffset? PaymentDueAt { get; set; }
+    public DateTimeOffset? PaymentExpiredAt { get; set; }
+    public string? CancellationReason { get; set; }
 
     public ICollection<BookingAddOn> BookingAddOns { get; set; } = new List<BookingAddOn>();
     public ICollection<GuideAvailability> GuideAvailabilities { get; set; } = new List<GuideAvailability>();

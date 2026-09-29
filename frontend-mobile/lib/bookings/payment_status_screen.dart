@@ -1,21 +1,83 @@
+import 'dart:async';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
+import '../config/bank_transfer_config.dart';
 import '../models/booking.dart';
 import '../models/payment_status.dart';
 import 'booking_status.dart';
+
+class SelectedSlipFile {
+  final String name;
+  final int size;
+  final List<int> bytes;
+  final String extension;
+
+  const SelectedSlipFile({
+    required this.name,
+    required this.size,
+    required this.bytes,
+    required this.extension,
+  });
+
+  String get formattedSize {
+    if (size < 1024) return '$size B';
+    if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
+    return '${(size / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
+  String get fileTypeDisplay {
+    final ext = extension.toLowerCase().replaceAll('.', '');
+    switch (ext) {
+      case 'pdf':
+        return 'PDF Document';
+      case 'png':
+        return 'PNG Image';
+      case 'jpg':
+      case 'jpeg':
+        return 'JPEG Image';
+      case 'webp':
+        return 'WEBP Image';
+      default:
+        return ext.isEmpty ? 'File' : '${ext.toUpperCase()} File';
+    }
+  }
+}
+
+typedef SlipPicker = Future<SelectedSlipFile?> Function();
+
+Future<SelectedSlipFile?> defaultSlipPicker() async {
+  final file = await FilePicker.pickFile(
+    type: FileType.custom,
+    allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+  );
+  if (file == null) return null;
+  final bytes = await file.xFile.readAsBytes();
+  return SelectedSlipFile(
+    name: file.name,
+    size: bytes.length,
+    bytes: bytes,
+    extension: file.extension ?? '',
+  );
+}
 
 class PaymentStatusScreen extends StatefulWidget {
   const PaymentStatusScreen({
     super.key,
     required this.booking,
     this.apiClient,
+    this.slipPicker = defaultSlipPicker,
+    this.nowProvider,
   });
 
   final Booking booking;
   final ApiClient? apiClient;
+  final SlipPicker slipPicker;
+  final DateTime Function()? nowProvider;
 
   @override
   State<PaymentStatusScreen> createState() => _PaymentStatusScreenState();
@@ -30,19 +92,29 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   String? _error;
 
   final _amountController = TextEditingController();
-  String _selectedMethod = 'Card';
+  SelectedSlipFile? _selectedSlip;
   bool _submitting = false;
   String? _submitError;
   String? _amountError;
+  String? _slipError;
+  Timer? _countdownTimer;
+
+  DateTime _currentNow() => widget.nowProvider?.call() ?? DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _loadPaymentStatus();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _amountController.dispose();
     super.dispose();
   }
@@ -60,7 +132,12 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
         _paymentStatus = status;
         _loading = false;
         if (status.remainingAmount > 0) {
-          _amountController.text = status.remainingAmount.toStringAsFixed(2);
+          if (status.totalPaid == 0) {
+            final minAdvance = status.minimumAdvance ?? (status.totalCost * 0.5);
+            _amountController.text = minAdvance.toStringAsFixed(2);
+          } else {
+            _amountController.text = status.remainingAmount.toStringAsFixed(2);
+          }
         }
       });
     } on ApiException catch (e) {
@@ -76,9 +153,33 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
     }
   }
 
+  Future<void> _pickSlip() async {
+    try {
+      final slip = await widget.slipPicker();
+      if (slip != null) {
+        setState(() {
+          _selectedSlip = slip;
+          _slipError = null;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _slipError = 'Could not select file. Please try again.';
+      });
+    }
+  }
+
   Future<void> _submitPayment() async {
+    if (_paymentStatus == null) return;
+
     final text = _amountController.text.trim();
     final amount = double.tryParse(text);
+
+    setState(() {
+      _amountError = null;
+      _slipError = null;
+      _submitError = null;
+    });
 
     if (amount == null || amount <= 0) {
       setState(() {
@@ -87,37 +188,73 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
       return;
     }
 
+    final minAdvance = _paymentStatus!.minimumAdvance ?? (_paymentStatus!.totalCost * 0.5);
+
+    if (_paymentStatus!.totalPaid == 0) {
+      if (amount < minAdvance) {
+        setState(() {
+          _amountError = 'Initial payment must be at least \$${minAdvance.toStringAsFixed(2)}.';
+        });
+        return;
+      }
+      if (amount > _paymentStatus!.totalCost) {
+        setState(() {
+          _amountError = 'Payment cannot exceed the total tour cost of \$${_paymentStatus!.totalCost.toStringAsFixed(2)}.';
+        });
+        return;
+      }
+    } else if (_paymentStatus!.status == 'DepositPaid') {
+      if (amount > _paymentStatus!.remainingAmount) {
+        setState(() {
+          _amountError = 'Payment cannot exceed the remaining balance of \$${_paymentStatus!.remainingAmount.toStringAsFixed(2)}.';
+        });
+        return;
+      }
+    }
+
+    if (_selectedSlip == null) {
+      setState(() {
+        _slipError = 'Please select a bank slip.';
+      });
+      return;
+    }
+
     setState(() {
-      _amountError = null;
-      _submitError = null;
       _submitting = true;
     });
 
     try {
-      await _apiClient.post('/api/payments', {
-        'bookingId': widget.booking.id,
-        'amount': amount,
-        'method': _selectedMethod,
-      });
+      await _apiClient.postMultipart(
+        '/api/bookings/${widget.booking.id}/payments/bank-transfer',
+        fields: {
+          'amount': amount.toStringAsFixed(2),
+        },
+        fileBytes: _selectedSlip!.bytes,
+        filename: _selectedSlip!.name,
+        fileFieldName: 'bankSlip',
+      );
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment recorded successfully.')),
+        const SnackBar(content: Text('Bank transfer submitted for verification.')),
       );
 
       setState(() {
         _submitting = false;
         _submitError = null;
+        _selectedSlip = null;
       });
 
       await _loadPaymentStatus();
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() {
         _submitting = false;
         _submitError = e.message;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _submitting = false;
         _submitError = 'Could not record payment. Please try again.';
@@ -125,19 +262,49 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
     }
   }
 
-  Color _paymentStatusColor(String status) {
+  Color _paymentStatusColor(String status, bool hasPendingVerification) {
+    if (hasPendingVerification || status == 'Pending') {
+      return Colors.orange;
+    }
     switch (status) {
-      case 'Pending':
-        return Colors.orange;
       case 'DepositPaid':
         return Colors.teal;
       case 'FullyPaid':
         return Colors.green;
       case 'Refunded':
         return Colors.red;
+      case 'Failed':
+        return Colors.redAccent;
+      case 'Unpaid':
       default:
         return Colors.grey;
     }
+  }
+
+  String _paymentStatusLabel(String status, bool hasPendingVerification) {
+    if (hasPendingVerification || status == 'Pending') {
+      return 'Pending Verification';
+    }
+    switch (status) {
+      case 'DepositPaid':
+        return 'Deposit Paid';
+      case 'FullyPaid':
+        return 'Fully Paid';
+      case 'Refunded':
+        return 'Refunded';
+      case 'Failed':
+        return 'Failed';
+      case 'Unpaid':
+        return 'Unpaid';
+      default:
+        return status;
+    }
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final date = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    final time = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return '$date $time';
   }
 
   @override
@@ -172,14 +339,25 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
     final payment = _paymentStatus!;
     final booking = widget.booking;
     final bookingColor = BookingStatus.color(booking.status);
-    final paymentColor = _paymentStatusColor(payment.status);
+    final statusColor = _paymentStatusColor(payment.status, payment.hasPendingVerification);
+    final statusLabel = _paymentStatusLabel(payment.status, payment.hasPendingVerification);
 
     final progress = payment.totalCost > 0
         ? (payment.totalPaid / payment.totalCost).clamp(0.0, 1.0)
         : 0.0;
 
     final isConfirmed = booking.status == BookingStatus.confirmed;
-    final isFullyPaid = payment.status == 'FullyPaid' || payment.remainingAmount <= 0;
+    final isBookingCancelled = booking.status == BookingStatus.cancelled;
+    final isPendingVerification = payment.hasPendingVerification || payment.status == 'Pending';
+    final isFullyPaid = !isPendingVerification && (payment.status == 'FullyPaid' || payment.remainingAmount <= 0);
+    final minAdvance = payment.minimumAdvance ?? (payment.totalCost * 0.5);
+
+    final isDeadlineExpired = payment.isPaymentDeadlineExpired ||
+        (payment.paymentDueAt != null &&
+            payment.totalPaid == 0 &&
+            !isPendingVerification &&
+            _currentNow().toUtc().isAfter(payment.paymentDueAt!.toUtc()));
+    final isExpiredOrCancelled = isBookingCancelled || isDeadlineExpired;
 
     return Center(
       child: ConstrainedBox(
@@ -229,7 +407,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 ),
               ),
 
-              // B. Payment Summary Card
+              // B. Payment Financial Summary Card
               Card(
                 margin: const EdgeInsets.only(bottom: 16),
                 child: Padding(
@@ -249,8 +427,8 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                           ),
                           const SizedBox(width: 8),
                           Chip(
-                            label: Text(payment.status, style: TextStyle(color: paymentColor, fontSize: 12)),
-                            backgroundColor: paymentColor.withValues(alpha: 0.15),
+                            label: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                            backgroundColor: statusColor.withValues(alpha: 0.15),
                             visualDensity: VisualDensity.compact,
                           ),
                         ],
@@ -259,7 +437,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(child: Text('Total Cost:')),
+                          const Expanded(child: Text('Total Tour Cost:')),
                           Text(
                             '\$${payment.totalCost.toStringAsFixed(2)}',
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -270,7 +448,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(child: Text('Total Paid:')),
+                          const Expanded(child: Text('Total Verified Paid:')),
                           Text(
                             '\$${payment.totalPaid.toStringAsFixed(2)}',
                             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
@@ -281,13 +459,40 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(child: Text('Remaining Amount:')),
+                          const Expanded(child: Text('Remaining Balance:')),
                           Text(
                             '\$${isFullyPaid ? '0.00' : payment.remainingAmount.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: isFullyPaid ? Colors.grey : Colors.orange.shade800,
                             ),
+                          ),
+                        ],
+                      ),
+                      if (payment.totalPaid == 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Expanded(child: Text('Minimum Advance:')),
+                            Text(
+                              '\$${minAdvance.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Expanded(child: Text('Payment Status:')),
+                          Text(
+                            statusLabel,
+                            style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
                           ),
                         ],
                       ),
@@ -314,8 +519,83 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 ),
               ),
 
-              // C. Conditional State: Non-Confirmed vs FullyPaid vs Payment Form
-              if (!isConfirmed)
+              // C. Bank Account Information Section
+              Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                color: Colors.grey.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.account_balance, color: Colors.teal.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Bank Transfer Details',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      _buildBankDetailRow('Bank Name', BankTransferConfig.bankName),
+                      const SizedBox(height: 6),
+                      _buildBankDetailRow('Account Name', BankTransferConfig.accountName),
+                      const SizedBox(height: 6),
+                      _buildBankDetailRow('Account Number', BankTransferConfig.accountNumber),
+                      const SizedBox(height: 6),
+                      _buildBankDetailRow('Branch', BankTransferConfig.branch),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Please transfer the payment to the bank account above and upload the transfer receipt below for verification.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // D. Conditional States: Non-Confirmed vs Pending Verification vs FullyPaid vs Payment Form
+              if (isExpiredOrCancelled)
+                Card(
+                  key: const Key('payment_deadline_expired_card'),
+                  color: Colors.red.shade50,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.red.shade200),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 24),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Payment deadline expired',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Your booking was cancelled because the advance payment was not submitted within 1 hour.',
+                          style: TextStyle(fontSize: 14, color: Colors.red.shade800),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (!isConfirmed)
                 Card(
                   color: Colors.amber.shade50,
                   child: Padding(
@@ -334,6 +614,46 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     ),
                   ),
                 )
+              else if (isPendingVerification)
+                Card(
+                  color: Colors.orange.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.hourglass_top, color: Colors.orange.shade800, size: 24),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Payment verification pending',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Payment submitted before the deadline and awaiting verification.',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Your bank transfer slip has been submitted and is waiting for staff review.',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          onPressed: _loadPaymentStatus,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Refresh Status'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               else if (isFullyPaid)
                 Card(
                   color: Colors.green.shade50,
@@ -341,7 +661,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     padding: EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_outline, color: Colors.green),
+                        Icon(Icons.check_circle_outline, color: Colors.green, size: 28),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -353,7 +673,143 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     ),
                   ),
                 )
-              else
+              else ...[
+                // Advance payment deadline countdown card (for unpaid initial payment with active deadline)
+                if (payment.totalPaid == 0 && payment.paymentDueAt != null) ...[
+                  () {
+                    final remaining = payment.paymentDueAt!.toUtc().difference(_currentNow().toUtc());
+                    final remainingSeconds = remaining.inSeconds > 0 ? remaining.inSeconds : 0;
+                    final hours = (remainingSeconds ~/ 3600).toString().padLeft(2, '0');
+                    final minutes = ((remainingSeconds % 3600) ~/ 60).toString().padLeft(2, '0');
+                    final seconds = (remainingSeconds % 60).toString().padLeft(2, '0');
+                    final countdownStr = '$hours:$minutes:$seconds';
+                    final isUnder15Minutes = remainingSeconds < 15 * 60;
+
+                    return Card(
+                      key: const Key('advance_payment_deadline_card'),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      color: isUnder15Minutes ? Colors.amber.shade50 : Colors.blue.shade50,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isUnder15Minutes ? Colors.amber.shade400 : Colors.blue.shade200,
+                          width: isUnder15Minutes ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  isUnder15Minutes ? Icons.warning_amber_rounded : Icons.timer_outlined,
+                                  color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade800,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Advance payment deadline',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Submit your advance bank transfer before:\n${_formatDateTime(payment.paymentDueAt!.toLocal())}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isUnder15Minutes ? Colors.amber.shade100 : Colors.blue.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Time remaining: $countdownStr',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                  color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }(),
+                ],
+                if (payment.latestRejectedPaymentReason != null &&
+                    !isPendingVerification &&
+                    !isFullyPaid)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    color: Colors.red.shade50,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.error_outline, color: Colors.red.shade700, size: 22),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Previous payment was rejected',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Reason: ${payment.latestRejectedPaymentReason}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.red.shade800,
+                            ),
+                          ),
+                          if (payment.latestRejectedAt != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Rejected on: ${_formatDateTime(payment.latestRejectedAt!)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Text(
+                            'Please correct the issue and submit a new bank transfer slip.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade800,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 // Payment Form
                 Card(
                   child: Padding(
@@ -365,7 +821,104 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                           'Make a Payment',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
+                        const SizedBox(height: 12),
+
+                        // Guidance Card for Deposit vs First Payment
+                        if (payment.status == 'DepositPaid')
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.teal.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.teal.shade700, size: 20),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Advance payment verified',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        'Advance payment verified. You can now pay the remaining balance.',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.info, color: Colors.blue.shade700, size: 20),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'First Payment Rule',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      const Text(
+                                        'Your first payment must be at least 50% of the total tour cost.',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Minimum advance: \$${minAdvance.toStringAsFixed(2)}',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Method indicator: Bank Transfer ONLY
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.account_balance, size: 20, color: Colors.teal),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Payment Method: Bank Transfer',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 16),
+
+                        // Amount field
                         TextFormField(
                           controller: _amountController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -376,20 +929,73 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedMethod,
-                          decoration: const InputDecoration(labelText: 'Payment Method'),
-                          items: const [
-                            DropdownMenuItem(value: 'Card', child: Text('Card')),
-                            DropdownMenuItem(value: 'BankTransfer', child: Text('Bank Transfer')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedMethod = val);
-                            }
-                          },
+
+                        // Bank Slip Picker
+                        const Text(
+                          'Bank Slip',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_selectedSlip == null)
+                          OutlinedButton.icon(
+                            onPressed: _pickSlip,
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Choose Bank Slip'),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.teal.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.teal.shade50.withValues(alpha: 0.3),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.receipt_long, color: Colors.teal),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _selectedSlip!.name,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${_selectedSlip!.fileTypeDisplay} · ${_selectedSlip!.formattedSize}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: _pickSlip,
+                                  icon: const Icon(Icons.edit, size: 16),
+                                  label: const Text('Change File'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (_slipError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              _slipError!,
+                              style: const TextStyle(color: Colors.red, fontSize: 12),
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Allowed formats: JPG, JPEG, PNG, WEBP, PDF (max 5MB)',
+                            style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                          ),
                         ),
                         const SizedBox(height: 16),
+
                         if (_submitError != null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -412,10 +1018,24 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildBankDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        SelectableText(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+      ],
     );
   }
 }

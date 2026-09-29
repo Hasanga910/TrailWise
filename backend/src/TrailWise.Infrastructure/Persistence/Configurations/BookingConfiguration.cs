@@ -11,6 +11,7 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(b => b.BudgetPerPerson).HasPrecision(10, 2);
         builder.Property(b => b.SpecialRequests).HasMaxLength(1000);
+        builder.Property(b => b.CancellationReason).HasMaxLength(500);
 
         builder.HasOne(b => b.Traveler)
             .WithMany(u => u.Bookings)
@@ -19,6 +20,7 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
 
         builder.HasIndex(b => b.Status);
         builder.HasIndex(b => b.TravelerId);
+        builder.HasIndex(b => b.PaymentDueAt);
 
         builder.HasMany(b => b.BookingAddOns)
             .WithOne(a => a.Booking)

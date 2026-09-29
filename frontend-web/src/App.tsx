@@ -18,6 +18,7 @@ import { AgentWorkflowPage } from './pages/ops/AgentWorkflowPage';
 import { OpsBookingsPage } from './pages/ops/OpsBookingsPage';
 import { OpsDashboardPage } from './pages/ops/OpsDashboardPage';
 import { OpsPackagesPage } from './pages/ops/OpsPackagesPage';
+import { OpsPaymentsPage } from './pages/ops/OpsPaymentsPage';
 import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
 import { OpsReportsPage } from './pages/ops/OpsReportsPage';
 import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
@@ -63,13 +64,14 @@ function App() {
       <Route
         path="/ops"
         element={
-          <RequireRole allowedRoles={['OperationsManager']}>
+          <RequireRole allowedRoles={['OperationsManager', 'Admin']}>
             <OpsLayout />
           </RequireRole>
         }
       >
         <Route index element={<OpsDashboardPage />} />
         <Route path="packages" element={<OpsPackagesPage />} />
+        <Route path="payments" element={<OpsPaymentsPage />} />
         <Route path="reports" element={<OpsReportsPage />} />
         <Route path="bookings" element={<OpsBookingsPage />} />
         <Route path="bookings/:bookingId/workflow" element={<AgentWorkflowPage />} />
@@ -99,6 +101,7 @@ function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="packages" element={<PackagesOverviewPage />} />
         <Route path="packages/manage" element={<PackageManagementPage />} />
+        <Route path="payments" element={<OpsPaymentsPage />} />
         <Route path="fleet" element={<FleetManagementPage />} />
         <Route path="staff" element={<UserManagementIndexPage />} />
         <Route path="staff/tour-guides" element={<StaffRolePage role="TourGuide" roleLabel="Tour Guide" />} />

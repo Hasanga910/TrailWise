@@ -24,4 +24,16 @@ class FakeApiClient extends ApiClient {
     if (postError != null) throw postError!;
     return postResponses[path] as Map<String, dynamic>;
   }
+
+  @override
+  Future<dynamic> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required List<int> fileBytes,
+    required String filename,
+    String fileFieldName = 'bankSlip',
+  }) async {
+    if (postError != null) throw postError!;
+    return postResponses[path];
+  }
 }

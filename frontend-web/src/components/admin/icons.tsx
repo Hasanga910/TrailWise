@@ -207,3 +207,14 @@ export function ReportsIcon({ className = base }: IconProps) {
   );
 }
 
+export function PaymentIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="2.5" y="5" width="19" height="14" rx="2" strokeLinejoin="round" />
+      <path d="M2.5 10h19" strokeLinecap="round" />
+      <path d="M6.5 15h3M13.5 15h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+

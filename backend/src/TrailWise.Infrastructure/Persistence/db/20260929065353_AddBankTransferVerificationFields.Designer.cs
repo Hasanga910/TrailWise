@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TrailWise.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace TrailWise.Infrastructure.Persistence.Db
+namespace TrailWise.Infrastructure.Persistence.db
 {
     [DbContext(typeof(TrailWiseDbContext))]
-    partial class TrailWiseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929065353_AddBankTransferVerificationFields")]
+    partial class AddBankTransferVerificationFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -157,10 +160,6 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
 
-                    b.Property<string>("CancellationReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -172,12 +171,6 @@ namespace TrailWise.Infrastructure.Persistence.Db
 
                     b.Property<Guid>("PackageTierId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("PaymentDueAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("PaymentExpiredAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("SpecialRequests")
                         .HasMaxLength(1000)
@@ -203,8 +196,6 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.HasKey("Id");
 
                     b.HasIndex("PackageTierId");
-
-                    b.HasIndex("PaymentDueAt");
 
                     b.HasIndex("Status");
 

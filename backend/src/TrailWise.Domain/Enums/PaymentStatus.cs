@@ -5,5 +5,6 @@ public enum PaymentStatus
     Pending,
     DepositPaid,
     FullyPaid,
-    Refunded
+    Refunded,
+    Failed
 }
