@@ -1,6 +1,8 @@
+using System.Net.Http.Headers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
@@ -31,8 +33,28 @@ public static class DependencyInjection
         });
         services.AddScoped<ILocationSearchService, NominatimLocationSearchService>();
 
+        var llmOptions = configuration.GetSection(LlmOptions.SectionName).Get<LlmOptions>() ?? new LlmOptions();
+        services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
+        services.AddHttpClient("Groq", client =>
+        {
+            client.BaseAddress = new Uri(llmOptions.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(llmOptions.TimeoutSeconds);
+            if (!string.IsNullOrEmpty(llmOptions.ApiKey))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", llmOptions.ApiKey);
+            }
+        });
+        services.AddScoped<ILlmClient>(sp => llmOptions.Enabled
+            ? new GroqAgentClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient("Groq"),
+                llmOptions,
+                sp.GetRequiredService<ILogger<GroqAgentClient>>())
+            : new NullLlmClient());
+
+        services.AddScoped<IPreferenceExtractionAgent, PreferenceExtractionAgent>();
+        services.AddScoped<IProposalSummaryAgent, ProposalSummaryAgent>();
         services.AddScoped<IGuideMatchingAgent, MockGuideMatchingAgent>();
-        services.AddScoped<IFleetCapacityAgent, MockFleetCapacityAgent>();
+        services.AddScoped<IFleetCapacityAgent, FleetCapacityAgent>();
         services.AddScoped<IFleetReservationService, FleetReservationService>();
         services.AddScoped<IPricingValidationAgent, PricingValidationAgent>();
         services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();

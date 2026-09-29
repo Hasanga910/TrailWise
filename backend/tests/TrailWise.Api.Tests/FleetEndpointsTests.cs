@@ -258,6 +258,32 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.Contains(drivers!, d => d.Id == created.Id);
     }
 
+    [Fact]
+    public async Task DeleteVehicle_AsAdminOrCoordinator_CascadesAssignmentsAndRemovesVehicle()
+    {
+        var adminClient = await AdminClientAsync();
+
+        // Create vehicle
+        var vehicleRes = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.SUV,
+            Capacity = 4,
+            HasAC = true,
+            SeatConfiguration = "2-2",
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        });
+        vehicleRes.EnsureSuccessStatusCode();
+        var vehicle = await vehicleRes.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
+
+        // Delete vehicle
+        var deleteRes = await adminClient.DeleteAsync($"/api/vehicles/{vehicle!.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteRes.StatusCode);
+
+        // Verify vehicle is not found
+        var getRes = await adminClient.GetAsync($"/api/vehicles/{vehicle.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, getRes.StatusCode);
+    }
+
     private async Task<HttpClient> AdminClientAsync()
     {
         var client = _factory.CreateClient();
