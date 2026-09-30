@@ -25,15 +25,14 @@ function isUpcoming(startDate: string): boolean {
   return startDate >= today;
 }
 
-const STATUS_OPTIONS: BookingStatus[] = [
-  'Requested',
-  'PlanProposed',
-  'PendingApproval',
-  'Confirmed',
-  'Completed',
+const STATUS_OPTIONS = [
   'Cancelled',
-  'NeedsManualReview',
-];
+  'Completed',
+  'Confirmed',
+  'Pending',
+] as const;
+
+type StatusFilterOption = (typeof STATUS_OPTIONS)[number];
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
   Requested: 'bg-slate-100 text-slate-600',
@@ -50,7 +49,7 @@ const inputClass =
 const labelClass = 'text-xs font-semibold text-slate-600';
 
 export function MyBookingsPage() {
-  const [status, setStatus] = useState<BookingStatus | ''>('');
+  const [status, setStatus] = useState<StatusFilterOption | ''>('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
@@ -110,7 +109,7 @@ export function MyBookingsPage() {
   }, [status, from, to, page]);
 
   function handleStatusChange(value: string) {
-    setStatus(value as BookingStatus | '');
+    setStatus(value as StatusFilterOption | '');
     setPage(1);
   }
 

@@ -32,6 +32,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
     private readonly IFleetCapacityAgent _fleetAgent;
     private readonly IPricingValidationAgent _pricingAgent;
     private readonly IGuideAssignmentService _guideAssignmentService;
+    private readonly IFleetReservationService? _fleetReservationService;
     private readonly IProposalSummaryAgent _summaryAgent;
     private readonly ILogger<CoordinatorAgentService> _logger;
 
@@ -43,7 +44,8 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         IPricingValidationAgent pricingAgent,
         IGuideAssignmentService guideAssignmentService,
         IProposalSummaryAgent summaryAgent,
-        ILogger<CoordinatorAgentService> logger)
+        ILogger<CoordinatorAgentService> logger,
+        IFleetReservationService? fleetReservationService = null)
     {
         _db = db;
         _preferenceAgent = preferenceAgent;
@@ -53,6 +55,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         _guideAssignmentService = guideAssignmentService;
         _summaryAgent = summaryAgent;
         _logger = logger;
+        _fleetReservationService = fleetReservationService;
     }
 
     public async Task StartWorkflowAsync(Guid bookingId, CancellationToken ct = default)
@@ -167,6 +170,27 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                 if (guideResult.GuideId != Guid.Empty)
                 {
                     assignmentSucceeded = await _guideAssignmentService.AssignGuideAsync(bookingId, guideResult.GuideId, ct);
+                }
+
+                if (_fleetReservationService != null && vehicleResult.VehicleId != Guid.Empty && vehicleResult.DriverId != Guid.Empty)
+                {
+                    var isVehAvail = await _fleetReservationService.IsVehicleAvailableAsync(vehicleResult.VehicleId, booking.StartDate, booking.EndDate, ct);
+                    var isDrvAvail = await _fleetReservationService.IsDriverAvailableAsync(vehicleResult.DriverId, booking.StartDate, booking.EndDate, ct);
+                    if (isVehAvail && isDrvAvail)
+                    {
+                        var hasAssignment = await _db.VehicleAssignments.AnyAsync(a => a.BookingId == bookingId, ct);
+                        if (!hasAssignment)
+                        {
+                            _db.VehicleAssignments.Add(new VehicleAssignment
+                            {
+                                VehicleId = vehicleResult.VehicleId,
+                                DriverId = vehicleResult.DriverId,
+                                BookingId = bookingId,
+                                StartDate = booking.StartDate,
+                                EndDate = booking.EndDate
+                            });
+                        }
+                    }
                 }
 
                 if (assignmentSucceeded)

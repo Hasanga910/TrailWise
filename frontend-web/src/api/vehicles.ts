@@ -202,6 +202,19 @@ export async function getVehicleAssignments(): Promise<VehicleAssignmentDetailDt
 }
 
 /**
+ * Fetch vehicle assignment for a specific booking
+ */
+export async function getAssignmentByBookingId(bookingId: string): Promise<VehicleAssignmentDetailDto | null> {
+  try {
+    const response = await apiClient.get<VehicleAssignmentDetailDto>(`/api/vehicles/assignments/by-booking/${bookingId}`);
+    return response.data;
+  } catch (err: any) {
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
  * Register a new driver
  */
 export async function createDriver(request: CreateDriverRequest): Promise<DriverDto> {
