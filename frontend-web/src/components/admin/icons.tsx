@@ -227,3 +227,25 @@ export function ReportsIcon({ className = base }: IconProps) {
   );
 }
 
+export function PaymentIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <rect x="2.5" y="5" width="19" height="14" rx="2" strokeLinejoin="round" />
+      <path d="M2.5 10h19" strokeLinecap="round" />
+      <path d="M6.5 15h3M13.5 15h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function SupportIcon({ className = base }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path d="M4 12a8 8 0 0 1 16 0" strokeLinecap="round" />
+      <path d="M4 12v3a2 2 0 0 0 2 2h1v-6H5a1 1 0 0 0-1 1ZM19 12v3a2 2 0 0 1-2 2h-1v-6h2a1 1 0 0 1 1 1Z" strokeLinejoin="round" />
+      <path d="M16 17v2a2 2 0 0 1-2 2h-3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+
+

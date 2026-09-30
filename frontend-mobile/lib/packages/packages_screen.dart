@@ -3,14 +3,17 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
+import '../auth/current_user.dart';
 import '../bookings/booking_request_screen.dart';
 import '../models/package_tier.dart';
 import '../models/tour_package.dart';
+import 'package_reviews_sheet.dart';
 
 class PackagesScreen extends StatefulWidget {
-  const PackagesScreen({super.key, this.apiClient});
+  const PackagesScreen({super.key, this.apiClient, this.currentUser});
 
   final ApiClient? apiClient;
+  final CurrentUser? currentUser;
 
   @override
   State<PackagesScreen> createState() => _PackagesScreenState();
@@ -23,6 +26,15 @@ class _PackagesScreenState extends State<PackagesScreen> {
   String? _error;
   bool _loading = true;
 
+  CurrentUser? _getUser() {
+    if (widget.currentUser != null) return widget.currentUser;
+    try {
+      return context.read<AuthProvider>().user;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +42,12 @@ class _PackagesScreenState extends State<PackagesScreen> {
   }
 
   Future<void> _load() async {
+    final user = _getUser();
+    if (user != null && user.role == 'TourGuide') {
+      setState(() => _loading = false);
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -62,8 +80,60 @@ class _PackagesScreenState extends State<PackagesScreen> {
     );
   }
 
+  void _openReviews(TourPackage package) {
+    showPackageReviewsBottomSheet(
+      context: context,
+      packageId: package.id,
+      packageName: package.name,
+      apiClient: _apiClient,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    CurrentUser? user = widget.currentUser;
+    if (user == null) {
+      try {
+        user = context.watch<AuthProvider>().user;
+      } catch (_) {
+        user = null;
+      }
+    }
+
+    if (user != null && user.role == 'TourGuide') {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Tour Packages')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline, size: 56, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'Access Restricted',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tour packages and booking creation are only available to Travelers.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Go Back'),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Tour Packages')),
       body: _buildBody(),
@@ -93,16 +163,25 @@ class _PackagesScreenState extends State<PackagesScreen> {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: packages.length,
-      itemBuilder: (_, i) => _PackageCard(package: packages[i], onRequestTier: _requestBooking),
+      itemBuilder: (_, i) => _PackageCard(
+        package: packages[i],
+        onRequestTier: _requestBooking,
+        onReviewsTap: _openReviews,
+      ),
     );
   }
 }
 
 class _PackageCard extends StatelessWidget {
-  const _PackageCard({required this.package, required this.onRequestTier});
+  const _PackageCard({
+    required this.package,
+    required this.onRequestTier,
+    required this.onReviewsTap,
+  });
 
   final TourPackage package;
   final void Function(TourPackage package, PackageTier tier) onRequestTier;
+  final void Function(TourPackage package) onReviewsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +209,40 @@ class _PackageCard extends StatelessWidget {
               '${package.durationDays} ${package.durationDays == 1 ? 'day' : 'days'} · '
               'up to ${package.maxGroupSize} travelers',
               style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () => onReviewsTap(package),
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (package.reviewCount > 0) ...[
+                      const Icon(Icons.star, size: 16, color: Colors.amber),
+                      const SizedBox(width: 4),
+                      Text(
+                        '★ ${package.averageRating.toStringAsFixed(1)} (${package.reviewCount} ${package.reviewCount == 1 ? 'review' : 'reviews'})',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ] else ...[
+                      const Text(
+                        'No reviews yet',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
             if (package.locations.isNotEmpty) ...[
               const SizedBox(height: 8),

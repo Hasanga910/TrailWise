@@ -40,7 +40,26 @@ public class PackagesController : ControllerBase
             .AsNoTracking()
             .ToListAsync(ct);
 
-        return Ok(packages.Select(TourPackageDto.FromEntity).ToList());
+        var reviewStats = await _db.Reviews
+            .AsNoTracking()
+            .GroupBy(r => r.Booking.TourPackageId)
+            .Select(g => new
+            {
+                PackageId = g.Key,
+                Count = g.Count(),
+                Average = g.Average(r => r.Rating)
+            })
+            .ToDictionaryAsync(x => x.PackageId, ct);
+
+        var dtos = packages.Select(p =>
+        {
+            reviewStats.TryGetValue(p.Id, out var stat);
+            var avg = stat != null && stat.Count > 0 ? Math.Round(stat.Average, 1) : 0.0;
+            var count = stat?.Count ?? 0;
+            return TourPackageDto.FromEntity(p, avg, count);
+        }).ToList();
+
+        return Ok(dtos);
     }
 
     [HttpGet("{id:guid}")]
@@ -57,7 +76,21 @@ public class PackagesController : ControllerBase
             return NotFound();
         }
 
-        return Ok(TourPackageDto.FromEntity(package));
+        var stat = await _db.Reviews
+            .AsNoTracking()
+            .Where(r => r.Booking.TourPackageId == id)
+            .GroupBy(r => r.Booking.TourPackageId)
+            .Select(g => new
+            {
+                Count = g.Count(),
+                Average = g.Average(r => r.Rating)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var avg = stat != null && stat.Count > 0 ? Math.Round(stat.Average, 1) : 0.0;
+        var count = stat?.Count ?? 0;
+
+        return Ok(TourPackageDto.FromEntity(package, avg, count));
     }
 
     [HttpPost]

@@ -38,6 +38,9 @@ services:
       Cors__AllowedOrigins__1: ${CORS_ALLOWED_ORIGIN_FLUTTER:-http://localhost:5000}
       Llm__Enabled: ${LLM_ENABLED:-false}
       Llm__ApiKey: ${GROQ_API_KEY}
+    volumes:
+      - trailwise_uploads:/app/wwwroot/uploads
+      - trailwise_private_uploads:/app/private_uploads
     ports:
       - "${BACKEND_PORT:-5080}:8080"
 
@@ -55,3 +58,5 @@ services:
 
 volumes:
   trailwise_pg_data:
+  trailwise_uploads:
+  trailwise_private_uploads:

@@ -446,4 +446,43 @@ public class CoordinatorAgentServiceTests
                 SeatConfigMatch: true,
                 ConflictCheck: true));
     }
+
+    private class CoordinatorTestClock : IClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = new(2026, 9, 29, 10, 0, 0, TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_WhenApproved_SetsPaymentDueAtUsingInjectedClock()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+        var clock = new CoordinatorTestClock { UtcNow = new DateTimeOffset(2026, 9, 29, 11, 30, 0, TimeSpan.Zero) };
+        var lifecycle = new BookingLifecycleService(clock);
+
+        var sut = new CoordinatorAgentService(
+            db,
+            new PreferenceExtractionAgent(new NullLlmClient(), Options.Create(new LlmOptions()), NullLogger<PreferenceExtractionAgent>.Instance),
+            new MockGuideMatchingAgent(),
+            new MockFleetCapacityAgent(),
+            new MockPricingValidationAgent(db),
+            new FakeGuideAssignmentService(),
+            new ProposalSummaryAgent(new FakeLlmClient { ResultToReturn = DefaultSummary }, Options.Create(new LlmOptions())),
+            NullLogger<CoordinatorAgentService>.Instance,
+            lifecycle,
+            clock);
+
+        await sut.StartWorkflowAsync(bookingId);
+
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.NotNull(booking);
+        Assert.Equal(BookingStatus.Confirmed, booking.Status);
+        Assert.NotNull(booking.PaymentDueAt);
+        Assert.Equal(clock.UtcNow.AddHours(1), booking.PaymentDueAt);
+        Assert.Equal(new DateTimeOffset(2026, 9, 29, 12, 30, 0, TimeSpan.Zero), booking.PaymentDueAt);
+
+        var run = Assert.Single(db.AgentWorkflowRuns, r => r.BookingId == bookingId);
+        Assert.Equal("Completed", run.Status);
+        Assert.Equal(clock.UtcNow, run.CompletedAt);
+    }
 }

@@ -563,6 +563,21 @@ public class ItineraryEndpointsTests : IClassFixture<TrailWiseWebApplicationFact
 
     private async Task<GuideDto> CreateGuideAsync(HttpClient adminClient, Guid userId, string name)
     {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var existing = await db.Guides.FirstOrDefaultAsync(g => g.UserId == userId);
+            if (existing != null)
+            {
+                existing.Name = name;
+                existing.Languages = new[] { "English" };
+                existing.Specializations = new[] { "Culture" };
+                existing.ContactInfo = "+94771112233";
+                await db.SaveChangesAsync();
+                return GuideDto.FromEntity(existing);
+            }
+        }
+
         var createResponse = await adminClient.PostAsJsonAsync("/api/guides", new CreateGuideRequest
         {
             Name = name,

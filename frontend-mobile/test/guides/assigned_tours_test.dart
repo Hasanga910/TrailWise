@@ -184,7 +184,7 @@ void main() {
   });
 
   group('Navigation', () {
-    testWidgets('MainShell displays Assigned Tours tab for TourGuide', (tester) async {
+    testWidgets('MainShell displays Assigned Tours tab for TourGuide and hides Packages/My Bookings', (tester) async {
       final fake = FakeApiClient(getResponses: {
         '/api/guides/me/assigned-tours': <dynamic>[],
         '/api/packages': <dynamic>[],
@@ -205,11 +205,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Dashboard'), findsOneWidget);
       expect(find.text('Assigned Tours'), findsOneWidget);
+      expect(find.text('Packages'), findsNothing);
       expect(find.text('My Bookings'), findsNothing);
     });
 
-    testWidgets('MainShell preserves My Bookings tab for Traveler', (tester) async {
+    testWidgets('MainShell preserves Packages and My Bookings tabs for Traveler and hides Assigned Tours', (tester) async {
       final fake = FakeApiClient(getResponses: {
         '/api/bookings/mine': {
           'items': <dynamic>[],
@@ -218,6 +220,12 @@ void main() {
           'pageSize': 10,
         },
         '/api/packages': <dynamic>[],
+        '/api/support/tickets/mine': {
+          'items': <dynamic>[],
+          'totalCount': 0,
+          'page': 1,
+          'pageSize': 50,
+        },
       });
       final travelerUser = CurrentUser(
         id: 'traveler-user-1',
@@ -235,6 +243,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Dashboard'), findsOneWidget);
+      expect(find.text('Packages'), findsOneWidget);
       expect(find.text('My Bookings'), findsOneWidget);
       expect(find.text('Assigned Tours'), findsNothing);
     });
@@ -259,7 +269,7 @@ void main() {
       expect(find.text('Tour Details'), findsOneWidget);
       expect(find.text('Save Updates'), findsOneWidget);
       expect(find.text('Attended'), findsOneWidget);
-      expect(find.text('Completed'), findsOneWidget);
+      expect(find.text('Completed'), findsNothing);
     });
 
     testWidgets('10. Returning after update refreshes or updates the assigned tours list', (tester) async {

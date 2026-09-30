@@ -25,6 +25,8 @@ export interface TourPackage {
   photoUrl: string | null;
   tiers: PackageTier[];
   locations: PackageLocation[];
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export interface PackageTierInput {

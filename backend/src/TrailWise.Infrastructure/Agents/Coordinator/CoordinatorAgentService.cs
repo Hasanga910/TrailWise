@@ -35,6 +35,8 @@ public class CoordinatorAgentService : ICoordinatorAgentService
     private readonly IFleetReservationService? _fleetReservationService;
     private readonly IProposalSummaryAgent _summaryAgent;
     private readonly ILogger<CoordinatorAgentService> _logger;
+    private readonly IBookingLifecycleService _bookingLifecycleService;
+    private readonly IClock _clock;
 
     public CoordinatorAgentService(
         TrailWiseDbContext db,
@@ -45,6 +47,8 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         IGuideAssignmentService guideAssignmentService,
         IProposalSummaryAgent summaryAgent,
         ILogger<CoordinatorAgentService> logger,
+        IBookingLifecycleService? bookingLifecycleService = null,
+        IClock? clock = null,
         IFleetReservationService? fleetReservationService = null)
     {
         _db = db;
@@ -56,6 +60,8 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         _summaryAgent = summaryAgent;
         _logger = logger;
         _fleetReservationService = fleetReservationService;
+        _clock = clock ?? new SystemClock();
+        _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(_clock);
     }
 
     public async Task StartWorkflowAsync(Guid bookingId, CancellationToken ct = default)
@@ -195,9 +201,9 @@ public class CoordinatorAgentService : ICoordinatorAgentService
 
                 if (assignmentSucceeded)
                 {
-                    booking.Status = BookingStatus.Confirmed;
+                    _bookingLifecycleService.TransitionToConfirmed(booking);
                     run.Status = WorkflowRunStatus.Completed;
-                    run.CompletedAt = DateTimeOffset.UtcNow;
+                    run.CompletedAt = _clock.UtcNow;
                 }
                 else
                 {
@@ -205,7 +211,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                         bookingId, guideResult.GuideId);
                     booking.Status = BookingStatus.NeedsManualReview;
                     run.Status = WorkflowRunStatus.Failed;
-                    run.CompletedAt = DateTimeOffset.UtcNow;
+                    run.CompletedAt = _clock.UtcNow;
                 }
                 break;
             case BookingApprovalEvaluator.Decision.NeedsApproval:
@@ -217,7 +223,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             case BookingApprovalEvaluator.Decision.ValidationFailed:
                 booking.Status = BookingStatus.NeedsManualReview;
                 run.Status = WorkflowRunStatus.Failed;
-                run.CompletedAt = DateTimeOffset.UtcNow;
+                run.CompletedAt = _clock.UtcNow;
                 break;
         }
 

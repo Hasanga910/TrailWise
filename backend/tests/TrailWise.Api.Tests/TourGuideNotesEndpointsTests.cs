@@ -56,7 +56,7 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
     }
 
     [Fact]
-    public async Task Test02_AssignedTourGuide_CanMarkCompleted()
+    public async Task Test02_AssignedTourGuide_CannotManuallyMarkCompletedThroughUpdateEndpoint()
     {
         var admin = await AdminClientAsync();
         var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
@@ -77,7 +77,7 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
         var dto = await patchResponse.Content.ReadFromJsonAsync<AssignedTourDto>(JsonOptions);
         Assert.NotNull(dto);
         Assert.False(dto.Attended);
-        Assert.True(dto.Completed);
+        Assert.False(dto.Completed); // Completed cannot be toggled manually; remains false
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
         var dto = await patchResponse.Content.ReadFromJsonAsync<AssignedTourDto>(JsonOptions);
         Assert.NotNull(dto);
         Assert.True(dto.Attended);
-        Assert.True(dto.Completed);
+        Assert.False(dto.Completed); // Completed remains false because tour was not ended
         Assert.Equal("Tour completed successfully with full attendance.", dto.GuideNotes);
     }
 
@@ -270,7 +270,7 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
 
         Assert.NotNull(dbBooking);
         Assert.True(dbBooking.Attended);
-        Assert.True(dbBooking.Completed);
+        Assert.False(dbBooking.Completed); // Completed cannot be changed via guide-notes
         Assert.Equal("Verified persistent values in PostgreSQL.", dbBooking.GuideNotes);
     }
 
@@ -303,7 +303,7 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
         var tour = tours.FirstOrDefault(t => t.BookingId == booking.Id);
         Assert.NotNull(tour);
         Assert.True(tour.Attended);
-        Assert.True(tour.Completed);
+        Assert.False(tour.Completed);
         Assert.Equal("Check via assigned tours endpoint", tour.GuideNotes);
     }
 
@@ -405,6 +405,7 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
         Assert.NotNull(dto);
         Assert.NotNull(dto.TourStartedAt);
         Assert.Null(dto.TourEndedAt);
+        Assert.False(dto.Completed);
 
         // Verify in database
         using var scope = _factory.Services.CreateScope();
@@ -413,6 +414,7 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
         Assert.NotNull(dbBooking);
         Assert.NotNull(dbBooking.TourStartedAt);
         Assert.Null(dbBooking.TourEndedAt);
+        Assert.False(dbBooking.Completed);
     }
 
     [Fact]
@@ -656,6 +658,21 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
 
     private async Task<GuideDto> CreateGuideAsync(HttpClient adminClient, Guid userId, string name)
     {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var existing = await db.Guides.FirstOrDefaultAsync(g => g.UserId == userId);
+            if (existing != null)
+            {
+                existing.Name = name;
+                existing.Languages = new[] { "English" };
+                existing.Specializations = new[] { "Wildlife" };
+                existing.ContactInfo = "+94770000000";
+                await db.SaveChangesAsync();
+                return GuideDto.FromEntity(existing);
+            }
+        }
+
         var createResponse = await adminClient.PostAsJsonAsync("/api/guides", new CreateGuideRequest
         {
             Name = name,

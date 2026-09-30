@@ -2,10 +2,13 @@ import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/apiClient';
 import {
+  assignGuide,
   cancelBooking,
   completeBooking,
   decideBooking,
   getAllBookings,
+  getAvailableGuidesForBooking,
+  type AvailableGuideDto,
   type BookingStatus,
   type BookingSummaryDto,
 } from '../../api/bookings';
@@ -51,6 +54,52 @@ export function OpsBookingsPage() {
   const [itineraryLoadingId, setItineraryLoadingId] = useState<string | null>(null);
   const [itineraryErrors, setItineraryErrors] = useState<Record<string, string>>({});
   const [editingItineraryId, setEditingItineraryId] = useState<string | null>(null);
+
+  const [assignModalBooking, setAssignModalBooking] = useState<BookingSummaryDto | null>(null);
+  const [availableGuides, setAvailableGuides] = useState<AvailableGuideDto[] | null>(null);
+  const [loadingGuides, setLoadingGuides] = useState(false);
+  const [guidesError, setGuidesError] = useState<string | null>(null);
+  const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);
+  const [isConfirmingAssign, setIsConfirmingAssign] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
+
+  function fetchAvailableGuides(bookingId: string) {
+    setLoadingGuides(true);
+    setGuidesError(null);
+    getAvailableGuidesForBooking(bookingId)
+      .then((guides) => setAvailableGuides(guides))
+      .catch((err) => setGuidesError(extractErrorMessage(err, 'Could not load available guides.')))
+      .finally(() => setLoadingGuides(false));
+  }
+
+  function openAssignModal(booking: BookingSummaryDto) {
+    setAssignModalBooking(booking);
+    setSelectedGuideId(null);
+    setIsConfirmingAssign(false);
+    setAssignError(null);
+    fetchAvailableGuides(booking.id);
+  }
+
+  async function handleConfirmAssign() {
+    if (!assignModalBooking || !selectedGuideId) return;
+    setIsAssigning(true);
+    setAssignError(null);
+    try {
+      const response = await assignGuide(assignModalBooking.id, selectedGuideId);
+      patchStatus(assignModalBooking.id, response.status);
+      setAssignSuccess(`Guide successfully assigned! Booking is now Confirmed.`);
+      setAssignModalBooking(null);
+      load();
+    } catch (err) {
+      setAssignError(extractErrorMessage(err, 'Selected guide is no longer available for this booking.'));
+      setIsConfirmingAssign(false);
+      fetchAvailableGuides(assignModalBooking.id);
+    } finally {
+      setIsAssigning(false);
+    }
+  }
 
   function toggleItinerary(bookingId: string) {
     if (expandedBookingId === bookingId) {
@@ -160,6 +209,12 @@ export function OpsBookingsPage() {
         </p>
       )}
 
+      {assignSuccess && (
+        <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          {assignSuccess}
+        </p>
+      )}
+
       {!error && bookings === null && (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
@@ -266,6 +321,16 @@ export function OpsBookingsPage() {
                               {isExpanded ? 'Hide Itinerary' : 'Itinerary'}
                             </button>
                           )}
+                          {booking.status === 'NeedsManualReview' && (
+                            <button
+                              type="button"
+                              disabled={isActioning}
+                              onClick={() => openAssignModal(booking)}
+                              className="rounded-lg border border-brand-300 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-50"
+                            >
+                              Assign Tour Guide
+                            </button>
+                          )}
                           <Link
                             to={`/ops/bookings/${booking.id}/workflow`}
                             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
@@ -356,6 +421,185 @@ export function OpsBookingsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {assignModalBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 className="font-heading text-lg font-bold text-slate-900">Assign Tour Guide</h3>
+              <button
+                type="button"
+                onClick={() => setAssignModalBooking(null)}
+                className="text-slate-400 hover:text-slate-600"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+                <h4 className="font-semibold text-slate-800">Booking Information</h4>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-slate-600">
+                  <div>
+                    <span className="font-medium text-slate-700">Package: </span>
+                    {assignModalBooking.packageName}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-700">Dates: </span>
+                    {assignModalBooking.startDate}
+                    {assignModalBooking.endDate ? ` to ${assignModalBooking.endDate}` : ''}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-700">Group size: </span>
+                    {assignModalBooking.groupSize}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-700">Language preference: </span>
+                    {assignModalBooking.languagePreference || 'None'}
+                  </div>
+                </div>
+              </div>
+
+              {assignError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
+                  {assignError}
+                </div>
+              )}
+
+              <div>
+                <h4 className="mb-2 font-semibold text-slate-800">Available Guides</h4>
+                {loadingGuides && (
+                  <div className="space-y-2 py-4">
+                    <div className="h-12 animate-pulse rounded-lg bg-slate-100" />
+                    <div className="h-12 animate-pulse rounded-lg bg-slate-100" />
+                  </div>
+                )}
+
+                {guidesError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    <p>{guidesError}</p>
+                    <button
+                      type="button"
+                      onClick={() => fetchAvailableGuides(assignModalBooking.id)}
+                      className="mt-2 text-xs font-semibold underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
+                {!loadingGuides && !guidesError && availableGuides !== null && availableGuides.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+                    No available guides found for these dates.
+                  </div>
+                )}
+
+                {!loadingGuides && !guidesError && availableGuides && availableGuides.length > 0 && (
+                  <div className="space-y-2">
+                    {availableGuides.map((guide) => {
+                      const isSelected = selectedGuideId === guide.guideId;
+                      return (
+                        <div
+                          key={guide.guideId}
+                          onClick={() => {
+                            if (!isConfirmingAssign) setSelectedGuideId(guide.guideId);
+                          }}
+                          className={`cursor-pointer rounded-lg border p-3 transition ${
+                            isSelected
+                              ? 'border-brand-500 bg-brand-50/40 ring-1 ring-brand-500'
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="selectedGuide"
+                                checked={isSelected}
+                                onChange={() => setSelectedGuideId(guide.guideId)}
+                                className="h-4 w-4 text-brand-600 focus:ring-brand-500"
+                              />
+                              <span className="font-semibold text-slate-900">{guide.name}</span>
+                            </div>
+                            <span className="text-xs text-slate-500">{guide.contactInfo}</span>
+                          </div>
+
+                          <div className="mt-2 space-y-1 pl-6 text-xs text-slate-600">
+                            <div>
+                              <span className="font-medium text-slate-700">Languages: </span>
+                              {guide.languages.join(', ') || 'None listed'}
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-700">Specializations: </span>
+                              {guide.specializations.join(', ') || 'None listed'}
+                            </div>
+                            {guide.notes && (
+                              <div className="mt-1 font-medium text-brand-700">
+                                {guide.notes}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 px-6 py-4">
+              {isConfirmingAssign ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm font-medium text-amber-900">
+                    Assign{' '}
+                    <strong>
+                      {availableGuides?.find((g) => g.guideId === selectedGuideId)?.name}
+                    </strong>{' '}
+                    to this booking?
+                  </p>
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={isAssigning}
+                      onClick={() => setIsConfirmingAssign(false)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isAssigning}
+                      onClick={handleConfirmAssign}
+                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      {isAssigning ? 'Assigning...' : 'Confirm Assignment'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAssignModalBooking(null)}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!selectedGuideId || loadingGuides}
+                    onClick={() => setIsConfirmingAssign(true)}
+                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    Assign Guide
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

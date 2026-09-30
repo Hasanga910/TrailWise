@@ -34,6 +34,8 @@ public class BookingsController : ControllerBase
     private readonly IAuditLogService _auditLogService;
     private readonly IFleetReservationService _fleetReservationService;
     private readonly IFleetCapacityAgent _fleetAgent;
+    private readonly IGuideAssignmentService _guideAssignmentService;
+    private readonly IGuideAvailabilityService _guideAvailabilityService;
     private readonly ILogger<BookingsController> _logger;
 
     public BookingsController(
@@ -43,6 +45,8 @@ public class BookingsController : ControllerBase
         IAuditLogService auditLogService,
         IFleetReservationService fleetReservationService,
         IFleetCapacityAgent fleetAgent,
+        IGuideAssignmentService guideAssignmentService,
+        IGuideAvailabilityService guideAvailabilityService,
         ILogger<BookingsController> logger)
     {
         _db = db;
@@ -51,10 +55,13 @@ public class BookingsController : ControllerBase
         _auditLogService = auditLogService;
         _fleetReservationService = fleetReservationService;
         _fleetAgent = fleetAgent;
+        _guideAssignmentService = guideAssignmentService;
+        _guideAvailabilityService = guideAvailabilityService;
         _logger = logger;
     }
 
     [HttpPost]
+    [Authorize(Roles = "Traveler")]
     public async Task<ActionResult<BookingDto>> Create(CreateBookingRequest request, CancellationToken ct)
     {
         var travelerId = GetUserId();
@@ -253,6 +260,7 @@ public class BookingsController : ControllerBase
         var query = _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .Where(b => b.TravelerId == travelerId.Value);
 
         if (!string.IsNullOrWhiteSpace(status))
@@ -313,6 +321,7 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
@@ -503,12 +512,14 @@ public class BookingsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/complete")]
+    [HttpPost("{id:guid}/complete")]
     [Authorize(Roles = ManagerRoles)]
     public async Task<ActionResult<BookingDto>> Complete(Guid id, CancellationToken ct)
     {
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
@@ -516,8 +527,24 @@ public class BookingsController : ControllerBase
             return NotFound();
         }
 
+        if (booking.Status == BookingStatus.Completed)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Booking is already completed.");
+        }
+
         if (!BookingStatusTransitions.CanComplete(booking.Status))
         {
+            // POST is the legacy contract (400 for an invalid transition); PATCH reports a 409 conflict.
+            if (HttpMethods.IsPost(Request.Method))
+            {
+                return BadRequest(new
+                {
+                    message = "Only confirmed bookings can be marked as completed."
+                });
+            }
+
             return Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: $"This booking is {booking.Status} and cannot be marked completed.");
@@ -544,6 +571,16 @@ public class BookingsController : ControllerBase
                 entityId: booking.Id,
                 action: "BookingCompleted",
                 performedBy: performedBy.Value,
+                details: new
+                {
+                    travelerId = booking.TravelerId,
+                    tourPackageId = booking.TourPackageId,
+                    startDate = booking.StartDate.ToString("yyyy-MM-dd"),
+                    endDate = booking.EndDate.ToString("yyyy-MM-dd"),
+                    previousStatus = "Confirmed",
+                    newStatus = "Completed",
+                    completedAt = DateTimeOffset.UtcNow
+                },
                 ct: ct);
 
             if (transaction is not null)
@@ -644,6 +681,143 @@ public class BookingsController : ControllerBase
         return Ok(BookingDto.FromEntity(booking));
     }
 
+    [HttpPost("{id:guid}/assign-guide")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<AssignGuideResponse>> AssignGuide(
+        Guid id,
+        AssignGuideRequest request,
+        CancellationToken ct)
+    {
+        if (request is null || request.GuideId == Guid.Empty)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("guideId", "GuideId is required.") }
+            });
+        }
+
+        var booking = await _db.Bookings
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var guideExists = await _db.Guides
+            .AsNoTracking()
+            .AnyAsync(g => g.Id == request.GuideId, ct);
+
+        if (!guideExists)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Guide not found.");
+        }
+
+        if (booking.Status != BookingStatus.NeedsManualReview)
+        {
+            return BadRequest(new
+            {
+                errors = new[] { new FieldValidationError("status", $"Only bookings in NeedsManualReview status can be assigned a guide. Current status is {booking.Status}.") }
+            });
+        }
+
+        var assigned = await _guideAssignmentService.AssignGuideAsync(id, request.GuideId, ct);
+        if (!assigned)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Selected guide is no longer available for this booking.");
+        }
+
+        booking.Status = BookingStatus.Confirmed;
+        await _db.SaveChangesAsync(ct);
+
+        var performedBy = GetUserId();
+        await _auditLogService.LogAsync(
+            entityType: "Booking",
+            entityId: booking.Id,
+            action: "Guide manually assigned by Operations Manager",
+            performedBy: performedBy,
+            details: new { guideId = request.GuideId },
+            ct: ct);
+
+        _logger.LogInformation("Guide {GuideId} manually assigned to booking {BookingId} by user {UserId}",
+            request.GuideId, booking.Id, performedBy);
+
+        return Ok(new AssignGuideResponse(booking.Id, request.GuideId, booking.Status));
+    }
+
+    [HttpGet("{id:guid}/available-guides")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<IReadOnlyList<AvailableGuideDto>>> GetAvailableGuides(
+        Guid id,
+        CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (booking is null)
+        {
+            return NotFound();
+        }
+
+        var allGuides = await _db.Guides
+            .AsNoTracking()
+            .OrderBy(g => g.Name)
+            .ToListAsync(ct);
+
+        var theme = booking.TourPackage?.Theme?.Trim();
+        var langPref = string.IsNullOrWhiteSpace(booking.LanguagePreference) ? null : booking.LanguagePreference.Trim();
+
+        var availableGuides = new List<AvailableGuideDto>();
+
+        foreach (var guide in allGuides)
+        {
+            var isAvailable = await _guideAvailabilityService.IsGuideAvailableAsync(
+                guide.Id,
+                booking.StartDate,
+                booking.EndDate,
+                ct);
+
+            if (!isAvailable)
+            {
+                continue;
+            }
+
+            var matchesSpec = !string.IsNullOrWhiteSpace(theme) &&
+                guide.Specializations.Any(s => string.Equals(s?.Trim(), theme, StringComparison.OrdinalIgnoreCase));
+
+            var matchesLang = langPref != null &&
+                guide.Languages.Any(l => string.Equals(l?.Trim(), langPref, StringComparison.OrdinalIgnoreCase));
+
+            var notesList = new List<string>();
+            if (matchesSpec) notesList.Add($"Matches package theme: {theme}");
+            if (matchesLang) notesList.Add($"Matches language preference: {langPref}");
+            if (!matchesSpec && !string.IsNullOrWhiteSpace(theme)) notesList.Add("Different specialization");
+
+            availableGuides.Add(new AvailableGuideDto(
+                guide.Id,
+                guide.Name,
+                guide.Languages,
+                guide.Specializations,
+                guide.ContactInfo,
+                matchesSpec,
+                matchesLang,
+                notesList.Count > 0 ? string.Join(", ", notesList) : null));
+        }
+
+        var sorted = availableGuides
+            .OrderByDescending(g => (g.MatchesSpecialization ? 2 : 0) + (g.MatchesLanguage ? 1 : 0))
+            .ThenBy(g => g.Name)
+            .ToList();
+
+        return Ok(sorted);
+    }
+
     [HttpPatch("{id:guid}/guide-notes")]
     [Authorize(Roles = "TourGuide")]
     public async Task<ActionResult<AssignedTourDto>> UpdateGuideNotes(
@@ -693,7 +867,8 @@ public class BookingsController : ControllerBase
         }
 
         booking.Attended = request.Attended;
-        booking.Completed = request.Completed;
+        // Completed is strictly lifecycle-controlled by EndTour and cannot be manually modified
+        booking.Completed = booking.TourEndedAt.HasValue;
         booking.GuideNotes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
 
         await _db.SaveChangesAsync(ct);

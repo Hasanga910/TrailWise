@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:trailwise_mobile/api/api_client.dart';
+import 'package:trailwise_mobile/auth/current_user.dart';
 import 'package:trailwise_mobile/bookings/booking_request_screen.dart';
 import 'package:trailwise_mobile/models/package_tier.dart';
 import 'package:trailwise_mobile/models/tour_package.dart';
@@ -62,5 +63,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Group size cannot exceed 12 for this package.'), findsOneWidget);
+  });
+
+  testWidgets('BookingRequestScreen displays Access Restricted when accessed by TourGuide', (tester) async {
+    final fake = FakeApiClient();
+    final guideUser = CurrentUser(
+      id: 'guide-1',
+      name: 'Guide Alpha',
+      email: 'guide@trailwise.com',
+      role: 'TourGuide',
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: BookingRequestScreen(
+        package: _fixturePackage(),
+        tier: _fixtureTier(),
+        apiClient: fake,
+        currentUser: guideUser,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Access Restricted'), findsOneWidget);
+    expect(find.textContaining('Only travelers can request tour bookings'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Go Back'), findsOneWidget);
+    expect(find.text('Submit request'), findsNothing);
   });
 }

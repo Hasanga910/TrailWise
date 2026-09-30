@@ -129,10 +129,8 @@ void main() {
       );
       expect(attendedSwitch.value, isTrue);
 
-      final completedSwitch = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Completed'),
-      );
-      expect(completedSwitch.value, isFalse);
+      // Completed toggle must NOT be present in Tour Management
+      expect(find.widgetWithText(SwitchListTile, 'Completed'), findsNothing);
     });
 
     testWidgets('3. Toggling attendance changes local state', (tester) async {
@@ -153,7 +151,7 @@ void main() {
       expect(tester.widget<SwitchListTile>(attendedFinder).value, isTrue);
     });
 
-    testWidgets('4. Toggling completion changes local state', (tester) async {
+    testWidgets('4. Completed toggle is absent and Attended toggle is present', (tester) async {
       final fake = FakeApiClient();
       final tour = _sampleTour(completed: false);
 
@@ -162,13 +160,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      final completedFinder = find.widgetWithText(SwitchListTile, 'Completed');
-      expect(tester.widget<SwitchListTile>(completedFinder).value, isFalse);
-
-      await tester.tap(completedFinder);
-      await tester.pumpAndSettle();
-
-      expect(tester.widget<SwitchListTile>(completedFinder).value, isTrue);
+      expect(find.widgetWithText(SwitchListTile, 'Completed'), findsNothing);
+      expect(find.widgetWithText(SwitchListTile, 'Attended'), findsOneWidget);
     });
 
     testWidgets('5. Existing guide notes appear in text field', (tester) async {
@@ -183,7 +176,7 @@ void main() {
       expect(find.text('Group arrived smoothly at hotel'), findsOneWidget);
     });
 
-    testWidgets('6. Save sends correct PATCH payload', (tester) async {
+    testWidgets('6. Save sends correct PATCH payload with attended and notes (without completed)', (tester) async {
       final fake = FakeApiClient();
       final tour = _sampleTour(
         bookingId: 'booking-999',
@@ -199,8 +192,6 @@ void main() {
 
       // Toggle attendance
       await tester.tap(find.widgetWithText(SwitchListTile, 'Attended'));
-      // Toggle completion
-      await tester.tap(find.widgetWithText(SwitchListTile, 'Completed'));
       // Edit notes
       final notesField = find.widgetWithText(TextField, 'Guide Notes');
       await tester.enterText(notesField, 'Traveler group arrived on time.');
@@ -217,7 +208,6 @@ void main() {
       expect(call['path'], '/api/bookings/booking-999/guide-notes');
       expect(call['body'], {
         'attended': true,
-        'completed': true,
         'notes': 'Traveler group arrived on time.',
       });
     });
@@ -339,7 +329,6 @@ void main() {
       expect(call['path'], '/api/bookings/b-clear-1/guide-notes');
       expect(call['body'], {
         'attended': true,
-        'completed': false,
         'notes': null,
       });
 
