@@ -330,4 +330,125 @@ void main() {
       expect(tester.widget<OutlinedButton>(reviewedButton).enabled, isFalse);
     });
   });
+
+  group('Booking Action Buttons Responsive Layout', () {
+    testWidgets('Confirmed booking on narrow viewport renders all 3 actions in Wrap without overflow', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final client = FakeApiClient(
+        getResponses: {
+          '/api/bookings/mine': {
+            'items': [
+              _bookingJson(status: 'Confirmed'),
+            ],
+            'totalCount': 1,
+            'page': 1,
+            'pageSize': 10,
+          },
+        },
+      );
+
+      await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: client)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.widgetWithText(TextButton, 'Get Support'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Payment'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Cancel Booking'), findsOneWidget);
+    });
+
+    testWidgets('Completed unreviewed booking on narrow viewport renders Get Support and Review without overflow', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final client = FakeApiClient(
+        getResponses: {
+          '/api/bookings/mine': {
+            'items': [
+              _bookingJson(status: 'Completed', hasReview: false),
+            ],
+            'totalCount': 1,
+            'page': 1,
+            'pageSize': 10,
+          },
+        },
+      );
+
+      await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: client)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.widgetWithText(TextButton, 'Get Support'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Review'), findsOneWidget);
+    });
+
+    testWidgets('Completed reviewed booking on narrow viewport renders Get Support and disabled Reviewed without overflow', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final client = FakeApiClient(
+        getResponses: {
+          '/api/bookings/mine': {
+            'items': [
+              _bookingJson(status: 'Completed', hasReview: true),
+            ],
+            'totalCount': 1,
+            'page': 1,
+            'pageSize': 10,
+          },
+        },
+      );
+
+      await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: client)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.widgetWithText(TextButton, 'Get Support'), findsOneWidget);
+      final reviewed = find.widgetWithText(OutlinedButton, 'Reviewed');
+      expect(reviewed, findsOneWidget);
+      expect(tester.widget<OutlinedButton>(reviewed).enabled, isFalse);
+    });
+
+    testWidgets('Requested booking on narrow viewport renders Get Support and Cancel Booking without overflow', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final client = FakeApiClient(
+        getResponses: {
+          '/api/bookings/mine': {
+            'items': [
+              _bookingJson(status: 'Requested'),
+            ],
+            'totalCount': 1,
+            'page': 1,
+            'pageSize': 10,
+          },
+        },
+      );
+
+      await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: client)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.widgetWithText(TextButton, 'Get Support'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Cancel Booking'), findsOneWidget);
+    });
+  });
 }

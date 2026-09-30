@@ -82,7 +82,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('No itinerary has been set for this trip yet.'), findsOneWidget);
+      expect(find.textContaining('No schedule steps have been created for this tour yet'), findsOneWidget);
     });
 
     testWidgets('shows an error state with a retry button on failure', (tester) async {
@@ -96,7 +96,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Failed to load itinerary. Please try again.'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Retry'), findsOneWidget);
+      expect(find.text('Retry schedule'), findsOneWidget);
     });
   });
 }
