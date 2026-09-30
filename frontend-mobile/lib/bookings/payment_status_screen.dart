@@ -105,18 +105,66 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   void initState() {
     super.initState();
     _loadPaymentStatus();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
+  }
+
+  @override
+  void didUpdateWidget(PaymentStatusScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.booking.id != widget.booking.id ||
+        oldWidget.booking.status != widget.booking.status) {
+      _syncCountdownTimer();
+    }
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _countdownTimer = null;
     _amountController.dispose();
     super.dispose();
+  }
+
+  bool get _shouldShowAdvanceCountdown {
+    final payment = _paymentStatus;
+    if (payment == null) return false;
+    if (widget.booking.status != BookingStatus.confirmed) return false;
+    if (payment.paymentDueAt == null) return false;
+    if (payment.isPaymentDeadlineExpired) return false;
+    if (payment.status == 'DepositPaid' || payment.status == 'FullyPaid') return false;
+    if (payment.hasPendingVerification || payment.status == 'Pending') return false;
+    if (payment.totalPaid > 0) return false;
+
+    final now = _currentNow().toUtc();
+    final dueAt = payment.paymentDueAt!.toUtc();
+    return dueAt.isAfter(now);
+  }
+
+  void _syncCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+
+    if (!mounted || !_shouldShowAdvanceCountdown) {
+      return;
+    }
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (!_shouldShowAdvanceCountdown) {
+        timer.cancel();
+        _countdownTimer = null;
+        if (mounted) {
+          setState(() {});
+          _loadPaymentStatus();
+        }
+        return;
+      }
+
+      setState(() {});
+    });
   }
 
   Future<void> _loadPaymentStatus() async {
@@ -128,6 +176,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
     try {
       final json = await _apiClient.get('/api/bookings/${widget.booking.id}/payment-status');
       final status = PaymentStatusDto.fromJson(json as Map<String, dynamic>);
+      if (!mounted) return;
       setState(() {
         _paymentStatus = status;
         _loading = false;
@@ -140,16 +189,21 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
           }
         }
       });
+      _syncCountdownTimer();
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.message;
         _loading = false;
       });
+      _syncCountdownTimer();
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Could not load payment status. Please try again.';
         _loading = false;
       });
+      _syncCountdownTimer();
     }
   }
 
@@ -352,11 +406,11 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
     final isFullyPaid = !isPendingVerification && (payment.status == 'FullyPaid' || payment.remainingAmount <= 0);
     final minAdvance = payment.minimumAdvance ?? (payment.totalCost * 0.5);
 
-    final isDeadlineExpired = payment.isPaymentDeadlineExpired ||
-        (payment.paymentDueAt != null &&
-            payment.totalPaid == 0 &&
-            !isPendingVerification &&
-            _currentNow().toUtc().isAfter(payment.paymentDueAt!.toUtc()));
+    final isDeadlinePast = payment.paymentDueAt != null &&
+        payment.totalPaid == 0 &&
+        !isPendingVerification &&
+        !payment.paymentDueAt!.toUtc().isAfter(_currentNow().toUtc());
+    final isDeadlineExpired = payment.isPaymentDeadlineExpired || isDeadlinePast;
     final isExpiredOrCancelled = isBookingCancelled || isDeadlineExpired;
 
     return Center(
@@ -675,7 +729,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 )
               else ...[
                 // Advance payment deadline countdown card (for unpaid initial payment with active deadline)
-                if (payment.totalPaid == 0 && payment.paymentDueAt != null) ...[
+                if (_shouldShowAdvanceCountdown) ...[
                   () {
                     final remaining = payment.paymentDueAt!.toUtc().difference(_currentNow().toUtc());
                     final remainingSeconds = remaining.inSeconds > 0 ? remaining.inSeconds : 0;
@@ -721,27 +775,49 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Submit your advance bank transfer before:\n${_formatDateTime(payment.paymentDueAt!.toLocal())}',
+                              'Advance payment due in',
                               style: TextStyle(
                                 fontSize: 13,
+                                fontWeight: FontWeight.w600,
                                 color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: isUnder15Minutes ? Colors.amber.shade100 : Colors.blue.shade100,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(
-                                'Time remaining: $countdownStr',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'monospace',
-                                  color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Advance payment due in $countdownStr',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Time remaining: $countdownStr',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Submit your advance bank transfer before:\n${_formatDateTime(payment.paymentDueAt!.toLocal())}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
                               ),
                             ),
                           ],

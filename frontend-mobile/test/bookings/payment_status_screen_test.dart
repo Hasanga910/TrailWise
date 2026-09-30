@@ -1087,6 +1087,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Time remaining: 00:42:15'), findsOneWidget);
+    expect(find.text('Advance payment due in 00:42:15'), findsOneWidget);
+    expect(find.text('Advance payment due in'), findsOneWidget);
   });
 
   testWidgets('29. Countdown decreases based on supplied time/clock abstraction', (tester) async {
@@ -1336,5 +1338,119 @@ void main() {
 
     expect(find.text('Cancelled'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Payment'), findsNothing);
+  });
+
+  testWidgets('37. Null PaymentDueAt hides countdown and keeps UI stable', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'paymentDueAt': null,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 9, 29, 10, 17, 45),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('advance_payment_deadline_card')), findsNothing);
+    expect(find.text('Bank Transfer Details'), findsOneWidget);
+    expect(find.text('Make a Payment'), findsOneWidget);
+    expect(find.text('Payment deadline expired'), findsNothing);
+  });
+
+  testWidgets('38. Timer stops at zero, cancels, and refreshes payment status without going negative', (tester) async {
+    setTestViewport(tester);
+    var currentTime = DateTime.utc(2026, 9, 29, 10, 59, 59);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'paymentDueAt': '2026-09-29T11:00:00Z',
+        },
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'paymentDueAt': '2026-09-29T11:00:00Z',
+          'isPaymentDeadlineExpired': true,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(),
+        apiClient: client,
+        nowProvider: () => currentTime,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Advance payment due in 00:00:01'), findsOneWidget);
+    expect(client.getCallCount, 1);
+
+    // Advance clock past deadline
+    currentTime = DateTime.utc(2026, 9, 29, 11, 0, 0);
+    await tester.pump(const Duration(seconds: 1));
+
+    // Timer detects zero/past, stops, and calls _loadPaymentStatus
+    await tester.pumpAndSettle();
+
+    expect(client.getCallCount, 2);
+    expect(find.byKey(const Key('advance_payment_deadline_card')), findsNothing);
+    expect(find.textContaining('00:00:-'), findsNothing);
+    expect(find.text('Payment deadline expired'), findsOneWidget);
+  });
+
+  testWidgets('39. Timer is disposed safely when screen is popped or unmounted', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'paymentDueAt': '2026-09-29T11:00:00Z',
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 9, 29, 10, 17, 45),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('advance_payment_deadline_card')), findsOneWidget);
+
+    // Unmount widget
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+
+    // Safe unmount without pending timer exceptions
+    expect(find.byKey(const Key('advance_payment_deadline_card')), findsNothing);
   });
 }
