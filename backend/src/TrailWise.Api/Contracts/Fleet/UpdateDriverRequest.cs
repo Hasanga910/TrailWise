@@ -12,4 +12,10 @@ public class UpdateDriverRequest
 
     [MaxLength(100)]
     public string ContactInfo { get; set; } = string.Empty;
+
+    [EmailAddress, MaxLength(256)]
+    public string? Email { get; set; }
+
+    [MinLength(6)]
+    public string? Password { get; set; }
 }

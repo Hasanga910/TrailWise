@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../models/assigned_tour.dart';
+import '../models/driver_assignment.dart';
 import '../models/itinerary_step.dart';
 
 class FieldError {
@@ -78,6 +79,23 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<dynamic> put(String path, Map<String, dynamic> body) async {
+    final response = await _httpClient.put(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
+
+  Future<dynamic> delete(String path) async {
+    final response = await _httpClient.delete(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers,
+    );
+    return _decode(response);
+  }
+
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
     final response = await _httpClient.get(_buildUri(path, query), headers: _headers);
     return _decode(response);
@@ -115,6 +133,17 @@ class ApiClient {
       return response
           .whereType<Map<String, dynamic>>()
           .map(AssignedTour.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<DriverAssignment>> getDriverAssignments() async {
+    final response = await get('/api/drivers/me/assignments');
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(DriverAssignment.fromJson)
           .toList();
     }
     return [];

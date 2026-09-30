@@ -294,6 +294,9 @@ export function FleetVehiclesPage() {
                         <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
                           {veh.registrationNumber || 'UNREGISTERED'}
                         </span>
+                        <span className="font-mono text-xs text-slate-400">
+                          #{veh.id.slice(0, 8)}
+                        </span>
                       </div>
                       {veh.seatConfiguration && (
                         <p className="mt-1 text-xs text-slate-400">Config: {veh.seatConfiguration}</p>

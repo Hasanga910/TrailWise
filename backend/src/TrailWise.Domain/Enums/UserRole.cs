@@ -6,5 +6,6 @@ public enum UserRole
     TourGuide,
     OperationsManager,
     FleetCoordinator,
+    Driver,
     Admin
 }

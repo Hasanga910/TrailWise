@@ -8,7 +8,9 @@ public record DriverDto(
     string LicenseNumber,
     string ContactInfo,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    string? Email = null,
+    Guid? UserId = null)
 {
     public static DriverDto FromEntity(Driver driver) => new(
         driver.Id,
@@ -16,5 +18,7 @@ public record DriverDto(
         driver.LicenseNumber,
         driver.ContactInfo,
         driver.CreatedAt,
-        driver.UpdatedAt);
+        driver.UpdatedAt,
+        driver.User?.Email,
+        driver.UserId);
 }

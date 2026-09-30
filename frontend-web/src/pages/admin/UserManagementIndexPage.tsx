@@ -40,6 +40,15 @@ const CARDS: {
     fromClass: 'from-brand-400',
     toClass: 'to-brand-600',
   },
+  {
+    to: '/admin/staff/drivers',
+    title: 'Drivers',
+    description: 'Add or remove Driver accounts who operate vehicles and complete tour transfers.',
+    role: 'Driver',
+    icon: TruckIcon,
+    fromClass: 'from-blue-500',
+    toClass: 'to-blue-700',
+  },
 ];
 
 export function UserManagementIndexPage() {

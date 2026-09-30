@@ -81,6 +81,16 @@ export interface VehicleAssignmentDetailDto {
   registrationNumber?: string;
   bookingStatus?: string;
   travelerName?: string;
+  travelerContact?: string;
+  packageName?: string;
+  packageTier?: string;
+  itineraryHighlights?: string[];
+  driverLicenseNumber?: string;
+  guideName?: string;
+  guideContact?: string;
+  groupSize?: number;
+  specialRequests?: string;
+  languagePreference?: string;
 }
 
 export interface DriverDto {
@@ -90,18 +100,24 @@ export interface DriverDto {
   contactInfo: string;
   createdAt: string;
   updatedAt: string;
+  email?: string;
+  userId?: string;
 }
 
 export interface CreateDriverRequest {
   name: string;
   licenseNumber: string;
   contactInfo?: string;
+  email?: string;
+  password?: string;
 }
 
 export interface UpdateDriverRequest {
   name: string;
   licenseNumber: string;
   contactInfo?: string;
+  email?: string;
+  password?: string;
 }
 
 export interface GetVehiclesFilter {
@@ -198,6 +214,14 @@ export async function checkDriverAvailability(
  */
 export async function getVehicleAssignments(): Promise<VehicleAssignmentDetailDto[]> {
   const response = await apiClient.get<VehicleAssignmentDetailDto[]>('/api/vehicles/assignments');
+  return response.data;
+}
+
+/**
+ * Fetch assigned tours and vehicle tasks for the authenticated driver
+ */
+export async function getMyDriverAssignments(): Promise<VehicleAssignmentDetailDto[]> {
+  const response = await apiClient.get<VehicleAssignmentDetailDto[]>('/api/drivers/me/assignments');
   return response.data;
 }
 
