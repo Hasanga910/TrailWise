@@ -19,4 +19,14 @@ public record VehicleAssignmentDetailDto(
     bool? HasAC = null,
     string? RegistrationNumber = null,
     BookingStatus? BookingStatus = null,
-    string? TravelerName = null);
+    string? TravelerName = null,
+    string? TravelerContact = null,
+    string? PackageName = null,
+    string? PackageTier = null,
+    IReadOnlyList<string>? ItineraryHighlights = null,
+    string? DriverLicenseNumber = null,
+    string? GuideName = null,
+    string? GuideContact = null,
+    int? GroupSize = null,
+    string? SpecialRequests = null,
+    string? LanguagePreference = null);

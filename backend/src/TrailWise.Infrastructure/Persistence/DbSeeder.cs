@@ -14,6 +14,18 @@ public static class DbSeeder
         if (db.Database.IsRelational())
         {
             await db.Database.MigrateAsync(ct);
+            // Ensure schema updates that were added without an EF migration are applied safely
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE \"Drivers\" ADD COLUMN IF NOT EXISTS \"UserId\" uuid REFERENCES \"Users\"(\"Id\"); " +
+                    "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Drivers_UserId\" ON \"Drivers\" (\"UserId\") WHERE \"UserId\" IS NOT NULL;",
+                    ct);
+            }
+            catch
+            {
+                // Ignore if already applied or not supported
+            }
         }
         else
         {
@@ -37,6 +49,40 @@ public static class DbSeeder
                 };
                 adminUser.PasswordHash = hasher.HashPassword(adminUser, admin.Password);
                 db.Users.Add(adminUser);
+                await db.SaveChangesAsync(ct);
+            }
+        }
+
+        var driverEmail = "driver@trailwise.local";
+        var driverUserExists = await db.Users.AnyAsync(u => u.Email == driverEmail, ct);
+        if (!driverUserExists)
+        {
+            var hasher = new PasswordHasher<User>();
+            var driverUser = new User
+            {
+                Name = "Sunil Jayawardena",
+                Email = driverEmail,
+                ContactNumber = "+94711122334",
+                Role = UserRole.Driver
+            };
+            driverUser.PasswordHash = hasher.HashPassword(driverUser, "ChangeMe123!");
+            db.Users.Add(driverUser);
+            await db.SaveChangesAsync(ct);
+
+            var driverProfile = await db.Drivers.FirstOrDefaultAsync(d => d.ContactInfo == "+94711122334" || d.Name == "Sunil Jayawardena", ct);
+            if (driverProfile != null)
+            {
+                driverProfile.UserId = driverUser.Id;
+                await db.SaveChangesAsync(ct);
+            }
+        }
+        else
+        {
+            var driverUser = await db.Users.FirstAsync(u => u.Email == driverEmail, ct);
+            var driverProfile = await db.Drivers.FirstOrDefaultAsync(d => d.ContactInfo == "+94711122334" || d.Name == "Sunil Jayawardena", ct);
+            if (driverProfile != null && driverProfile.UserId != driverUser.Id)
+            {
+                driverProfile.UserId = driverUser.Id;
                 await db.SaveChangesAsync(ct);
             }
         }

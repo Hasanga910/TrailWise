@@ -38,6 +38,8 @@ import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSet
 import { GuideAvailabilityPage } from './pages/guides/GuideAvailabilityPage';
 import { AssignedToursPage } from './pages/guides/AssignedToursPage';
 import { TourDetailPage } from './pages/guides/TourDetailPage';
+import { DriverDashboardPage } from './pages/driver/DriverDashboardPage';
+import { DriverProfileSettingsPage } from './pages/driver/DriverProfileSettingsPage';
 
 function App() {
   return (
@@ -78,6 +80,24 @@ function App() {
         element={
           <RequireRole allowedRoles={['TourGuide']}>
             <TourDetailPage />
+          </RequireRole>
+        }
+      />
+
+      <Route
+        path="/driver/dashboard"
+        element={
+          <RequireRole allowedRoles={['Driver', 'FleetCoordinator', 'Admin']}>
+            <DriverDashboardPage />
+          </RequireRole>
+        }
+      />
+
+      <Route
+        path="/driver/profile"
+        element={
+          <RequireRole allowedRoles={['Driver', 'FleetCoordinator', 'Admin']}>
+            <DriverProfileSettingsPage />
           </RequireRole>
         }
       />
@@ -155,6 +175,10 @@ function App() {
         <Route
           path="staff/fleet-coordinators"
           element={<StaffRolePage role="FleetCoordinator" roleLabel="Fleet Coordinator" />}
+        />
+        <Route
+          path="staff/drivers"
+          element={<StaffRolePage role="Driver" roleLabel="Driver" />}
         />
         <Route path="profile" element={<AdminProfileSettingsPage />} />
       </Route>

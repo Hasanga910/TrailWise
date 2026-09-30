@@ -194,29 +194,56 @@ public class VehiclesController : ControllerBase
             .Include(a => a.Driver)
             .Include(a => a.Booking)
                 .ThenInclude(b => b.Traveler)
+            .Include(a => a.Booking)
+                .ThenInclude(b => b.TourPackage)
+            .Include(a => a.Booking)
+                .ThenInclude(b => b.PackageTier)
+            .Include(a => a.Booking)
+                .ThenInclude(b => b.ItinerarySteps)
+            .Include(a => a.Booking)
+                .ThenInclude(b => b.GuideAvailabilities)
+                    .ThenInclude(ga => ga.Guide)
             .AsNoTracking()
             .OrderByDescending(a => a.StartDate)
             .ToListAsync(ct);
 
-        var dtos = assignments.Select(a => new VehicleAssignmentDetailDto(
-            a.Id,
-            a.VehicleId,
-            a.Vehicle != null ? $"{a.Vehicle.Type} ({a.Vehicle.Capacity} seats)" : "Unknown Vehicle",
-            a.BookingId,
-            a.DriverId,
-            a.Driver != null ? a.Driver.Name : "Unknown Driver",
-            a.Driver != null ? a.Driver.ContactInfo : "",
-            a.StartDate,
-            a.EndDate,
-            a.CreatedAt,
-            a.UpdatedAt,
-            a.Vehicle?.Type,
-            a.Vehicle?.Capacity,
-            a.Vehicle?.HasAC,
-            a.Vehicle?.RegistrationNumber,
-            a.Booking?.Status,
-            a.Booking?.Traveler != null ? a.Booking.Traveler.Name : null
-        )).ToList();
+        var dtos = assignments.Select(a =>
+        {
+            var guide = a.Booking?.GuideAvailabilities?.FirstOrDefault(ga => ga.Guide != null)?.Guide;
+            return new VehicleAssignmentDetailDto(
+                a.Id,
+                a.VehicleId,
+                a.Vehicle != null ? $"{a.Vehicle.Type} ({a.Vehicle.Capacity} seats)" : "Unknown Vehicle",
+                a.BookingId,
+                a.DriverId,
+                a.Driver != null ? a.Driver.Name : "Unknown Driver",
+                a.Driver != null ? a.Driver.ContactInfo : "",
+                a.StartDate,
+                a.EndDate,
+                a.CreatedAt,
+                a.UpdatedAt,
+                a.Vehicle?.Type,
+                a.Vehicle?.Capacity,
+                a.Vehicle?.HasAC,
+                a.Vehicle?.RegistrationNumber,
+                a.Booking?.Status,
+                a.Booking?.Traveler != null ? a.Booking.Traveler.Name : null,
+                TravelerContact: a.Booking?.Traveler != null ? a.Booking.Traveler.ContactNumber : null,
+                PackageName: a.Booking?.TourPackage?.Name,
+                PackageTier: a.Booking?.PackageTier != null ? a.Booking.PackageTier.ClassType.ToString() : null,
+                ItineraryHighlights: a.Booking?.ItinerarySteps?
+                    .OrderBy(s => s.DayNumber)
+                    .ThenBy(s => s.StartTime)
+                    .Select(s => $"Day {s.DayNumber}: {s.Activity} ({s.Location})")
+                    .ToList(),
+                DriverLicenseNumber: a.Driver?.LicenseNumber,
+                GuideName: guide?.Name,
+                GuideContact: guide?.ContactInfo,
+                GroupSize: a.Booking?.GroupSize,
+                SpecialRequests: a.Booking?.SpecialRequests,
+                LanguagePreference: a.Booking?.LanguagePreference
+            );
+        }).ToList();
 
         return Ok(dtos);
     }
@@ -227,6 +254,11 @@ public class VehiclesController : ControllerBase
     {
         var booking = await _db.Bookings
             .Include(b => b.Traveler)
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .Include(b => b.ItinerarySteps)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == bookingId, ct);
 
@@ -256,6 +288,8 @@ public class VehiclesController : ControllerBase
             return NotFound();
         }
 
+        var guide = booking.GuideAvailabilities?.FirstOrDefault(ga => ga.Guide != null)?.Guide;
+
         var dto = new VehicleAssignmentDetailDto(
             assignment.Id,
             assignment.VehicleId,
@@ -273,7 +307,21 @@ public class VehiclesController : ControllerBase
             assignment.Vehicle?.HasAC,
             assignment.Vehicle?.RegistrationNumber,
             booking.Status,
-            booking.Traveler != null ? booking.Traveler.Name : null
+            booking.Traveler != null ? booking.Traveler.Name : null,
+            TravelerContact: booking.Traveler != null ? booking.Traveler.ContactNumber : null,
+            PackageName: booking.TourPackage?.Name,
+            PackageTier: booking.PackageTier != null ? booking.PackageTier.ClassType.ToString() : null,
+            ItineraryHighlights: booking.ItinerarySteps?
+                .OrderBy(s => s.DayNumber)
+                .ThenBy(s => s.StartTime)
+                .Select(s => $"Day {s.DayNumber}: {s.Activity} ({s.Location})")
+                .ToList(),
+            DriverLicenseNumber: assignment.Driver?.LicenseNumber,
+            GuideName: guide?.Name,
+            GuideContact: guide?.ContactInfo,
+            GroupSize: booking.GroupSize,
+            SpecialRequests: booking.SpecialRequests,
+            LanguagePreference: booking.LanguagePreference
         );
 
         return Ok(dto);

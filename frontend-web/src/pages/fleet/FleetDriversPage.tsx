@@ -16,6 +16,8 @@ export function FleetDriversPage() {
   const [name, setName] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [contactInfo, setContactInfo] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -24,6 +26,8 @@ export function FleetDriversPage() {
   const [editName, setEditName] = useState('');
   const [editLicenseNumber, setEditLicenseNumber] = useState('');
   const [editContactInfo, setEditContactInfo] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
 
@@ -53,10 +57,14 @@ export function FleetDriversPage() {
         name: name.trim(),
         licenseNumber: licenseNumber.trim(),
         contactInfo: contactInfo.trim(),
+        email: email.trim() || undefined,
+        password: password || undefined,
       });
       setName('');
       setLicenseNumber('');
       setContactInfo('');
+      setEmail('');
+      setPassword('');
       setShowModal(false);
       loadDrivers();
     } catch (err) {
@@ -71,6 +79,8 @@ export function FleetDriversPage() {
     setEditName(driver.name);
     setEditLicenseNumber(driver.licenseNumber);
     setEditContactInfo(driver.contactInfo || '');
+    setEditEmail(driver.email || '');
+    setEditPassword('');
     setEditError(null);
   }
 
@@ -84,6 +94,8 @@ export function FleetDriversPage() {
         name: editName.trim(),
         licenseNumber: editLicenseNumber.trim(),
         contactInfo: editContactInfo.trim(),
+        email: editEmail.trim() || undefined,
+        password: editPassword || undefined,
       });
       setEditingDriver(null);
       loadDrivers();
@@ -316,6 +328,28 @@ export function FleetDriversPage() {
                 />
               </div>
 
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Account Email (Optional Login)</label>
+                <input
+                  type="email"
+                  placeholder="e.g. driver@trailwise.local"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Account Password (Optional Login)</label>
+                <input
+                  type="password"
+                  placeholder="Min 6 characters (defaults to ChangeMe123!)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
               {createError && (
                 <div className="rounded-lg bg-rose-50 p-3 text-xs font-medium text-rose-700">
                   {createError}
@@ -384,6 +418,28 @@ export function FleetDriversPage() {
                   placeholder="e.g. +94 77 123 4567"
                   value={editContactInfo}
                   onChange={(e) => setEditContactInfo(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Account Email (Login)</label>
+                <input
+                  type="email"
+                  placeholder="e.g. driver@trailwise.local"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600">New Password (Leave blank to keep)</label>
+                <input
+                  type="password"
+                  placeholder="Optional new password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
                   className={inputClass}
                 />
               </div>
