@@ -16,9 +16,11 @@ public record TourPackageDto(
     int MaxGroupSize,
     string? PhotoUrl,
     IReadOnlyList<PackageTierDto> Tiers,
-    IReadOnlyList<PackageLocationDto> Locations)
+    IReadOnlyList<PackageLocationDto> Locations,
+    double AverageRating = 0.0,
+    int ReviewCount = 0)
 {
-    public static TourPackageDto FromEntity(TourPackage package) => new(
+    public static TourPackageDto FromEntity(TourPackage package, double averageRating = 0.0, int reviewCount = 0) => new(
         package.Id,
         package.Name,
         package.Theme,
@@ -27,5 +29,7 @@ public record TourPackageDto(
         package.MaxGroupSize,
         package.PhotoUrl,
         package.PackageTiers.Select(PackageTierDto.FromEntity).ToList(),
-        package.Locations.Select(PackageLocationDto.FromEntity).ToList());
+        package.Locations.Select(PackageLocationDto.FromEntity).ToList(),
+        averageRating,
+        reviewCount);
 }

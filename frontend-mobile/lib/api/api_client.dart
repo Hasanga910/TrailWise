@@ -40,7 +40,13 @@ class ApiClient {
     return 'http://localhost:5080';
   }();
 
+  final http.Client _httpClient;
   String? _token;
+
+  ApiClient({http.Client? httpClient}) : _httpClient = httpClient ?? http.Client();
+
+  String? get token => _token;
+  Map<String, String> get headers => _headers;
 
   void setToken(String? token) {
     _token = token;
@@ -55,7 +61,7 @@ class ApiClient {
     String path,
     Map<String, dynamic> body,
   ) async {
-    final response = await http.post(
+    final response = await _httpClient.post(
       Uri.parse('$baseUrl$path'),
       headers: _headers,
       body: jsonEncode(body),
@@ -64,7 +70,7 @@ class ApiClient {
   }
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) async {
-    final response = await http.patch(
+    final response = await _httpClient.patch(
       Uri.parse('$baseUrl$path'),
       headers: _headers,
       body: jsonEncode(body),
@@ -73,7 +79,33 @@ class ApiClient {
   }
 
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
-    final response = await http.get(_buildUri(path, query), headers: _headers);
+    final response = await _httpClient.get(_buildUri(path, query), headers: _headers);
+    return _decode(response);
+  }
+
+  Future<dynamic> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required List<int> fileBytes,
+    required String filename,
+    String fileFieldName = 'bankSlip',
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final request = http.MultipartRequest('POST', uri);
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+    request.fields.addAll(fields);
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        fileFieldName,
+        fileBytes,
+        filename: filename,
+      ),
+    );
+
+    final streamedResponse = await _httpClient.send(request);
+    final response = await http.Response.fromStream(streamedResponse);
     return _decode(response);
   }
 
@@ -166,5 +198,37 @@ class ApiClient {
               .toString()
         : 'Request failed with status ${response.statusCode}';
     throw ApiException(response.statusCode, message);
+  }
+
+  Future<Map<String, dynamic>> createSupportTicket({
+    required String category,
+    required String subject,
+    required String description,
+    String? bookingId,
+  }) async {
+    return post('/api/support/tickets', {
+      'category': category,
+      'subject': subject,
+      'description': description,
+      'bookingId': ?bookingId,
+    });
+  }
+
+  Future<dynamic> getMySupportTickets({String? status, int page = 1, int pageSize = 10}) async {
+    return get('/api/support/tickets/mine', query: {
+      'status': ?status,
+      'page': page,
+      'pageSize': pageSize,
+    });
+  }
+
+  Future<dynamic> getSupportTicket(String id) async {
+    return get('/api/support/tickets/$id');
+  }
+
+  Future<Map<String, dynamic>> sendSupportMessage(String id, String message) async {
+    return post('/api/support/tickets/$id/messages', {
+      'message': message,
+    });
   }
 }

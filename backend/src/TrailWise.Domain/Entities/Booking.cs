@@ -20,6 +20,9 @@ public class Booking : BaseEntity
     public string? SpecialRequests { get; set; }
     public string? LanguagePreference { get; set; }
     public BookingStatus Status { get; set; } = BookingStatus.Requested;
+    public DateTimeOffset? PaymentDueAt { get; set; }
+    public DateTimeOffset? PaymentExpiredAt { get; set; }
+    public string? CancellationReason { get; set; }
 
     public bool Attended { get; set; } = false;
     public bool Completed { get; set; } = false;

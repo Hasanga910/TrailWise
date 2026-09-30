@@ -31,16 +31,17 @@ public class AuditLogEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
     }
 
     [Fact]
-    public async Task SuccessfulPayment_CreatesExactlyOneAuditLogRow()
+    public async Task SuccessfulBankTransfer_CreatesExactlyOneAuditLogRow()
     {
         var (client, bookingId, travelerId) = await SetupConfirmedBookingWithPricingAsync(totalCost: 500m);
 
-        var response = await client.PostAsJsonAsync("/api/payments", new
-        {
-            BookingId = bookingId,
-            Amount = 150m,
-            Method = "Card"
-        });
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent("250.00"), "amount");
+        var fileContent = new ByteArrayContent(new byte[] { 0xFF, 0xD8, 0xFF, 0x00 });
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        form.Add(fileContent, "bankSlip", "slip.jpg");
+
+        var response = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var payment = await response.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions);
@@ -55,7 +56,7 @@ public class AuditLogEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
 
         Assert.Single(auditLogs);
         var log = auditLogs[0];
-        Assert.Equal("PaymentRecorded", log.Action);
+        Assert.Equal("BankTransferSubmitted", log.Action);
         Assert.Equal(travelerId, log.PerformedBy);
         Assert.True(log.Timestamp > DateTimeOffset.UtcNow.AddMinutes(-5));
 
@@ -63,9 +64,9 @@ public class AuditLogEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
         using var detailsDoc = JsonDocument.Parse(log.Details);
         var root = detailsDoc.RootElement;
         Assert.Equal(bookingId, root.GetProperty("bookingId").GetGuid());
-        Assert.Equal(150m, root.GetProperty("amount").GetDecimal());
-        Assert.Equal("Card", root.GetProperty("method").GetString());
-        Assert.Equal("DepositPaid", root.GetProperty("status").GetString());
+        Assert.Equal(250m, root.GetProperty("amount").GetDecimal());
+        Assert.Equal("BankTransfer", root.GetProperty("method").GetString());
+        Assert.False(string.IsNullOrEmpty(root.GetProperty("bankSlipUrl").GetString()));
 
         // Verify sensitive tokens or passwords are not present
         Assert.False(root.TryGetProperty("token", out _));

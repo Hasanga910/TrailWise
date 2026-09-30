@@ -14,6 +14,10 @@
 *.sln.docstates
 backend/src/TrailWise.Api/wwwroot/uploads/packages/*
 !backend/src/TrailWise.Api/wwwroot/uploads/packages/.gitkeep
+backend/src/TrailWise.Api/wwwroot/uploads/slips/*
+!backend/src/TrailWise.Api/wwwroot/uploads/slips/.gitkeep
+backend/**/private_uploads/**/*
+!backend/**/private_uploads/**/.gitkeep
 
 # Node / React
 **/node_modules/

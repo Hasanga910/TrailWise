@@ -254,6 +254,7 @@ public class BookingsController : ControllerBase
         var query = _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .Where(b => b.TravelerId == travelerId.Value);
 
         if (status.HasValue)
@@ -293,6 +294,7 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
@@ -405,12 +407,14 @@ public class BookingsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/complete")]
+    [HttpPost("{id:guid}/complete")]
     [Authorize(Roles = ManagerRoles)]
     public async Task<ActionResult<BookingDto>> Complete(Guid id, CancellationToken ct)
     {
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.Reviews)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
@@ -418,8 +422,24 @@ public class BookingsController : ControllerBase
             return NotFound();
         }
 
+        if (booking.Status == BookingStatus.Completed)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Booking is already completed.");
+        }
+
         if (!BookingStatusTransitions.CanComplete(booking.Status))
         {
+            // POST is the legacy contract (400 for an invalid transition); PATCH reports a 409 conflict.
+            if (HttpMethods.IsPost(Request.Method))
+            {
+                return BadRequest(new
+                {
+                    message = "Only confirmed bookings can be marked as completed."
+                });
+            }
+
             return Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: $"This booking is {booking.Status} and cannot be marked completed.");
@@ -446,6 +466,16 @@ public class BookingsController : ControllerBase
                 entityId: booking.Id,
                 action: "BookingCompleted",
                 performedBy: performedBy.Value,
+                details: new
+                {
+                    travelerId = booking.TravelerId,
+                    tourPackageId = booking.TourPackageId,
+                    startDate = booking.StartDate.ToString("yyyy-MM-dd"),
+                    endDate = booking.EndDate.ToString("yyyy-MM-dd"),
+                    previousStatus = "Confirmed",
+                    newStatus = "Completed",
+                    completedAt = DateTimeOffset.UtcNow
+                },
                 ct: ct);
 
             if (transaction is not null)

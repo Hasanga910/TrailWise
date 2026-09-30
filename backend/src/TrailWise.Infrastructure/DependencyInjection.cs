@@ -66,6 +66,14 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<IAuditReportService, AuditReportService>();
         services.AddScoped<IOperationsReportService, OperationsReportService>();
+        services.AddScoped<IDiscountService, DiscountService>();
+        services.AddScoped<IBankSlipStorageService, BankSlipStorageService>();
+        services.AddScoped<ISupportService, SupportService>();
+
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<IBookingLifecycleService, BookingLifecycleService>();
+        services.AddSingleton<BookingPaymentExpiryService>();
+        services.AddHostedService(sp => sp.GetRequiredService<BookingPaymentExpiryService>());
 
         return services;
     }

@@ -145,7 +145,50 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors(CorsPolicyName);
 
-Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "uploads", "packages"));
+var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "packages"));
+
+var privateSlipsDir = Path.Combine(app.Environment.ContentRootPath, "private_uploads", "slips");
+Directory.CreateDirectory(privateSlipsDir);
+
+// Legacy migration: Move existing bank slips out of wwwroot into private storage
+var legacySlipsDir = Path.Combine(webRoot, "uploads", "slips");
+if (Directory.Exists(legacySlipsDir))
+{
+    try
+    {
+        foreach (var file in Directory.GetFiles(legacySlipsDir))
+        {
+            var fileName = Path.GetFileName(file);
+            if (fileName.Equals(".gitkeep", StringComparison.OrdinalIgnoreCase)) continue;
+            var destFile = Path.Combine(privateSlipsDir, fileName);
+            if (!File.Exists(destFile))
+            {
+                File.Move(file, destFile);
+            }
+            else
+            {
+                File.Delete(file);
+            }
+        }
+    }
+    catch
+    {
+        // Ignore startup migration errors to prevent startup crash
+    }
+}
+
+// Security Hardening: Ensure bank slips are NEVER served statically
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/uploads/slips", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+    await next();
+});
+
 app.UseStaticFiles();
 
 app.UseAuthentication();

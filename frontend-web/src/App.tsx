@@ -19,8 +19,11 @@ import { OpsBookingsPage } from './pages/ops/OpsBookingsPage';
 import { OpsDashboardPage } from './pages/ops/OpsDashboardPage';
 import { OpsDiscountsPage } from './pages/ops/OpsDiscountsPage';
 import { OpsPackagesPage } from './pages/ops/OpsPackagesPage';
+import { OpsPaymentsPage } from './pages/ops/OpsPaymentsPage';
 import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
 import { OpsReportsPage } from './pages/ops/OpsReportsPage';
+import { OpsSupportPage } from './pages/ops/OpsSupportPage';
+import { OpsTicketDetailPage } from './pages/ops/OpsTicketDetailPage';
 import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
 import { MyBookingsPage } from './pages/traveler/MyBookingsPage';
 import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
@@ -97,7 +100,7 @@ function App() {
       <Route
         path="/ops"
         element={
-          <RequireRole allowedRoles={['OperationsManager']}>
+          <RequireRole allowedRoles={['OperationsManager', 'Admin']}>
             <OpsLayout />
           </RequireRole>
         }
@@ -105,9 +108,12 @@ function App() {
         <Route index element={<OpsDashboardPage />} />
         <Route path="packages" element={<OpsPackagesPage />} />
         <Route path="discounts" element={<OpsDiscountsPage />} />
+        <Route path="payments" element={<OpsPaymentsPage />} />
         <Route path="reports" element={<OpsReportsPage />} />
         <Route path="bookings" element={<OpsBookingsPage />} />
         <Route path="bookings/:bookingId/workflow" element={<AgentWorkflowPage />} />
+        <Route path="support" element={<OpsSupportPage />} />
+        <Route path="support/:ticketId" element={<OpsTicketDetailPage />} />
         <Route path="profile" element={<OpsProfileSettingsPage />} />
       </Route>
 
@@ -137,6 +143,9 @@ function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="packages" element={<PackagesOverviewPage />} />
         <Route path="packages/manage" element={<PackageManagementPage />} />
+        <Route path="payments" element={<OpsPaymentsPage />} />
+        <Route path="support" element={<OpsSupportPage />} />
+        <Route path="support/:ticketId" element={<OpsTicketDetailPage />} />
         <Route path="staff" element={<UserManagementIndexPage />} />
         <Route path="staff/tour-guides" element={<StaffRolePage role="TourGuide" roleLabel="Tour Guide" />} />
         <Route

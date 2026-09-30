@@ -220,6 +220,12 @@ void main() {
           'pageSize': 10,
         },
         '/api/packages': <dynamic>[],
+        '/api/support/tickets/mine': {
+          'items': <dynamic>[],
+          'totalCount': 0,
+          'page': 1,
+          'pageSize': 50,
+        },
       });
       final travelerUser = CurrentUser(
         id: 'traveler-user-1',
