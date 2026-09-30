@@ -42,8 +42,46 @@ public class AuthService : IAuthService
         };
         user.PasswordHash = _passwordHasher.HashPassword(user, password);
 
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync(ct);
+        if (role == UserRole.TourGuide)
+        {
+            var guide = new Guide
+            {
+                UserId = user.Id,
+                Name = user.Name,
+                ContactInfo = user.ContactNumber,
+                Languages = Array.Empty<string>(),
+                Specializations = Array.Empty<string>()
+            };
+
+            await using var transaction = _db.Database.IsRelational()
+                ? await _db.Database.BeginTransactionAsync(ct)
+                : null;
+
+            try
+            {
+                _db.Users.Add(user);
+                _db.Guides.Add(guide);
+                await _db.SaveChangesAsync(ct);
+
+                if (transaction is not null)
+                {
+                    await transaction.CommitAsync(ct);
+                }
+            }
+            catch
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(ct);
+                }
+                throw;
+            }
+        }
+        else
+        {
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync(ct);
+        }
 
         var token = _tokenService.CreateToken(user);
         return AuthResult.Success(user, token);
