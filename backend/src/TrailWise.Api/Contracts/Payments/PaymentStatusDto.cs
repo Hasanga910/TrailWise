@@ -5,4 +5,11 @@ public record PaymentStatusDto(
     decimal TotalCost,
     decimal TotalPaid,
     decimal RemainingAmount,
-    string Status);
+    string Status,
+    bool HasPendingVerification = false,
+    decimal? MinimumAdvance = null,
+    string? LatestRejectedPaymentReason = null,
+    DateTimeOffset? LatestRejectedAt = null,
+    Guid? LatestRejectedPaymentId = null,
+    DateTimeOffset? PaymentDueAt = null,
+    bool IsPaymentDeadlineExpired = false);

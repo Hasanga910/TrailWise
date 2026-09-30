@@ -14,6 +14,7 @@ class Booking {
   final String status;
   final bool isLargeGroup;
   final VehicleAssignment? vehicleAssignment;
+  final bool hasReview;
 
   Booking({
     required this.id,
@@ -28,6 +29,7 @@ class Booking {
     required this.status,
     required this.isLargeGroup,
     this.vehicleAssignment,
+    this.hasReview = false,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -45,5 +47,6 @@ class Booking {
         vehicleAssignment: json['vehicleAssignment'] != null
             ? VehicleAssignment.fromJson(json['vehicleAssignment'] as Map<String, dynamic>)
             : null,
+        hasReview: (json['hasReview'] ?? json['HasReview'] ?? false) as bool,
       );
 }

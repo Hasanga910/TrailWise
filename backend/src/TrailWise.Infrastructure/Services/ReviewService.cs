@@ -127,6 +127,7 @@ public class ReviewService : IReviewService
             .AsNoTracking()
             .Where(r => r.Booking.TourPackageId == packageId)
             .OrderByDescending(r => r.SubmittedAt)
+            .ThenByDescending(r => r.Id)
             .ToListAsync(ct);
 
         var totalReviews = reviews.Count;

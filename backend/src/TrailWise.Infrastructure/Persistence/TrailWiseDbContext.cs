@@ -27,6 +27,8 @@ public class TrailWiseDbContext : DbContext
     public DbSet<AgentWorkflowRun> AgentWorkflowRuns => Set<AgentWorkflowRun>();
     public DbSet<AgentStepLog> AgentStepLogs => Set<AgentStepLog>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
+    public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

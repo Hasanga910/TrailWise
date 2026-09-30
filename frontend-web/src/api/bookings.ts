@@ -32,6 +32,7 @@ export interface BookingDto {
   specialRequests?: string | null;
   status: BookingStatus;
   isLargeGroup: boolean;
+  hasReview?: boolean;
 }
 
 export interface PagedResult<T> {

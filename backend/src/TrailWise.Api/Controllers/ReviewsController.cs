@@ -67,7 +67,7 @@ public class ReviewsController : ControllerBase
             };
         }
 
-        var reviewDtos = result.Reviews.Select(ReviewDto.FromEntity).ToList();
+        var reviewDtos = result.Reviews.Select(PublicReviewDto.FromEntity).ToList();
 
         return Ok(new PackageReviewsDto(
             result.TourPackageId,

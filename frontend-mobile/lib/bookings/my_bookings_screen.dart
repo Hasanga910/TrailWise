@@ -10,6 +10,7 @@ import 'booking_status.dart';
 import 'itinerary_screen.dart';
 import 'payment_status_screen.dart';
 import 'review_screen.dart';
+import '../support/create_support_ticket_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key, this.apiClient, this.currentUser});
@@ -153,12 +154,26 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     );
   }
 
-  void _openReview(Booking booking) {
-    Navigator.of(context).push(
+  Future<void> _openReview(Booking booking) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ReviewScreen(
           booking: booking,
           apiClient: _apiClient,
+        ),
+      ),
+    );
+    if (mounted) {
+      _load();
+    }
+  }
+
+  Future<void> _openSupport(Booking booking) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateSupportTicketScreen(
+          apiClient: _apiClient,
+          preselectedBookingId: booking.id,
         ),
       ),
     );
@@ -355,6 +370,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               onReviewTap: () => _openReview(result.items[i]),
               onCancelTap:
                   _isCancellable(result.items[i]) ? () => _cancelBooking(result.items[i]) : null,
+              onSupportTap: () => _openSupport(result.items[i]),
             ),
           ),
         ),
@@ -397,6 +413,7 @@ class _BookingCard extends StatelessWidget {
     this.onPaymentTap,
     this.onReviewTap,
     this.onCancelTap,
+    this.onSupportTap,
   });
 
   final Booking booking;
@@ -404,6 +421,7 @@ class _BookingCard extends StatelessWidget {
   final VoidCallback? onPaymentTap;
   final VoidCallback? onReviewTap;
   final VoidCallback? onCancelTap;
+  final VoidCallback? onSupportTap;
 
   @override
   Widget build(BuildContext context) {
@@ -442,36 +460,52 @@ class _BookingCard extends StatelessWidget {
                 ],
               ),
             ),
-            if ((isConfirmed && onPaymentTap != null) ||
-                (isCompleted && onReviewTap != null) ||
-                onCancelTap != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 8,
-                  children: [
-                    if (isConfirmed && onPaymentTap != null)
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.payment, size: 16),
-                        label: const Text('Payment'),
-                        onPressed: onPaymentTap,
-                      )
-                    else if (isCompleted && onReviewTap != null)
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.rate_review_outlined, size: 16),
-                        label: const Text('Review'),
-                        onPressed: onReviewTap,
-                      ),
-                    if (onCancelTap != null)
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.cancel_outlined, size: 16),
-                        label: const Text('Cancel Booking'),
-                        onPressed: onCancelTap,
-                      ),
-                  ],
-                ),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+              child: Row(
+                children: [
+                  if (onSupportTap != null)
+                    TextButton.icon(
+                      icon: const Icon(Icons.help_outline, size: 16),
+                      label: const Text('Get Support'),
+                      onPressed: onSupportTap,
+                    ),
+                  const Spacer(),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    children: [
+                      if (isConfirmed && onPaymentTap != null)
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.payment, size: 16),
+                          label: const Text('Payment'),
+                          onPressed: onPaymentTap,
+                        )
+                      else if (isCompleted) ...[
+                        if (booking.hasReview)
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.check_circle_outline, size: 16),
+                            label: const Text('Reviewed'),
+                            onPressed: null,
+                          )
+                        else if (onReviewTap != null)
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.rate_review_outlined, size: 16),
+                            label: const Text('Review'),
+                            onPressed: onReviewTap,
+                          ),
+                      ],
+                      if (onCancelTap != null)
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.cancel_outlined, size: 16),
+                          label: const Text('Cancel Booking'),
+                          onPressed: onCancelTap,
+                        ),
+                    ],
+                  ),
+                ],
               ),
+            ),
           ],
         ),
       ),

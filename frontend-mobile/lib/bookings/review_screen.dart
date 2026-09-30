@@ -177,7 +177,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   ),
                 )
               // Success State Banner
-              else if (_submitted)
+              else if (_submitted || widget.booking.hasReview)
                 Card(
                   color: Colors.green.shade50,
                   child: const Padding(
