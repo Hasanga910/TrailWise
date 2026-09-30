@@ -1,0 +1,1 @@
+SELECT Id, Name, Role, Email FROM public." Users;

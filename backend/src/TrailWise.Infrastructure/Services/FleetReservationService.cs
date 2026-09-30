@@ -149,11 +149,11 @@ public class FleetReservationService : IFleetReservationService
 
             _db.VehicleAssignments.Add(assignment);
 
-            // If the booking was pending approval or required manual intervention, manual vehicle allocation resolves it!
-            if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval)
+            // If the booking was pending approval, plan proposed, or required manual intervention, manual vehicle allocation resolves it!
+            if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval || booking.Status == BookingStatus.PlanProposed)
             {
                 booking.Status = BookingStatus.Confirmed;
-                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator manual allocation.", bookingId);
+                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator vehicle allocation.", bookingId);
             }
 
             await _db.SaveChangesAsync(ct);

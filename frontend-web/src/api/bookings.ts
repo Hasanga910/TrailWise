@@ -43,7 +43,7 @@ export interface PagedResult<T> {
 }
 
 export interface GetMyBookingsParams {
-  status?: BookingStatus;
+  status?: BookingStatus | 'Pending';
   from?: string;
   to?: string;
   page?: number;

@@ -8,6 +8,7 @@ class BookingStatus {
   static const completed = 'Completed';
   static const cancelled = 'Cancelled';
   static const needsManualReview = 'NeedsManualReview';
+  static const pending = 'Pending';
 
   static const List<String> all = [
     requested,
@@ -17,6 +18,13 @@ class BookingStatus {
     completed,
     cancelled,
     needsManualReview,
+  ];
+
+  static const List<String> filterOptions = [
+    cancelled,
+    completed,
+    confirmed,
+    pending,
   ];
 
   static Color color(String status) {

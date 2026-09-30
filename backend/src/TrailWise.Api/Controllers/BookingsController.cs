@@ -32,6 +32,8 @@ public class BookingsController : ControllerBase
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IItineraryService _itineraryService;
     private readonly IAuditLogService _auditLogService;
+    private readonly IFleetReservationService _fleetReservationService;
+    private readonly IFleetCapacityAgent _fleetAgent;
     private readonly IGuideAssignmentService _guideAssignmentService;
     private readonly IGuideAvailabilityService _guideAvailabilityService;
     private readonly ILogger<BookingsController> _logger;
@@ -41,6 +43,8 @@ public class BookingsController : ControllerBase
         IServiceScopeFactory scopeFactory,
         IItineraryService itineraryService,
         IAuditLogService auditLogService,
+        IFleetReservationService fleetReservationService,
+        IFleetCapacityAgent fleetAgent,
         IGuideAssignmentService guideAssignmentService,
         IGuideAvailabilityService guideAvailabilityService,
         ILogger<BookingsController> logger)
@@ -49,6 +53,8 @@ public class BookingsController : ControllerBase
         _scopeFactory = scopeFactory;
         _itineraryService = itineraryService;
         _auditLogService = auditLogService;
+        _fleetReservationService = fleetReservationService;
+        _fleetAgent = fleetAgent;
         _guideAssignmentService = guideAssignmentService;
         _guideAvailabilityService = guideAvailabilityService;
         _logger = logger;
@@ -227,7 +233,7 @@ public class BookingsController : ControllerBase
 
     [HttpGet("mine")]
     public async Task<ActionResult<PagedResult<BookingDto>>> GetMine(
-        BookingStatus? status,
+        string? status,
         DateOnly? from,
         DateOnly? to,
         int page = 1,
@@ -257,9 +263,30 @@ public class BookingsController : ControllerBase
             .Include(b => b.Reviews)
             .Where(b => b.TravelerId == travelerId.Value);
 
-        if (status.HasValue)
+        if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(b => b.Status == status.Value);
+            if (string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase))
+            {
+                var pendingStatuses = new[]
+                {
+                    BookingStatus.Requested,
+                    BookingStatus.PlanProposed,
+                    BookingStatus.PendingApproval,
+                    BookingStatus.NeedsManualReview
+                };
+                query = query.Where(b => pendingStatuses.Contains(b.Status));
+            }
+            else if (Enum.TryParse<BookingStatus>(status, true, out var parsedStatus))
+            {
+                query = query.Where(b => b.Status == parsedStatus);
+            }
+            else
+            {
+                return BadRequest(new
+                {
+                    errors = new[] { new FieldValidationError("status", $"'{status}' is not a valid booking status.") }
+                });
+            }
         }
 
         if (from.HasValue)
@@ -377,6 +404,84 @@ public class BookingsController : ControllerBase
                         AgentJsonOptions.Default),
                     DurationMs = 0,
                 });
+            }
+
+            // Option 1: Auto-assign AI-matched vehicle and driver on approval if not already assigned
+            if (request.Decision == BookingDecision.Approve)
+            {
+                var alreadyAssigned = await _db.VehicleAssignments.AnyAsync(a => a.BookingId == booking.Id, ct);
+                if (!alreadyAssigned)
+                {
+                    Guid vehicleId = Guid.Empty;
+                    Guid driverId = Guid.Empty;
+
+                    if (run is not null)
+                    {
+                        var vehicleStepLog = await _db.AgentStepLogs
+                            .Where(s => s.WorkflowRunId == run.Id && s.AgentName == "FleetCapacityAgent")
+                            .OrderByDescending(s => s.CreatedAt)
+                            .FirstOrDefaultAsync(ct);
+
+                        if (vehicleStepLog != null && !string.IsNullOrWhiteSpace(vehicleStepLog.OutputJson))
+                        {
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(vehicleStepLog.OutputJson);
+                                if (doc.RootElement.TryGetProperty("vehicleId", out var vProp) && vProp.TryGetGuid(out var vGuid))
+                                    vehicleId = vGuid;
+                                if (doc.RootElement.TryGetProperty("driverId", out var dProp) && dProp.TryGetGuid(out var dGuid))
+                                    driverId = dGuid;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to parse vehicleStepLog OutputJson for booking {BookingId}", booking.Id);
+                            }
+                        }
+                    }
+
+                    // Check if proposed vehicle and driver are still available
+                    bool isVehAvail = vehicleId != Guid.Empty && await _fleetReservationService.IsVehicleAvailableAsync(vehicleId, booking.StartDate, booking.EndDate, ct);
+                    bool isDrvAvail = driverId != Guid.Empty && await _fleetReservationService.IsDriverAvailableAsync(driverId, booking.StartDate, booking.EndDate, ct);
+
+                    // If neither was proposed or if either has been taken by an earlier approval, dynamically re-match against the currently available fleet
+                    if (!isVehAvail || !isDrvAvail)
+                    {
+                        if (vehicleId != Guid.Empty || driverId != Guid.Empty)
+                        {
+                            _logger.LogInformation("Originally proposed vehicle {VehicleId} or driver {DriverId} is no longer available for booking {BookingId}. Performing dynamic real-time re-match.",
+                                vehicleId, driverId, booking.Id);
+                        }
+
+                        var rematch = await _fleetAgent.MatchAsync(booking.Id, ct);
+                        if (!rematch.ConflictCheck && rematch.VehicleId != Guid.Empty && rematch.DriverId != Guid.Empty)
+                        {
+                            vehicleId = rematch.VehicleId;
+                            driverId = rematch.DriverId;
+                            isVehAvail = await _fleetReservationService.IsVehicleAvailableAsync(vehicleId, booking.StartDate, booking.EndDate, ct);
+                            isDrvAvail = await _fleetReservationService.IsDriverAvailableAsync(driverId, booking.StartDate, booking.EndDate, ct);
+                        }
+                    }
+
+                    if (isVehAvail && isDrvAvail)
+                    {
+                        var newAssignment = new VehicleAssignment
+                        {
+                            VehicleId = vehicleId,
+                            DriverId = driverId,
+                            BookingId = booking.Id,
+                            StartDate = booking.StartDate,
+                            EndDate = booking.EndDate
+                        };
+                        _db.VehicleAssignments.Add(newAssignment);
+                        _logger.LogInformation("Auto-assigned vehicle {VehicleId} and driver {DriverId} to approved booking {BookingId}",
+                            vehicleId, driverId, booking.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No suitable available vehicle or driver could be assigned to booking {BookingId} upon approval",
+                            booking.Id);
+                    }
+                }
             }
 
             await _db.SaveChangesAsync(ct);
