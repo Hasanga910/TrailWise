@@ -3,9 +3,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Guides;
+using TrailWise.Infrastructure.Persistence;
 using Xunit;
 
 namespace TrailWise.Api.Tests;
@@ -289,6 +291,17 @@ public class GuideAvailabilityEndpointsTests : IClassFixture<TrailWiseWebApplica
         });
         createResponse.EnsureSuccessStatusCode();
         var user = await createResponse.Content.ReadFromJsonAsync<UserDto>(JsonOptions);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var autoGuide = await db.Guides.FirstOrDefaultAsync(g => g.UserId == user!.Id);
+            if (autoGuide != null)
+            {
+                db.Guides.Remove(autoGuide);
+                await db.SaveChangesAsync();
+            }
+        }
 
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
         {

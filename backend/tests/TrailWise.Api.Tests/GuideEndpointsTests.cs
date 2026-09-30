@@ -3,8 +3,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Guides;
+using TrailWise.Infrastructure.Persistence;
 using Xunit;
 
 namespace TrailWise.Api.Tests;
@@ -464,7 +467,7 @@ public class GuideEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         return client;
     }
 
-    private static async Task<Guid> CreateTourGuideUserAsync(HttpClient adminClient)
+    private async Task<Guid> CreateTourGuideUserAsync(HttpClient adminClient)
     {
         var email = $"tourguide-{Guid.NewGuid():N}@example.com";
         var response = await adminClient.PostAsJsonAsync("/api/auth/admin/users", new
@@ -477,6 +480,18 @@ public class GuideEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         });
         response.EnsureSuccessStatusCode();
         var user = await response.Content.ReadFromJsonAsync<UserDto>(JsonOptions);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var autoGuide = await db.Guides.FirstOrDefaultAsync(g => g.UserId == user!.Id);
+            if (autoGuide != null)
+            {
+                db.Guides.Remove(autoGuide);
+                await db.SaveChangesAsync();
+            }
+        }
+
         return user!.Id;
     }
 

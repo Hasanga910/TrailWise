@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Guides;
@@ -208,9 +209,20 @@ public class AssignedToursEndpointsTests : IClassFixture<TrailWiseWebApplication
     public async Task TourGuideWithNoLinkedGuideProfile_ReturnsNotFound()
     {
         var admin = await AdminClientAsync();
-        var (guideClient, _) = await TourGuideClientAsync(admin);
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
 
-        // TourGuide user exists, but no Guide profile is created with UserId = guideUserId
+        // Remove the auto-created Guide profile to simulate an unlinked / legacy TourGuide user
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var guide = await db.Guides.FirstOrDefaultAsync(g => g.UserId == guideUserId);
+            if (guide != null)
+            {
+                db.Guides.Remove(guide);
+                await db.SaveChangesAsync();
+            }
+        }
+
         var response = await guideClient.GetAsync("/api/guides/me/assigned-tours");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -354,6 +366,21 @@ public class AssignedToursEndpointsTests : IClassFixture<TrailWiseWebApplication
 
     private async Task<GuideDto> CreateGuideAsync(HttpClient adminClient, Guid userId, string name)
     {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var existing = await db.Guides.FirstOrDefaultAsync(g => g.UserId == userId);
+            if (existing != null)
+            {
+                existing.Name = name;
+                existing.Languages = new[] { "English" };
+                existing.Specializations = new[] { "Wildlife" };
+                existing.ContactInfo = "+94770000000";
+                await db.SaveChangesAsync();
+                return GuideDto.FromEntity(existing);
+            }
+        }
+
         var createResponse = await adminClient.PostAsJsonAsync("/api/guides", new CreateGuideRequest
         {
             Name = name,
