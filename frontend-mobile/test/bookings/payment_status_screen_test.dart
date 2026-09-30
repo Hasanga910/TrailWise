@@ -446,6 +446,7 @@ void main() {
     expect(find.text('may_transfer_receipt.pdf'), findsOneWidget);
     expect(find.text('PDF Document · 2.00 MB'), findsOneWidget);
     expect(find.text('Change File'), findsOneWidget);
+    expect(find.text('Remove'), findsOneWidget);
   });
 
   testWidgets('10. Multipart submission calls correct endpoint', (tester) async {
@@ -1452,5 +1453,300 @@ void main() {
 
     // Safe unmount without pending timer exceptions
     expect(find.byKey(const Key('advance_payment_deadline_card')), findsNothing);
+  });
+
+  testWidgets('40. Tapping Remove clears selected file, returns original picker UI, and preserves payment amount', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'minimumAdvance': 400.0,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(),
+        apiClient: client,
+        slipPicker: () async => _dummySlip(
+          name: 'first_slip.png',
+          size: 1024 * 191,
+          extension: 'png',
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Change amount field to a custom value
+    final amountField = find.byType(TextFormField);
+    await tester.enterText(amountField, '450.00');
+    await tester.pumpAndSettle();
+
+    // Select slip
+    final pickBtn = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('first_slip.png'), findsOneWidget);
+    expect(find.text('Change File'), findsOneWidget);
+    expect(find.text('Remove'), findsOneWidget);
+
+    // Tap Remove
+    final removeBtn = find.text('Remove');
+    await tester.ensureVisible(removeBtn);
+    await tester.tap(removeBtn);
+    await tester.pumpAndSettle();
+
+    // Selected file should be cleared, original picker restored
+    expect(find.text('first_slip.png'), findsNothing);
+    expect(find.text('Remove'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Choose Bank Slip'), findsOneWidget);
+
+    // Payment amount remains unchanged
+    expect(find.text('450.00'), findsOneWidget);
+  });
+
+  testWidgets('41. Submitting payment after Remove is blocked without making API calls', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'minimumAdvance': 400.0,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(),
+        apiClient: client,
+        slipPicker: () async => _dummySlip(name: 'first_slip.png'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Select slip
+    final pickBtn = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+
+    // Tap Remove
+    final removeBtn = find.text('Remove');
+    await tester.ensureVisible(removeBtn);
+    await tester.tap(removeBtn);
+    await tester.pumpAndSettle();
+
+    // Attempt submission
+    final submitBtn = find.widgetWithText(FilledButton, 'Submit Payment');
+    await tester.ensureVisible(submitBtn);
+    await tester.tap(submitBtn);
+    await tester.pumpAndSettle();
+
+    // Blocked with error, no API call
+    expect(find.text('Please select a bank slip.'), findsOneWidget);
+    expect(client.postMultipartCallCount, 0);
+  });
+
+  testWidgets('42. Selecting another file after Remove works and submits new file', (tester) async {
+    setTestViewport(tester);
+    var slipCount = 0;
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'minimumAdvance': 400.0,
+        },
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Pending',
+          'hasPendingVerification': true,
+        },
+      ],
+      postMultipartResponse: {
+        'id': 'payment-new',
+        'status': 'Pending',
+      },
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(),
+        apiClient: client,
+        slipPicker: () async {
+          slipCount++;
+          if (slipCount == 1) {
+            return _dummySlip(name: 'wrong_slip.png');
+          } else {
+            return _dummySlip(name: 'correct_slip.pdf', extension: 'pdf');
+          }
+        },
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Select first slip
+    final pickBtn = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('wrong_slip.png'), findsOneWidget);
+
+    // Remove first slip
+    final removeBtn = find.text('Remove');
+    await tester.ensureVisible(removeBtn);
+    await tester.tap(removeBtn);
+    await tester.pumpAndSettle();
+
+    // Select second slip
+    final pickBtn2 = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn2);
+    await tester.tap(pickBtn2);
+    await tester.pumpAndSettle();
+    expect(find.text('correct_slip.pdf'), findsOneWidget);
+
+    // Submit payment
+    final submitBtn = find.widgetWithText(FilledButton, 'Submit Payment');
+    await tester.ensureVisible(submitBtn);
+    await tester.tap(submitBtn);
+    await tester.pumpAndSettle();
+
+    expect(client.postMultipartCallCount, 1);
+    expect(client.recordedMultipartCalls.first.filename, 'correct_slip.pdf');
+  });
+
+  testWidgets('43. Change File preserves ability to replace selected slip and submit', (tester) async {
+    setTestViewport(tester);
+    var slipCount = 0;
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'minimumAdvance': 400.0,
+        },
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Pending',
+          'hasPendingVerification': true,
+        },
+      ],
+      postMultipartResponse: {
+        'id': 'payment-change',
+        'status': 'Pending',
+      },
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(),
+        apiClient: client,
+        slipPicker: () async {
+          slipCount++;
+          if (slipCount == 1) {
+            return _dummySlip(name: 'initial_slip.jpg', extension: 'jpg');
+          } else {
+            return _dummySlip(name: 'replacement_slip.pdf', extension: 'pdf');
+          }
+        },
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Pick initial slip
+    final pickBtn = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('initial_slip.jpg'), findsOneWidget);
+
+    // Tap Change File
+    final changeBtn = find.text('Change File');
+    await tester.ensureVisible(changeBtn);
+    await tester.tap(changeBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('replacement_slip.pdf'), findsOneWidget);
+
+    // Submit
+    final submitBtn = find.widgetWithText(FilledButton, 'Submit Payment');
+    await tester.ensureVisible(submitBtn);
+    await tester.tap(submitBtn);
+    await tester.pumpAndSettle();
+
+    expect(client.postMultipartCallCount, 1);
+    expect(client.recordedMultipartCalls.first.filename, 'replacement_slip.pdf');
+  });
+
+  testWidgets('44. Selected bank slip UI renders without overflow on narrow viewports', (tester) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'minimumAdvance': 400.0,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(),
+        apiClient: client,
+        slipPicker: () async => _dummySlip(
+          name: 'very_long_bank_transfer_deposit_slip_reference_2026_final.png',
+          size: 1024 * 1024 * 3,
+          extension: 'png',
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Select file
+    final pickBtn = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('very_long_bank_transfer_deposit_slip_reference_2026_final.png'), findsOneWidget);
+    expect(find.text('Change File'), findsOneWidget);
+    expect(find.text('Remove'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

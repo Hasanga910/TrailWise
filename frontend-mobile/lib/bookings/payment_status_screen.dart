@@ -223,6 +223,13 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
     }
   }
 
+  void _removeSlip() {
+    setState(() {
+      _selectedSlip = null;
+      _slipError = null;
+    });
+  }
+
   Future<void> _submitPayment() async {
     if (_paymentStatus == null) return;
 
@@ -586,9 +593,11 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         children: [
                           Icon(Icons.account_balance, color: Colors.teal.shade700, size: 20),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Bank Transfer Details',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          const Expanded(
+                            child: Text(
+                              'Bank Transfer Details',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),
@@ -763,12 +772,14 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                   size: 22,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'Advance payment deadline',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                Expanded(
+                                  child: Text(
+                                    'Advance payment deadline',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1026,31 +1037,52 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               borderRadius: BorderRadius.circular(8),
                               color: Colors.teal.shade50.withValues(alpha: 0.3),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.receipt_long, color: Colors.teal),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _selectedSlip!.name,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                        overflow: TextOverflow.ellipsis,
+                                Row(
+                                  children: [
+                                    const Icon(Icons.receipt_long, color: Colors.teal),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _selectedSlip!.name,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${_selectedSlip!.fileTypeDisplay} · ${_selectedSlip!.formattedSize}',
+                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${_selectedSlip!.fileTypeDisplay} · ${_selectedSlip!.formattedSize}',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
-                                TextButton.icon(
-                                  onPressed: _pickSlip,
-                                  icon: const Icon(Icons.edit, size: 16),
-                                  label: const Text('Change File'),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: _pickSlip,
+                                      icon: const Icon(Icons.edit, size: 16),
+                                      label: const Text('Change File'),
+                                    ),
+                                    TextButton.icon(
+                                      key: const Key('remove_bank_slip_button'),
+                                      onPressed: _removeSlip,
+                                      icon: const Icon(Icons.delete_outline, size: 16),
+                                      label: const Text('Remove'),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.red.shade700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1105,11 +1137,16 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   Widget _buildBankDetailRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-        SelectableText(
-          value,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
         ),
       ],
     );
