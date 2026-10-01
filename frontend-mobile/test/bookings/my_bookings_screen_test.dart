@@ -142,4 +142,45 @@ void main() {
     expect(find.textContaining('Personal bookings are only available to Travelers'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Go Back'), findsOneWidget);
   });
+
+  testWidgets('MyBookingsScreen renders assigned tour guide name on booking card', (tester) async {
+    final bookingData = _bookingJson(status: 'Confirmed');
+    bookingData['assignedGuide'] = {
+      'id': 'guide-1',
+      'name': 'Janindu',
+      'contactInfo': '0775645000',
+      'languages': ['Sinhala', 'English'],
+      'specializations': ['Cultural'],
+    };
+
+    final fake = FakeApiClient(getResponses: {
+      '/api/bookings/mine': {
+        'items': [bookingData],
+        'totalCount': 1,
+        'page': 1,
+        'pageSize': 10,
+      },
+    });
+
+    await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tour Guide: Janindu'), findsOneWidget);
+  });
+
+  testWidgets('MyBookingsScreen renders Tour Guide not assigned yet when guide is null', (tester) async {
+    final fake = FakeApiClient(getResponses: {
+      '/api/bookings/mine': {
+        'items': [_bookingJson(status: 'Requested')],
+        'totalCount': 1,
+        'page': 1,
+        'pageSize': 10,
+      },
+    });
+
+    await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tour Guide not assigned yet'), findsOneWidget);
+  });
 }

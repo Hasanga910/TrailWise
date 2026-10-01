@@ -17,24 +17,40 @@ public record BookingDto(
     string? SpecialRequests,
     BookingStatus Status,
     bool IsLargeGroup,
-    string? LanguagePreference = null)
+    string? LanguagePreference = null,
+    AssignedGuideDto? AssignedGuide = null)
 {
     // Duplicated by value in TrailWise.Infrastructure.Agents.BookingApprovalEvaluator.LargeGroupThreshold
     // since Infrastructure cannot reference this (Api) project. Keep both in sync if this ever changes.
     public const int LargeGroupThreshold = 10;
 
-    public static BookingDto FromEntity(Booking booking) => new(
-        booking.Id,
-        booking.TravelerId,
-        booking.TourPackageId,
-        booking.TourPackage.Name,
-        PackageTierDto.FromEntity(booking.PackageTier),
-        booking.GroupSize,
-        booking.StartDate,
-        booking.EndDate,
-        booking.BudgetPerPerson,
-        booking.SpecialRequests,
-        booking.Status,
-        booking.GroupSize > LargeGroupThreshold,
-        booking.LanguagePreference);
+    public static BookingDto FromEntity(Booking booking)
+    {
+        var guide = booking.GuideAvailabilities
+            ?.Select(ga => ga.Guide)
+            .FirstOrDefault(g => g != null);
+
+        return new(
+            booking.Id,
+            booking.TravelerId,
+            booking.TourPackageId,
+            booking.TourPackage.Name,
+            PackageTierDto.FromEntity(booking.PackageTier),
+            booking.GroupSize,
+            booking.StartDate,
+            booking.EndDate,
+            booking.BudgetPerPerson,
+            booking.SpecialRequests,
+            booking.Status,
+            booking.GroupSize > LargeGroupThreshold,
+            booking.LanguagePreference,
+            guide != null
+                ? new AssignedGuideDto(
+                    guide.Id,
+                    guide.Name,
+                    guide.ContactInfo,
+                    guide.Languages,
+                    guide.Specializations)
+                : null);
+    }
 }

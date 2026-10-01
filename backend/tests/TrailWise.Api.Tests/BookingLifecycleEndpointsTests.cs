@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Bookings;
+using TrailWise.Api.Contracts.Common;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;
@@ -198,6 +199,135 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetById_WithAssignedGuide_ReturnsAssignedGuideDetails()
+    {
+        var (travelerClient, bookingId, _) = await SetupBookingAsync(BookingStatus.Confirmed);
+        var expectedGuideId = Guid.NewGuid();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            var guide = new Guide
+            {
+                Id = expectedGuideId,
+                Name = "Janindu Perera",
+                Specializations = new[] { "Cultural", "Wildlife" },
+                Languages = new[] { "Sinhala", "English" },
+                ContactInfo = "0771234567"
+            };
+            db.Guides.Add(guide);
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                GuideId = expectedGuideId,
+                Date = booking!.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = bookingId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await travelerClient.GetAsync($"/api/bookings/{bookingId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bookingDto = await response.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+        Assert.NotNull(bookingDto);
+        Assert.NotNull(bookingDto.AssignedGuide);
+        Assert.Equal(expectedGuideId, bookingDto.AssignedGuide.Id);
+        Assert.Equal("Janindu Perera", bookingDto.AssignedGuide.Name);
+        Assert.Equal("0771234567", bookingDto.AssignedGuide.ContactInfo);
+        Assert.Equal(new[] { "Sinhala", "English" }, bookingDto.AssignedGuide.Languages);
+        Assert.Equal(new[] { "Cultural", "Wildlife" }, bookingDto.AssignedGuide.Specializations);
+    }
+
+    [Fact]
+    public async Task GetById_WithoutAssignedGuide_ReturnsAssignedGuideNull()
+    {
+        var (travelerClient, bookingId, _) = await SetupBookingAsync(BookingStatus.Requested);
+
+        var response = await travelerClient.GetAsync($"/api/bookings/{bookingId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bookingDto = await response.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+        Assert.NotNull(bookingDto);
+        Assert.Null(bookingDto.AssignedGuide);
+    }
+
+    [Fact]
+    public async Task GetById_OtherTravelerBooking_CannotAccessGuideDetails()
+    {
+        var (_, bookingId, _) = await SetupBookingAsync(BookingStatus.Confirmed);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            var guide = new Guide
+            {
+                Name = "Private Guide",
+                Specializations = new[] { "Historical" },
+                Languages = new[] { "English" },
+                ContactInfo = "0779998888"
+            };
+            db.Guides.Add(guide);
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                Guide = guide,
+                Date = booking!.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = bookingId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var otherTravelerClient = await AuthenticatedTravelerAsync();
+        var response = await otherTravelerClient.GetAsync($"/api/bookings/{bookingId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMine_IncludesAssignedGuideDetailsForTraveler()
+    {
+        var (travelerClient, bookingId, _) = await SetupBookingAsync(BookingStatus.Confirmed);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            var guide = new Guide
+            {
+                Name = "Tour Guide Kasun",
+                Specializations = new[] { "Adventure" },
+                Languages = new[] { "German", "English" },
+                ContactInfo = "+94770001122"
+            };
+            db.Guides.Add(guide);
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                Guide = guide,
+                Date = booking!.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = bookingId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await travelerClient.GetAsync("/api/bookings/mine");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var paged = await response.Content.ReadFromJsonAsync<PagedResult<BookingDto>>(JsonOptions);
+        Assert.NotNull(paged);
+        var found = paged.Items.FirstOrDefault(b => b.Id == bookingId);
+        Assert.NotNull(found);
+        Assert.NotNull(found.AssignedGuide);
+        Assert.Equal("Tour Guide Kasun", found.AssignedGuide.Name);
+        Assert.Equal("+94770001122", found.AssignedGuide.ContactInfo);
+        Assert.Equal(new[] { "German", "English" }, found.AssignedGuide.Languages);
+        Assert.Equal(new[] { "Adventure" }, found.AssignedGuide.Specializations);
     }
 
     [Fact]

@@ -193,6 +193,8 @@ public class BookingsController : ControllerBase
         var query = _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .AsNoTracking();
 
         if (status.HasValue)
@@ -254,6 +256,8 @@ public class BookingsController : ControllerBase
         var query = _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .Where(b => b.TravelerId == travelerId.Value);
 
         if (status.HasValue)
@@ -293,6 +297,8 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
@@ -320,6 +326,8 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
@@ -425,6 +433,8 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
@@ -485,6 +495,8 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)

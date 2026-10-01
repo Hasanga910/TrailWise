@@ -19,6 +19,14 @@ export interface CreateBookingInput {
   specialRequests?: string;
 }
 
+export interface AssignedGuideDto {
+  id: string;
+  name: string;
+  contactInfo?: string | null;
+  languages: string[];
+  specializations: string[];
+}
+
 export interface BookingDto {
   id: string;
   travelerId: string;
@@ -32,6 +40,8 @@ export interface BookingDto {
   specialRequests?: string | null;
   status: BookingStatus;
   isLargeGroup: boolean;
+  languagePreference?: string | null;
+  assignedGuide?: AssignedGuideDto | null;
 }
 
 export interface PagedResult<T> {
