@@ -60,3 +60,112 @@ export async function updateGuideAvailability(
   const response = await apiClient.put<GuideAvailabilityDto[]>(`/api/guides/${guideId}/availability`, request);
   return response.data;
 }
+
+export const AVAILABLE_LANGUAGES = [
+  'Afrikaans',
+  'Albanian',
+  'Amharic',
+  'Arabic',
+  'Armenian',
+  'Azerbaijani',
+  'Basque',
+  'Bengali',
+  'Bosnian',
+  'Bulgarian',
+  'Burmese',
+  'Catalan',
+  'Chinese',
+  'Croatian',
+  'Czech',
+  'Danish',
+  'Dutch',
+  'English',
+  'Estonian',
+  'Filipino',
+  'Finnish',
+  'French',
+  'Georgian',
+  'German',
+  'Greek',
+  'Gujarati',
+  'Hebrew',
+  'Hindi',
+  'Hungarian',
+  'Icelandic',
+  'Indonesian',
+  'Irish',
+  'Italian',
+  'Japanese',
+  'Kannada',
+  'Kazakh',
+  'Khmer',
+  'Korean',
+  'Lao',
+  'Latvian',
+  'Lithuanian',
+  'Malay',
+  'Malayalam',
+  'Marathi',
+  'Mongolian',
+  'Nepali',
+  'Norwegian',
+  'Persian',
+  'Polish',
+  'Portuguese',
+  'Punjabi',
+  'Romanian',
+  'Russian',
+  'Serbian',
+  'Sinhala',
+  'Slovak',
+  'Slovenian',
+  'Spanish',
+  'Swahili',
+  'Swedish',
+  'Tamil',
+  'Telugu',
+  'Thai',
+  'Turkish',
+  'Ukrainian',
+  'Urdu',
+  'Uzbek',
+  'Vietnamese',
+  'Welsh',
+] as const;
+
+export type AvailableLanguage = (typeof AVAILABLE_LANGUAGES)[number];
+
+export interface GuideProfileDto {
+  id: string;
+  userId: string | null;
+  name: string;
+  email: string;
+  contactInfo: string;
+  languages: string[];
+  specializations: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateGuideProfileInput {
+  name: string;
+  email: string;
+  contactInfo?: string;
+  languages?: string[];
+  specializations?: string[];
+}
+
+export async function getMyGuideProfile(): Promise<GuideProfileDto> {
+  const response = await apiClient.get<GuideProfileDto>('/api/guides/me');
+  return response.data;
+}
+
+export async function updateMyGuideProfile(input: UpdateGuideProfileInput): Promise<GuideProfileDto> {
+  const response = await apiClient.put<GuideProfileDto>('/api/guides/me/profile', input);
+  return response.data;
+}
+
+export async function deleteMyGuideProfile(): Promise<void> {
+  await apiClient.delete('/api/guides/me/profile');
+}
+

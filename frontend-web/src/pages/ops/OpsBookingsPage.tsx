@@ -246,7 +246,10 @@ export function OpsBookingsPage() {
             <tbody className="divide-y divide-slate-100">
               {bookings.map((booking) => {
                 const isActioning = actioningId === booking.id;
-                const canDecide =
+                const canApprove =
+                  booking.status === 'PendingApproval' ||
+                  booking.status === 'PlanProposed';
+                const canReject =
                   booking.status === 'PendingApproval' ||
                   booking.status === 'NeedsManualReview' ||
                   booking.status === 'PlanProposed';
@@ -272,25 +275,25 @@ export function OpsBookingsPage() {
                       <td className="px-4 py-3 text-slate-600">{booking.groupSize}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                          {canDecide && (
-                            <>
-                              <button
-                                type="button"
-                                disabled={isActioning}
-                                onClick={() => handleApprove(booking.id)}
-                                className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                type="button"
-                                disabled={isActioning}
-                                onClick={() => setPrompt({ kind: 'reject', bookingId: booking.id, text: '' })}
-                                className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                            </>
+                          {canApprove && (
+                            <button
+                              type="button"
+                              disabled={isActioning}
+                              onClick={() => handleApprove(booking.id)}
+                              className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                          )}
+                          {canReject && (
+                            <button
+                              type="button"
+                              disabled={isActioning}
+                              onClick={() => setPrompt({ kind: 'reject', bookingId: booking.id, text: '' })}
+                              className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
                           )}
                           {canComplete && (
                             <button

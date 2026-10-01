@@ -177,7 +177,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         switch (decisionResult.Decision)
         {
             case BookingApprovalEvaluator.Decision.Approved:
-                assignmentSucceeded = true;
+                assignmentSucceeded = false;
                 if (guideResult.GuideId != Guid.Empty)
                 {
                     assignmentSucceeded = await _guideAssignmentService.AssignGuideAsync(bookingId, guideResult.GuideId, ct);
