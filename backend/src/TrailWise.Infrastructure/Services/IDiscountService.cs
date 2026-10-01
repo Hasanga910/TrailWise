@@ -14,7 +14,13 @@ public interface IDiscountService
         string description,
         decimal percentageOff,
         int minGroupSize,
+        bool isActive = true,
+        DateTimeOffset? validFrom = null,
+        DateTimeOffset? validUntil = null,
         Guid? performedBy = null,
+        CancellationToken ct = default);
+
+    Task<IReadOnlyList<Discount>> GetAllListAsync(
         CancellationToken ct = default);
 
     Task<PagedDiscountsResult> GetAllAsync(
@@ -34,7 +40,20 @@ public interface IDiscountService
         string description,
         decimal percentageOff,
         int minGroupSize,
+        bool isActive = true,
+        DateTimeOffset? validFrom = null,
+        DateTimeOffset? validUntil = null,
         Guid? performedBy = null,
+        CancellationToken ct = default);
+
+    Task<Discount?> ToggleActiveAsync(
+        Guid id,
+        bool isActive,
+        Guid? performedBy = null,
+        CancellationToken ct = default);
+
+    Task<IReadOnlyList<Discount>> GetActiveDiscountsAsync(
+        DateTimeOffset? now = null,
         CancellationToken ct = default);
 
     Task<bool> DeleteAsync(

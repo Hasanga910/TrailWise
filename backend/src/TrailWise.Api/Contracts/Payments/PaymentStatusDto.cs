@@ -15,4 +15,5 @@ public record PaymentStatusDto(
     bool IsPaymentDeadlineExpired = false,
     DateTimeOffset? BalancePaymentDueAt = null,
     bool IsBalancePaymentDeadlineExpired = false,
-    string? BookingStatus = null);
+    string? BookingStatus = null,
+    PricingBreakdownDto? PricingBreakdown = null);

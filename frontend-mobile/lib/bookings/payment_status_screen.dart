@@ -498,6 +498,9 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 ),
               ),
 
+              // Cost Breakdown Card
+              _buildCostBreakdownCard(payment.pricingBreakdown, payment.totalCost),
+
               // B. Payment Financial Summary Card
               Card(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -517,10 +520,12 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Chip(
-                            label: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                            backgroundColor: statusColor.withValues(alpha: 0.15),
-                            visualDensity: VisualDensity.compact,
+                          Flexible(
+                            child: Chip(
+                              label: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                              backgroundColor: statusColor.withValues(alpha: 0.15),
+                              visualDensity: VisualDensity.compact,
+                            ),
                           ),
                         ],
                       ),
@@ -580,10 +585,15 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(child: Text('Payment Status:')),
-                          Text(
-                            statusLabel,
-                            style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                          const Text('Payment Status:'),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              statusLabel,
+                              textAlign: TextAlign.end,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                            ),
                           ),
                         ],
                       ),
@@ -1300,6 +1310,105 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCostBreakdownCard(PricingBreakdown? breakdown, double totalCost) {
+    if (breakdown == null) {
+      return const SizedBox.shrink();
+    }
+
+    final hasDiscount = breakdown.discountAmount > 0;
+    final discountLabel = hasDiscount
+        ? (breakdown.discountPercentage != null && breakdown.discountPercentage! > 0
+            ? 'Group Discount (${breakdown.discountPercentage!.toStringAsFixed(0)}%):'
+            : 'Group Discount:')
+        : 'Group Discount:';
+    final discountFormatted = hasDiscount
+        ? '-\$${breakdown.discountAmount.toStringAsFixed(2)}'
+        : '\$0.00';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Cost Breakdown',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            _buildBreakdownRow('Base Cost:', '\$${breakdown.baseCost.toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            _buildBreakdownRow('Catering:', '\$${breakdown.cateringCost.toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            _buildBreakdownRow('Add-ons:', '\$${breakdown.addOnCost.toStringAsFixed(2)}'),
+            const Divider(height: 24),
+            _buildBreakdownRow('Subtotal:', '\$${breakdown.subtotal.toStringAsFixed(2)}', isBold: true),
+            const SizedBox(height: 8),
+            _buildBreakdownRow(
+              discountLabel,
+              discountFormatted,
+              valueColor: hasDiscount ? Colors.green.shade700 : null,
+              isBold: hasDiscount,
+            ),
+            if (hasDiscount && breakdown.discountDescription != null && breakdown.discountDescription!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                breakdown.discountDescription!,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+              ),
+            ] else if (!hasDiscount) ...[
+              const SizedBox(height: 2),
+              Text(
+                'No discount applied',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+              ),
+            ],
+            const Divider(height: 24),
+            _buildBreakdownRow(
+              'Final Total:',
+              '\$${breakdown.finalTotal.toStringAsFixed(2)}',
+              isBold: true,
+              fontSize: 16,
+              valueColor: Colors.teal.shade800,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBreakdownRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    double fontSize = 14,
+    Color? valueColor,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: valueColor,
+          ),
+        ),
+      ],
     );
   }
 

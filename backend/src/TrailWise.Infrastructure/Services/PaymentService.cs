@@ -518,7 +518,7 @@ public class PaymentService : IPaymentService
             return PaymentStatusResult.Failure("Forbidden. You do not have access to view this booking's payment status.", 403);
         }
 
-        var totalCost = await GetAuthoritativeTotalCostAsync(bookingId, ct);
+        var (totalCost, pricingBreakdown) = await GetAuthoritativePricingAsync(bookingId, ct);
         if (!totalCost.HasValue)
         {
             return PaymentStatusResult.Failure("Booking pricing is not available yet.", 400);
@@ -604,7 +604,8 @@ public class PaymentService : IPaymentService
             isPaymentDeadlineExpired: isPaymentDeadlineExpired,
             balancePaymentDueAt: booking.BalancePaymentDueAt,
             isBalancePaymentDeadlineExpired: isBalancePaymentDeadlineExpired,
-            bookingStatus: booking.Status.ToString());
+            bookingStatus: booking.Status.ToString(),
+            pricingBreakdown: pricingBreakdown);
     }
 
     public async Task<Dictionary<Guid, PaymentStatusResult>> GetPaymentStatusesForBookingsAsync(
@@ -640,6 +641,7 @@ public class PaymentService : IPaymentService
             : new List<AgentStepLog>();
 
         var authoritativeCosts = new Dictionary<Guid, decimal>();
+        var authoritativeBreakdowns = new Dictionary<Guid, PricingBreakdownResult>();
         foreach (var bookingId in idList)
         {
             var bookingRun = runs.FirstOrDefault(r => r.BookingId == bookingId);
@@ -656,6 +658,11 @@ public class PaymentService : IPaymentService
                             totalCostProp.TryGetDecimal(out var totalCost))
                         {
                             authoritativeCosts[bookingId] = totalCost;
+                            var bd = ParsePricingBreakdown(doc.RootElement, totalCost);
+                            if (bd != null)
+                            {
+                                authoritativeBreakdowns[bookingId] = bd;
+                            }
                             break;
                         }
                     }
@@ -756,13 +763,20 @@ public class PaymentService : IPaymentService
                 isPaymentDeadlineExpired: isPaymentDeadlineExpired,
                 balancePaymentDueAt: booking.BalancePaymentDueAt,
                 isBalancePaymentDeadlineExpired: isBalancePaymentDeadlineExpired,
-                bookingStatus: booking.Status.ToString());
+                bookingStatus: booking.Status.ToString(),
+                pricingBreakdown: authoritativeBreakdowns.TryGetValue(booking.Id, out var bdResult) ? bdResult : null);
         }
 
         return results;
     }
 
     private async Task<decimal?> GetAuthoritativeTotalCostAsync(Guid bookingId, CancellationToken ct)
+    {
+        var (totalCost, _) = await GetAuthoritativePricingAsync(bookingId, ct);
+        return totalCost;
+    }
+
+    private async Task<(decimal? TotalCost, PricingBreakdownResult? Breakdown)> GetAuthoritativePricingAsync(Guid bookingId, CancellationToken ct)
     {
         var run = await _db.AgentWorkflowRuns
             .AsNoTracking()
@@ -772,7 +786,7 @@ public class PaymentService : IPaymentService
 
         if (run is null)
         {
-            return null;
+            return (null, null);
         }
 
         var stepLogs = await _db.AgentStepLogs
@@ -790,7 +804,8 @@ public class PaymentService : IPaymentService
                 if (doc.RootElement.TryGetProperty("totalCost", out var totalCostProp) &&
                     totalCostProp.TryGetDecimal(out var totalCost))
                 {
-                    return totalCost;
+                    var breakdown = ParsePricingBreakdown(doc.RootElement, totalCost);
+                    return (totalCost, breakdown);
                 }
             }
             catch (JsonException)
@@ -799,6 +814,94 @@ public class PaymentService : IPaymentService
             }
         }
 
-        return null;
+        return (null, null);
+    }
+
+    private static PricingBreakdownResult? ParsePricingBreakdown(JsonElement root, decimal fallbackTotalCost)
+    {
+        if (!root.TryGetProperty("breakdown", out var bdProp))
+        {
+            return null;
+        }
+
+        try
+        {
+            JsonDocument? innerDoc = null;
+            JsonElement bdElement;
+            if (bdProp.ValueKind == JsonValueKind.String)
+            {
+                var innerJson = bdProp.GetString();
+                if (string.IsNullOrWhiteSpace(innerJson)) return null;
+                innerDoc = JsonDocument.Parse(innerJson);
+                bdElement = innerDoc.RootElement;
+            }
+            else if (bdProp.ValueKind == JsonValueKind.Object)
+            {
+                bdElement = bdProp;
+            }
+            else
+            {
+                return null;
+            }
+
+            if (bdElement.ValueKind != JsonValueKind.Object)
+            {
+                innerDoc?.Dispose();
+                return null;
+            }
+
+            decimal baseCost = 0m;
+            if (bdElement.TryGetProperty("tierBasePrice", out var tp) && tp.TryGetDecimal(out var tpVal))
+                baseCost = tpVal;
+            else if (bdElement.TryGetProperty("basePricePerPerson", out var bpp) && bpp.TryGetDecimal(out var bppVal)
+                     && bdElement.TryGetProperty("groupSize", out var gs) && gs.TryGetInt32(out var gsVal))
+                baseCost = bppVal * gsVal;
+
+            decimal cateringCost = 0m;
+            if (bdElement.TryGetProperty("cateringCost", out var cp) && cp.TryGetDecimal(out var cpVal))
+                cateringCost = cpVal;
+            else if (bdElement.TryGetProperty("cateringSurchargeTotal", out var cst) && cst.TryGetDecimal(out var cstVal))
+                cateringCost = cstVal;
+
+            decimal addOnsCost = 0m;
+            if (bdElement.TryGetProperty("addOnsCost", out var ap) && ap.TryGetDecimal(out var apVal))
+                addOnsCost = apVal;
+
+            decimal subtotal = baseCost + cateringCost + addOnsCost;
+            if (bdElement.TryGetProperty("subtotal", out var sp) && sp.TryGetDecimal(out var spVal))
+                subtotal = spVal;
+
+            decimal discountAmount = 0m;
+            if (bdElement.TryGetProperty("groupDiscount", out var dp) && dp.TryGetDecimal(out var dpVal))
+                discountAmount = dpVal;
+
+            decimal finalTotal = fallbackTotalCost;
+            if (bdElement.TryGetProperty("finalTotal", out var fp) && fp.TryGetDecimal(out var fpVal))
+                finalTotal = fpVal;
+
+            string? discountDescription = null;
+            if (bdElement.TryGetProperty("discountDescription", out var ddp) && ddp.ValueKind == JsonValueKind.String)
+                discountDescription = ddp.GetString();
+
+            decimal? discountPercentage = null;
+            if (bdElement.TryGetProperty("discountPercentage", out var dpp) && dpp.TryGetDecimal(out var dppVal))
+                discountPercentage = dppVal;
+
+            innerDoc?.Dispose();
+
+            return new PricingBreakdownResult(
+                baseCost,
+                cateringCost,
+                addOnsCost,
+                subtotal,
+                discountAmount,
+                finalTotal,
+                discountDescription,
+                discountPercentage);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
