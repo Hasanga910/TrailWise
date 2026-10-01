@@ -8,6 +8,7 @@ import {
   type PagedResult,
 } from '../../api/bookings';
 import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
+import { getAssignmentByBookingId, type VehicleAssignmentDetailDto } from '../../api/vehicles';
 import { ItineraryList } from '../../components/itinerary/ItineraryList';
 
 const PAGE_SIZE = 10;
@@ -66,6 +67,7 @@ export function MyBookingsPage() {
   const [itineraryCache, setItineraryCache] = useState<Record<string, ItineraryStepDto[]>>({});
   const [itineraryLoadingId, setItineraryLoadingId] = useState<string | null>(null);
   const [itineraryErrors, setItineraryErrors] = useState<Record<string, string>>({});
+  const [assignmentCache, setAssignmentCache] = useState<Record<string, VehicleAssignmentDetailDto | null>>({});
 
   function toggleItinerary(bookingId: string) {
     if (expandedBookingId === bookingId) {
@@ -73,6 +75,17 @@ export function MyBookingsPage() {
       return;
     }
     setExpandedBookingId(bookingId);
+
+    if (!assignmentCache[bookingId]) {
+      getAssignmentByBookingId(bookingId)
+        .then((assignment) => {
+          setAssignmentCache((prev) => ({ ...prev, [bookingId]: assignment }));
+        })
+        .catch(() => {
+          // assignment is optional, ignore error
+        });
+    }
+
     if (itineraryCache[bookingId]) {
       return;
     }
@@ -279,7 +292,50 @@ export function MyBookingsPage() {
                 </div>
 
                 {expandedBookingId === booking.id && (
-                  <div className="mt-4 border-t border-slate-100 pt-4">
+                  <div className="mt-4 border-t border-slate-100 pt-4 space-y-4">
+                    {assignmentCache[booking.id] && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+                          Assigned Transport & Crew
+                        </h4>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          <div>
+                            <p className="text-xs font-medium text-slate-500">Vehicle</p>
+                            <p className="text-sm font-semibold text-slate-800">
+                              {assignmentCache[booking.id]?.vehicleName || 'Assigned Vehicle'}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {assignmentCache[booking.id]?.registrationNumber && (
+                                <span className="font-mono font-medium">{assignmentCache[booking.id]?.registrationNumber} · </span>
+                              )}
+                              {assignmentCache[booking.id]?.vehicleType}
+                              {assignmentCache[booking.id]?.hasAC ? ' (AC)' : ''}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-slate-500">Driver</p>
+                            <p className="text-sm font-semibold text-slate-800">
+                              {assignmentCache[booking.id]?.driverName || 'Driver'}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {assignmentCache[booking.id]?.driverContact || 'Contact pending'}
+                            </p>
+                          </div>
+                          {assignmentCache[booking.id]?.guideName && (
+                            <div>
+                              <p className="text-xs font-medium text-slate-500">Tour Guide</p>
+                              <p className="text-sm font-semibold text-slate-800">
+                                {assignmentCache[booking.id]?.guideName}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {assignmentCache[booking.id]?.guideContact || 'Contact pending'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {itineraryLoadingId === booking.id && (
                       <div className="h-12 animate-pulse rounded-lg bg-slate-100" />
                     )}

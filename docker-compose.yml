@@ -38,6 +38,9 @@ services:
       Cors__AllowedOrigins__1: ${CORS_ALLOWED_ORIGIN_FLUTTER:-http://localhost:5000}
       Llm__Enabled: ${LLM_ENABLED:-false}
       Llm__ApiKey: ${GROQ_API_KEY}
+      NOTIFY_LK_USER_ID: ${NOTIFY_LK_USER_ID}
+      NOTIFY_LK_API_KEY: ${NOTIFY_LK_API_KEY}
+      NOTIFY_LK_SENDER_ID: ${NOTIFY_LK_SENDER_ID:-NotifyDEMO}
     volumes:
       - trailwise_uploads:/app/wwwroot/uploads
       - trailwise_private_uploads:/app/private_uploads

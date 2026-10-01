@@ -36,6 +36,7 @@ public class BookingsController : ControllerBase
     private readonly IFleetCapacityAgent _fleetAgent;
     private readonly IGuideAssignmentService _guideAssignmentService;
     private readonly IGuideAvailabilityService _guideAvailabilityService;
+    private readonly IBookingNotificationService? _bookingNotificationService;
     private readonly ILogger<BookingsController> _logger;
     private readonly IPaymentService _paymentService;
     private readonly IClock _clock;
@@ -53,7 +54,8 @@ public class BookingsController : ControllerBase
         ILogger<BookingsController> logger,
         IPaymentService paymentService,
         IClock? clock = null,
-        IBookingLifecycleService? bookingLifecycleService = null)
+        IBookingLifecycleService? bookingLifecycleService = null,
+        IBookingNotificationService? bookingNotificationService = null)
     {
         _db = db;
         _scopeFactory = scopeFactory;
@@ -67,6 +69,7 @@ public class BookingsController : ControllerBase
         _paymentService = paymentService;
         _clock = clock ?? new SystemClock();
         _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(_clock);
+        _bookingNotificationService = bookingNotificationService;
     }
 
     [HttpPost]
@@ -561,6 +564,24 @@ public class BookingsController : ControllerBase
             {
                 await transaction.CommitAsync(ct);
             }
+
+            if (request.Decision == BookingDecision.Approve)
+            {
+                var bookingId = booking.Id;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
+                        await notificationService.SendBookingConfirmedNotificationsAsync(bookingId, CancellationToken.None);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", bookingId);
+                    }
+                });
+            }
         }
         catch
         {
@@ -844,6 +865,21 @@ public class BookingsController : ControllerBase
 
         _logger.LogInformation("Guide {GuideId} manually assigned to booking {BookingId} by user {UserId}",
             request.GuideId, booking.Id, performedBy);
+
+        var assignedBookingId = booking.Id;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
+                await notificationService.SendBookingConfirmedNotificationsAsync(assignedBookingId, CancellationToken.None);
+            }
+            catch (Exception notifEx)
+            {
+                _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", assignedBookingId);
+            }
+        });
 
         return Ok(new AssignGuideResponse(booking.Id, request.GuideId, booking.Status));
     }

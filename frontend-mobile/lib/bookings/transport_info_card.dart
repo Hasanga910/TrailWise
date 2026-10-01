@@ -359,6 +359,80 @@ class TransportInfoCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (data.guideName != null && data.guideName!.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              Text(
+                'ASSIGNED TOUR GUIDE',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: Colors.teal.shade800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: Colors.blue.shade100,
+                      child: Text(
+                        _initials(data.guideName!),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            data.guideName!,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            (data.guideContact != null && data.guideContact!.isNotEmpty)
+                                ? data.guideContact!
+                                : 'Licensed Tour Guide',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (data.guideContact != null && data.guideContact!.isNotEmpty)
+                      IconButton.filledTonal(
+                        icon: const Icon(Icons.phone, size: 20),
+                        tooltip: 'Copy guide contact',
+                        onPressed: () => _copyToClipboard(
+                          context,
+                          data.guideContact!,
+                          'Guide contact',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

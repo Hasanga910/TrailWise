@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
@@ -37,6 +38,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
     private readonly ILogger<CoordinatorAgentService> _logger;
     private readonly IBookingLifecycleService _bookingLifecycleService;
     private readonly IClock _clock;
+    private readonly IServiceScopeFactory? _scopeFactory;
 
     public CoordinatorAgentService(
         TrailWiseDbContext db,
@@ -49,7 +51,8 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         ILogger<CoordinatorAgentService> logger,
         IBookingLifecycleService? bookingLifecycleService = null,
         IClock? clock = null,
-        IFleetReservationService? fleetReservationService = null)
+        IFleetReservationService? fleetReservationService = null,
+        IServiceScopeFactory? scopeFactory = null)
     {
         _db = db;
         _preferenceAgent = preferenceAgent;
@@ -62,6 +65,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         _fleetReservationService = fleetReservationService;
         _clock = clock ?? new SystemClock();
         _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(_clock);
+        _scopeFactory = scopeFactory;
     }
 
     public async Task StartWorkflowAsync(Guid bookingId, CancellationToken ct = default)
@@ -169,10 +173,11 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         MarkStepDone(plan, "validate");
         run.PlanJson = Serialize(plan);
 
+        var assignmentSucceeded = false;
         switch (decisionResult.Decision)
         {
             case BookingApprovalEvaluator.Decision.Approved:
-                var assignmentSucceeded = true;
+                assignmentSucceeded = true;
                 if (guideResult.GuideId != Guid.Empty)
                 {
                     assignmentSucceeded = await _guideAssignmentService.AssignGuideAsync(bookingId, guideResult.GuideId, ct);
@@ -237,6 +242,23 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             if (transaction is not null)
             {
                 await transaction.CommitAsync(ct);
+            }
+
+            if (assignmentSucceeded && _scopeFactory is not null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
+                        await notificationService.SendBookingConfirmedNotificationsAsync(bookingId, CancellationToken.None);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", bookingId);
+                    }
+                });
             }
         }
         catch
