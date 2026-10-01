@@ -412,6 +412,7 @@ describe('GuideAvailabilityPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('next-month-button')).toBeInTheDocument();
+      expect(mockedGetGuideAvailability).toHaveBeenCalled();
     });
 
     mockedGetGuideAvailability.mockClear();

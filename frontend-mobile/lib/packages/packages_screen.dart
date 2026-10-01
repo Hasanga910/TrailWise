@@ -160,14 +160,41 @@ class _PackagesScreenState extends State<PackagesScreen> {
     if (packages.isEmpty) {
       return const Center(child: Text('No tour packages yet.'));
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: packages.length,
-      itemBuilder: (_, i) => _PackageCard(
-        package: packages[i],
-        onRequestTier: _requestBooking,
-        onReviewsTap: _openReviews,
-      ),
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          color: Colors.teal.shade50,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.discount_outlined, size: 16, color: Colors.teal.shade700),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Group discounts are available on all tours.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.teal.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: packages.length,
+            itemBuilder: (_, i) => _PackageCard(
+              package: packages[i],
+              onRequestTier: _requestBooking,
+              onReviewsTap: _openReviews,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

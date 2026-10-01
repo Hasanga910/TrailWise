@@ -17,5 +17,15 @@ public class DiscountConfiguration : IEntityTypeConfiguration<Discount>
 
         builder.Property(d => d.MinGroupSize)
             .IsRequired();
+
+        builder.Property(d => d.IsActive)
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(d => d.ValidFrom);
+
+        builder.Property(d => d.ValidUntil);
+
+        builder.HasIndex(d => new { d.IsActive, d.MinGroupSize });
     }
 }

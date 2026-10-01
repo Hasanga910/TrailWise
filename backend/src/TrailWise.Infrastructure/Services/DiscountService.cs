@@ -10,21 +10,27 @@ public class DiscountService : IDiscountService
     private readonly TrailWiseDbContext _db;
     private readonly IAuditLogService _auditLogService;
     private readonly ILogger<DiscountService> _logger;
+    private readonly IClock _clock;
 
     public DiscountService(
         TrailWiseDbContext db,
         IAuditLogService auditLogService,
-        ILogger<DiscountService> logger)
+        ILogger<DiscountService> logger,
+        IClock? clock = null)
     {
         _db = db;
         _auditLogService = auditLogService;
         _logger = logger;
+        _clock = clock ?? new SystemClock();
     }
 
     public async Task<Discount> CreateAsync(
         string description,
         decimal percentageOff,
         int minGroupSize,
+        bool isActive = true,
+        DateTimeOffset? validFrom = null,
+        DateTimeOffset? validUntil = null,
         Guid? performedBy = null,
         CancellationToken ct = default)
     {
@@ -36,14 +42,20 @@ public class DiscountService : IDiscountService
             throw new ArgumentOutOfRangeException(nameof(percentageOff), "PercentageOff must be greater than 0 and at most 100.");
         if (minGroupSize < 1)
             throw new ArgumentOutOfRangeException(nameof(minGroupSize), "MinGroupSize must be at least 1.");
+        if (validFrom.HasValue && validUntil.HasValue && validUntil.Value < validFrom.Value)
+            throw new ArgumentException("ValidUntil must be greater than or equal to ValidFrom.", nameof(validUntil));
 
+        var now = _clock.UtcNow;
         var discount = new Discount
         {
             Description = description.Trim(),
             PercentageOff = percentageOff,
             MinGroupSize = minGroupSize,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            IsActive = isActive,
+            ValidFrom = validFrom,
+            ValidUntil = validUntil,
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
         await using var transaction = _db.Database.IsRelational()
@@ -64,7 +76,10 @@ public class DiscountService : IDiscountService
                 {
                     description = discount.Description,
                     percentageOff = discount.PercentageOff,
-                    minGroupSize = discount.MinGroupSize
+                    minGroupSize = discount.MinGroupSize,
+                    isActive = discount.IsActive,
+                    validFrom = discount.ValidFrom,
+                    validUntil = discount.ValidUntil
                 },
                 ct: ct);
 
@@ -84,6 +99,14 @@ public class DiscountService : IDiscountService
             }
             throw;
         }
+    }
+
+    public async Task<IReadOnlyList<Discount>> GetAllListAsync(CancellationToken ct = default)
+    {
+        return await _db.Discounts
+            .OrderBy(d => d.MinGroupSize)
+            .AsNoTracking()
+            .ToListAsync(ct);
     }
 
     public async Task<PagedDiscountsResult> GetAllAsync(
@@ -138,6 +161,9 @@ public class DiscountService : IDiscountService
         string description,
         decimal percentageOff,
         int minGroupSize,
+        bool isActive = true,
+        DateTimeOffset? validFrom = null,
+        DateTimeOffset? validUntil = null,
         Guid? performedBy = null,
         CancellationToken ct = default)
     {
@@ -149,6 +175,8 @@ public class DiscountService : IDiscountService
             throw new ArgumentOutOfRangeException(nameof(percentageOff), "PercentageOff must be greater than 0 and at most 100.");
         if (minGroupSize < 1)
             throw new ArgumentOutOfRangeException(nameof(minGroupSize), "MinGroupSize must be at least 1.");
+        if (validFrom.HasValue && validUntil.HasValue && validUntil.Value < validFrom.Value)
+            throw new ArgumentException("ValidUntil must be greater than or equal to ValidFrom.", nameof(validUntil));
 
         var discount = await _db.Discounts.FirstOrDefaultAsync(d => d.Id == id, ct);
         if (discount is null)
@@ -165,7 +193,10 @@ public class DiscountService : IDiscountService
             discount.Description = description.Trim();
             discount.PercentageOff = percentageOff;
             discount.MinGroupSize = minGroupSize;
-            discount.UpdatedAt = DateTimeOffset.UtcNow;
+            discount.IsActive = isActive;
+            discount.ValidFrom = validFrom;
+            discount.ValidUntil = validUntil;
+            discount.UpdatedAt = _clock.UtcNow;
 
             await _db.SaveChangesAsync(ct);
 
@@ -178,7 +209,10 @@ public class DiscountService : IDiscountService
                 {
                     description = discount.Description,
                     percentageOff = discount.PercentageOff,
-                    minGroupSize = discount.MinGroupSize
+                    minGroupSize = discount.MinGroupSize,
+                    isActive = discount.IsActive,
+                    validFrom = discount.ValidFrom,
+                    validUntil = discount.ValidUntil
                 },
                 ct: ct);
 
@@ -200,6 +234,82 @@ public class DiscountService : IDiscountService
         }
     }
 
+    public async Task<Discount?> ToggleActiveAsync(
+        Guid id,
+        bool isActive,
+        Guid? performedBy = null,
+        CancellationToken ct = default)
+    {
+        var discount = await _db.Discounts.FirstOrDefaultAsync(d => d.Id == id, ct);
+        if (discount is null)
+        {
+            return null;
+        }
+
+        var previousState = discount.IsActive;
+        if (previousState == isActive)
+        {
+            return discount;
+        }
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            discount.IsActive = isActive;
+            discount.UpdatedAt = _clock.UtcNow;
+
+            await _db.SaveChangesAsync(ct);
+
+            var actionName = isActive ? "DiscountActivated" : "DiscountDeactivated";
+            await _auditLogService.LogAsync(
+                entityType: "Discount",
+                entityId: discount.Id,
+                action: actionName,
+                performedBy: performedBy,
+                details: new
+                {
+                    discountId = discount.Id,
+                    isActive = discount.IsActive,
+                    previousState = previousState
+                },
+                ct: ct);
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+
+            _logger.LogInformation("Discount {DiscountId} active status set to {IsActive}", discount.Id, discount.IsActive);
+            return discount;
+        }
+        catch
+        {
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<Discount>> GetActiveDiscountsAsync(
+        DateTimeOffset? now = null,
+        CancellationToken ct = default)
+    {
+        var effectiveNow = now ?? _clock.UtcNow;
+        return await _db.Discounts
+            .AsNoTracking()
+            .Where(d => d.IsActive
+                && (d.ValidFrom == null || effectiveNow >= d.ValidFrom.Value)
+                && (d.ValidUntil == null || effectiveNow <= d.ValidUntil.Value))
+            .OrderBy(d => d.MinGroupSize)
+            .ThenByDescending(d => d.PercentageOff)
+            .ToListAsync(ct);
+    }
+
     public async Task<bool> DeleteAsync(
         Guid id,
         Guid? performedBy = null,
@@ -215,7 +325,8 @@ public class DiscountService : IDiscountService
         {
             description = discount.Description,
             percentageOff = discount.PercentageOff,
-            minGroupSize = discount.MinGroupSize
+            minGroupSize = discount.MinGroupSize,
+            isActive = discount.IsActive
         };
 
         await using var transaction = _db.Database.IsRelational()

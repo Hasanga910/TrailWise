@@ -150,7 +150,7 @@ public class PaymentsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Payment can only be recorded for confirmed bookings", content);
+        Assert.Contains("Payment can only be recorded for confirmed or completed bookings", content);
     }
 
     // 9. Missing pricing rejected
@@ -948,6 +948,166 @@ public class PaymentsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
         Assert.Equal(500m, status.TotalPaid);
         Assert.Equal(0m, status.RemainingAmount);
         Assert.False(status.HasPendingVerification);
+    }
+
+    // 42. Completed + DepositPaid + remaining > 0 accepts balance slip
+    [Fact]
+    public async Task SubmitBankTransfer_CompletedBooking_WithRemainingBalance_AcceptsBalanceSlip()
+    {
+        var (client, bookingId, _) = await SetupConfirmedBookingWithPricingAsync(totalCost: 500m);
+        var adminClient = await AuthenticatedAdminAsync();
+
+        // Deposit payment of $250
+        Guid depositId;
+        using (var form1 = CreateBankTransferContent(250m))
+        {
+            var res1 = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form1);
+            var p1 = await res1.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions);
+            depositId = p1!.Id;
+        }
+        await adminClient.PostAsync($"/api/payments/{depositId}/approve", null);
+
+        // Mark completed
+        await SetBookingStatusAsync(bookingId, BookingStatus.Completed);
+
+        // Submit remaining balance ($250)
+        using var form2 = CreateBankTransferContent(250m);
+        var response = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form2);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payment = await response.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions);
+        Assert.NotNull(payment);
+        Assert.Equal(250m, payment.Amount);
+        Assert.Equal("Pending", payment.Status);
+    }
+
+    // 43. Completed + FullyPaid rejects extra payment
+    [Fact]
+    public async Task SubmitBankTransfer_CompletedBooking_FullyPaid_RejectsExtraPayment()
+    {
+        var (client, bookingId, _) = await SetupConfirmedBookingWithPricingAsync(totalCost: 500m);
+        var adminClient = await AuthenticatedAdminAsync();
+
+        // Full payment
+        Guid paymentId;
+        using (var form1 = CreateBankTransferContent(500m))
+        {
+            var res1 = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form1);
+            var p1 = await res1.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions);
+            paymentId = p1!.Id;
+        }
+        await adminClient.PostAsync($"/api/payments/{paymentId}/approve", null);
+
+        // Mark completed
+        await SetBookingStatusAsync(bookingId, BookingStatus.Completed);
+
+        // Attempt another payment
+        using var form2 = CreateBankTransferContent(100m);
+        var response = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form2);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("already fully paid", content);
+    }
+
+    // 44. Completed + Pending verification rejects another submission
+    [Fact]
+    public async Task SubmitBankTransfer_CompletedBooking_PendingVerification_RejectsAnotherSubmission()
+    {
+        var (client, bookingId, _) = await SetupConfirmedBookingWithPricingAsync(totalCost: 500m);
+        var adminClient = await AuthenticatedAdminAsync();
+
+        // Deposit payment of $250
+        Guid depositId;
+        using (var form1 = CreateBankTransferContent(250m))
+        {
+            var res1 = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form1);
+            var p1 = await res1.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions);
+            depositId = p1!.Id;
+        }
+        await adminClient.PostAsync($"/api/payments/{depositId}/approve", null);
+
+        // Mark completed
+        await SetBookingStatusAsync(bookingId, BookingStatus.Completed);
+
+        // Submit balance payment -> now Pending
+        using (var form2 = CreateBankTransferContent(250m))
+        {
+            var res2 = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form2);
+            Assert.Equal(HttpStatusCode.Created, res2.StatusCode);
+        }
+
+        // Attempt second balance payment while pending
+        using var form3 = CreateBankTransferContent(250m);
+        var response = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form3);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("pending review", content);
+    }
+
+    // 45. Completed + rejected prior balance allows retry
+    [Fact]
+    public async Task SubmitBankTransfer_CompletedBooking_RejectedPriorBalance_AllowsRetry()
+    {
+        var (client, bookingId, _) = await SetupConfirmedBookingWithPricingAsync(totalCost: 600m);
+        var adminClient = await AuthenticatedAdminAsync();
+
+        // Deposit payment of $300
+        Guid depositId;
+        using (var form1 = CreateBankTransferContent(300m))
+        {
+            var res1 = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form1);
+            var p1 = await res1.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions);
+            depositId = p1!.Id;
+        }
+        await adminClient.PostAsync($"/api/payments/{depositId}/approve", null);
+
+        // Mark completed
+        await SetBookingStatusAsync(bookingId, BookingStatus.Completed);
+
+        // Submit balance payment of $300 and reject it
+        Guid balancePaymentId;
+        using (var form2 = CreateBankTransferContent(300m))
+        {
+            var res2 = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form2);
+            var p2 = await res2.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions);
+            balancePaymentId = p2!.Id;
+        }
+        await adminClient.PostAsJsonAsync($"/api/payments/{balancePaymentId}/reject", new { Reason = "Unclear transfer image" });
+
+        // Retry balance payment
+        using var form3 = CreateBankTransferContent(300m);
+        var retryResponse = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form3);
+
+        Assert.Equal(HttpStatusCode.Created, retryResponse.StatusCode);
+        var retryPayment = await retryResponse.Content.ReadFromJsonAsync<PaymentDto>(JsonOptions);
+        Assert.NotNull(retryPayment);
+        Assert.Equal(300m, retryPayment.Amount);
+        Assert.Equal("Pending", retryPayment.Status);
+    }
+
+    // 46. Cancelled booking rejects payment
+    [Fact]
+    public async Task SubmitBankTransfer_CancelledBooking_ReturnsBadRequest()
+    {
+        var (client, bookingId, _) = await SetupConfirmedBookingWithPricingAsync(totalCost: 500m, status: BookingStatus.Cancelled);
+
+        using var form = CreateBankTransferContent(250m);
+        var response = await client.PostAsync($"/api/bookings/{bookingId}/payments/bank-transfer", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Payment can only be recorded for confirmed or completed bookings", content);
+    }
+
+    private async Task SetBookingStatusAsync(Guid bookingId, BookingStatus status)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var b = await db.Bookings.FindAsync(bookingId);
+        b!.Status = status;
+        await db.SaveChangesAsync();
     }
 
     private static MultipartFormDataContent CreateBankTransferContent(

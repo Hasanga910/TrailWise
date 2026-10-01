@@ -11,6 +11,7 @@ export interface PendingPaymentDto {
   submittedAt: string;
   status: string;
   paymentDueAt?: string | null;
+  balancePaymentDueAt?: string | null;
 }
 
 export interface PaymentDto {

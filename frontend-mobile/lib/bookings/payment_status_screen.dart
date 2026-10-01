@@ -105,18 +105,86 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   void initState() {
     super.initState();
     _loadPaymentStatus();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
+  }
+
+  @override
+  void didUpdateWidget(PaymentStatusScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.booking.id != widget.booking.id ||
+        oldWidget.booking.status != widget.booking.status) {
+      _syncCountdownTimer();
+    }
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _countdownTimer = null;
     _amountController.dispose();
     super.dispose();
+  }
+
+  String get _effectiveBookingStatus =>
+      _paymentStatus?.bookingStatus ?? widget.booking.status;
+
+  bool get _shouldShowAdvanceCountdown {
+    final payment = _paymentStatus;
+    if (payment == null) return false;
+    if (_effectiveBookingStatus != BookingStatus.confirmed) return false;
+    if (payment.paymentDueAt == null) return false;
+    if (payment.isPaymentDeadlineExpired) return false;
+    if (payment.status == 'DepositPaid' || payment.status == 'FullyPaid') return false;
+    if (payment.hasPendingVerification || payment.status == 'Pending') return false;
+    if (payment.totalPaid > 0) return false;
+
+    final now = _currentNow().toUtc();
+    final dueAt = payment.paymentDueAt!.toUtc();
+    return dueAt.isAfter(now);
+  }
+
+  bool get _shouldShowBalanceCountdown {
+    final payment = _paymentStatus;
+    if (payment == null) return false;
+    if (_effectiveBookingStatus != BookingStatus.completed) return false;
+    if (payment.remainingAmount <= 0) return false;
+    if (payment.status == 'FullyPaid') return false;
+    if (payment.hasPendingVerification || payment.status == 'Pending') return false;
+    if (payment.balancePaymentDueAt == null) return false;
+    if (payment.isBalancePaymentDeadlineExpired) return false;
+
+    final now = _currentNow().toUtc();
+    final dueAt = payment.balancePaymentDueAt!.toUtc();
+    return dueAt.isAfter(now);
+  }
+
+  bool get _shouldRunCountdownTimer => _shouldShowAdvanceCountdown || _shouldShowBalanceCountdown;
+
+  void _syncCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+
+    if (!mounted || !_shouldRunCountdownTimer) {
+      return;
+    }
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (!_shouldRunCountdownTimer) {
+        timer.cancel();
+        _countdownTimer = null;
+        if (mounted) {
+          setState(() {});
+          _loadPaymentStatus();
+        }
+        return;
+      }
+
+      setState(() {});
+    });
   }
 
   Future<void> _loadPaymentStatus() async {
@@ -128,11 +196,12 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
     try {
       final json = await _apiClient.get('/api/bookings/${widget.booking.id}/payment-status');
       final status = PaymentStatusDto.fromJson(json as Map<String, dynamic>);
+      if (!mounted) return;
       setState(() {
         _paymentStatus = status;
         _loading = false;
         if (status.remainingAmount > 0) {
-          if (status.totalPaid == 0) {
+          if (status.totalPaid == 0 && _effectiveBookingStatus == BookingStatus.confirmed) {
             final minAdvance = status.minimumAdvance ?? (status.totalCost * 0.5);
             _amountController.text = minAdvance.toStringAsFixed(2);
           } else {
@@ -140,16 +209,21 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
           }
         }
       });
+      _syncCountdownTimer();
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.message;
         _loading = false;
       });
+      _syncCountdownTimer();
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Could not load payment status. Please try again.';
         _loading = false;
       });
+      _syncCountdownTimer();
     }
   }
 
@@ -167,6 +241,13 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
         _slipError = 'Could not select file. Please try again.';
       });
     }
+  }
+
+  void _removeSlip() {
+    setState(() {
+      _selectedSlip = null;
+      _slipError = null;
+    });
   }
 
   Future<void> _submitPayment() async {
@@ -190,7 +271,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
 
     final minAdvance = _paymentStatus!.minimumAdvance ?? (_paymentStatus!.totalCost * 0.5);
 
-    if (_paymentStatus!.totalPaid == 0) {
+    if (_paymentStatus!.totalPaid == 0 && _effectiveBookingStatus == BookingStatus.confirmed) {
       if (amount < minAdvance) {
         setState(() {
           _amountError = 'Initial payment must be at least \$${minAdvance.toStringAsFixed(2)}.';
@@ -203,7 +284,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
         });
         return;
       }
-    } else if (_paymentStatus!.status == 'DepositPaid') {
+    } else {
       if (amount > _paymentStatus!.remainingAmount) {
         setState(() {
           _amountError = 'Payment cannot exceed the remaining balance of \$${_paymentStatus!.remainingAmount.toStringAsFixed(2)}.';
@@ -338,7 +419,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
 
     final payment = _paymentStatus!;
     final booking = widget.booking;
-    final bookingColor = BookingStatus.color(booking.status);
+    final bookingColor = BookingStatus.color(_effectiveBookingStatus);
     final statusColor = _paymentStatusColor(payment.status, payment.hasPendingVerification);
     final statusLabel = _paymentStatusLabel(payment.status, payment.hasPendingVerification);
 
@@ -346,18 +427,28 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
         ? (payment.totalPaid / payment.totalCost).clamp(0.0, 1.0)
         : 0.0;
 
-    final isConfirmed = booking.status == BookingStatus.confirmed;
-    final isBookingCancelled = booking.status == BookingStatus.cancelled;
+    final isConfirmed = _effectiveBookingStatus == BookingStatus.confirmed;
+    final isCompleted = _effectiveBookingStatus == BookingStatus.completed;
+    final isPayableLifecycle = isConfirmed || isCompleted;
+    final isBookingCancelled = _effectiveBookingStatus == BookingStatus.cancelled;
     final isPendingVerification = payment.hasPendingVerification || payment.status == 'Pending';
     final isFullyPaid = !isPendingVerification && (payment.status == 'FullyPaid' || payment.remainingAmount <= 0);
     final minAdvance = payment.minimumAdvance ?? (payment.totalCost * 0.5);
 
-    final isDeadlineExpired = payment.isPaymentDeadlineExpired ||
-        (payment.paymentDueAt != null &&
-            payment.totalPaid == 0 &&
-            !isPendingVerification &&
-            _currentNow().toUtc().isAfter(payment.paymentDueAt!.toUtc()));
+    final isDeadlinePast = isConfirmed &&
+        payment.paymentDueAt != null &&
+        payment.totalPaid == 0 &&
+        !isPendingVerification &&
+        !payment.paymentDueAt!.toUtc().isAfter(_currentNow().toUtc());
+    final isDeadlineExpired = isConfirmed && (payment.isPaymentDeadlineExpired || isDeadlinePast);
     final isExpiredOrCancelled = isBookingCancelled || isDeadlineExpired;
+
+    final isBalanceDeadlinePast = isCompleted &&
+        payment.balancePaymentDueAt != null &&
+        payment.remainingAmount > 0 &&
+        !isPendingVerification &&
+        !payment.balancePaymentDueAt!.toUtc().isAfter(_currentNow().toUtc());
+    final isBalanceDeadlineExpired = isCompleted && (payment.isBalancePaymentDeadlineExpired || isBalanceDeadlinePast);
 
     return Center(
       child: ConstrainedBox(
@@ -386,7 +477,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             ),
                           ),
                           Chip(
-                            label: Text(booking.status, style: TextStyle(color: bookingColor, fontSize: 12)),
+                            label: Text(_effectiveBookingStatus, style: TextStyle(color: bookingColor, fontSize: 12)),
                             backgroundColor: bookingColor.withValues(alpha: 0.15),
                             visualDensity: VisualDensity.compact,
                           ),
@@ -407,6 +498,9 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 ),
               ),
 
+              // Cost Breakdown Card
+              _buildCostBreakdownCard(payment.pricingBreakdown, payment.totalCost),
+
               // B. Payment Financial Summary Card
               Card(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -426,10 +520,12 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Chip(
-                            label: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
-                            backgroundColor: statusColor.withValues(alpha: 0.15),
-                            visualDensity: VisualDensity.compact,
+                          Flexible(
+                            child: Chip(
+                              label: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                              backgroundColor: statusColor.withValues(alpha: 0.15),
+                              visualDensity: VisualDensity.compact,
+                            ),
                           ),
                         ],
                       ),
@@ -489,10 +585,15 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(child: Text('Payment Status:')),
-                          Text(
-                            statusLabel,
-                            style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                          const Text('Payment Status:'),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              statusLabel,
+                              textAlign: TextAlign.end,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+                            ),
                           ),
                         ],
                       ),
@@ -532,9 +633,11 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         children: [
                           Icon(Icons.account_balance, color: Colors.teal.shade700, size: 20),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Bank Transfer Details',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          const Expanded(
+                            child: Text(
+                              'Bank Transfer Details',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),
@@ -595,7 +698,45 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     ),
                   ),
                 )
-              else if (!isConfirmed)
+              else if (isBalanceDeadlineExpired)
+                Card(
+                  key: const Key('completed_balance_deadline_expired_card'),
+                  color: Colors.red.shade50,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.red.shade200),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 24),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Final payment deadline expired',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Please contact TrailWise Support for assistance with the remaining balance.',
+                          style: TextStyle(fontSize: 14, color: Colors.red.shade800),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (!isPayableLifecycle)
                 Card(
                   color: Colors.amber.shade50,
                   child: Padding(
@@ -606,7 +747,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
-                            'Payments can only be made for confirmed bookings.',
+                            'Payments can only be made for confirmed or completed bookings.',
                             style: TextStyle(fontSize: 14),
                           ),
                         ),
@@ -675,7 +816,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 )
               else ...[
                 // Advance payment deadline countdown card (for unpaid initial payment with active deadline)
-                if (payment.totalPaid == 0 && payment.paymentDueAt != null) ...[
+                if (_shouldShowAdvanceCountdown) ...[
                   () {
                     final remaining = payment.paymentDueAt!.toUtc().difference(_currentNow().toUtc());
                     final remainingSeconds = remaining.inSeconds > 0 ? remaining.inSeconds : 0;
@@ -709,15 +850,56 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                   size: 22,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  'Advance payment deadline',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                Expanded(
+                                  child: Text(
+                                    'Advance payment deadline',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
                                   ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Advance payment due in',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isUnder15Minutes ? Colors.amber.shade100 : Colors.blue.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Advance payment due in $countdownStr',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Time remaining: $countdownStr',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -727,21 +909,103 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                 color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
                               ),
                             ),
-                            const SizedBox(height: 10),
+                          ],
+                        ),
+                      ),
+                    );
+                  }(),
+                ],
+                if (_shouldShowBalanceCountdown) ...[
+                  () {
+                    final remaining = payment.balancePaymentDueAt!.toUtc().difference(_currentNow().toUtc());
+                    final remainingSeconds = remaining.inSeconds > 0 ? remaining.inSeconds : 0;
+                    final hours = (remainingSeconds ~/ 3600).toString().padLeft(2, '0');
+                    final minutes = ((remainingSeconds % 3600) ~/ 60).toString().padLeft(2, '0');
+                    final seconds = (remainingSeconds % 60).toString().padLeft(2, '0');
+                    final countdownStr = '$hours:$minutes:$seconds';
+                    final isUnder4Hours = remainingSeconds < 4 * 3600;
+
+                    return Card(
+                      key: const Key('balance_payment_deadline_card'),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      color: isUnder4Hours ? Colors.amber.shade50 : Colors.blue.shade50,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isUnder4Hours ? Colors.amber.shade400 : Colors.blue.shade200,
+                          width: isUnder4Hours ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  isUnder4Hours ? Icons.warning_amber_rounded : Icons.timer_outlined,
+                                  color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade800,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Final balance payment deadline',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Final balance due in',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: isUnder15Minutes ? Colors.amber.shade100 : Colors.blue.shade100,
+                                color: isUnder4Hours ? Colors.amber.shade100 : Colors.blue.shade100,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(
-                                'Time remaining: $countdownStr',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'monospace',
-                                  color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Final balance due in $countdownStr',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                      color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Remaining balance due in $countdownStr',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Submit your remaining balance before:\n${_formatDateTime(payment.balancePaymentDueAt!.toLocal())}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
                               ),
                             ),
                           ],
@@ -824,7 +1088,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         const SizedBox(height: 12),
 
                         // Guidance Card for Deposit vs First Payment
-                        if (payment.status == 'DepositPaid')
+                        if (payment.status == 'DepositPaid' || isCompleted)
                           Container(
                             margin: const EdgeInsets.only(bottom: 16),
                             padding: const EdgeInsets.all(12),
@@ -837,18 +1101,20 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               children: [
                                 Icon(Icons.check_circle, color: Colors.teal.shade700, size: 20),
                                 const SizedBox(width: 10),
-                                const Expanded(
+                                Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Advance payment verified',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal),
+                                        isCompleted ? 'Balance payment' : 'Advance payment verified',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal),
                                       ),
-                                      SizedBox(height: 2),
+                                      const SizedBox(height: 2),
                                       Text(
-                                        'Advance payment verified. You can now pay the remaining balance.',
-                                        style: TextStyle(fontSize: 12),
+                                        isCompleted
+                                            ? 'The tour has completed. Please submit the remaining balance.'
+                                            : 'Advance payment verified. You can now pay the remaining balance.',
+                                        style: const TextStyle(fontSize: 12),
                                       ),
                                     ],
                                   ),
@@ -950,31 +1216,52 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               borderRadius: BorderRadius.circular(8),
                               color: Colors.teal.shade50.withValues(alpha: 0.3),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.receipt_long, color: Colors.teal),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _selectedSlip!.name,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                        overflow: TextOverflow.ellipsis,
+                                Row(
+                                  children: [
+                                    const Icon(Icons.receipt_long, color: Colors.teal),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _selectedSlip!.name,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${_selectedSlip!.fileTypeDisplay} · ${_selectedSlip!.formattedSize}',
+                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${_selectedSlip!.fileTypeDisplay} · ${_selectedSlip!.formattedSize}',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
-                                TextButton.icon(
-                                  onPressed: _pickSlip,
-                                  icon: const Icon(Icons.edit, size: 16),
-                                  label: const Text('Change File'),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: _pickSlip,
+                                      icon: const Icon(Icons.edit, size: 16),
+                                      label: const Text('Change File'),
+                                    ),
+                                    TextButton.icon(
+                                      key: const Key('remove_bank_slip_button'),
+                                      onPressed: _removeSlip,
+                                      icon: const Icon(Icons.delete_outline, size: 16),
+                                      label: const Text('Remove'),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.red.shade700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1026,14 +1313,118 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
     );
   }
 
-  Widget _buildBankDetailRow(String label, String value) {
+  Widget _buildCostBreakdownCard(PricingBreakdown? breakdown, double totalCost) {
+    if (breakdown == null) {
+      return const SizedBox.shrink();
+    }
+
+    final hasDiscount = breakdown.discountAmount > 0;
+    final discountLabel = hasDiscount
+        ? (breakdown.discountPercentage != null && breakdown.discountPercentage! > 0
+            ? 'Group Discount (${breakdown.discountPercentage!.toStringAsFixed(0)}%):'
+            : 'Group Discount:')
+        : 'Group Discount:';
+    final discountFormatted = hasDiscount
+        ? '-\$${breakdown.discountAmount.toStringAsFixed(2)}'
+        : '\$0.00';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Cost Breakdown',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            _buildBreakdownRow('Base Cost:', '\$${breakdown.baseCost.toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            _buildBreakdownRow('Catering:', '\$${breakdown.cateringCost.toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            _buildBreakdownRow('Add-ons:', '\$${breakdown.addOnCost.toStringAsFixed(2)}'),
+            const Divider(height: 24),
+            _buildBreakdownRow('Subtotal:', '\$${breakdown.subtotal.toStringAsFixed(2)}', isBold: true),
+            const SizedBox(height: 8),
+            _buildBreakdownRow(
+              discountLabel,
+              discountFormatted,
+              valueColor: hasDiscount ? Colors.green.shade700 : null,
+              isBold: hasDiscount,
+            ),
+            if (hasDiscount && breakdown.discountDescription != null && breakdown.discountDescription!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                breakdown.discountDescription!,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+              ),
+            ] else if (!hasDiscount) ...[
+              const SizedBox(height: 2),
+              Text(
+                'No discount applied',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+              ),
+            ],
+            const Divider(height: 24),
+            _buildBreakdownRow(
+              'Final Total:',
+              '\$${breakdown.finalTotal.toStringAsFixed(2)}',
+              isBold: true,
+              fontSize: 16,
+              valueColor: Colors.teal.shade800,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBreakdownRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    double fontSize = 14,
+    Color? valueColor,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-        SelectableText(
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+        Text(
           value,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            color: valueColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBankDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
         ),
       ],
     );

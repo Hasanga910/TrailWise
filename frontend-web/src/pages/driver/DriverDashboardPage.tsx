@@ -212,7 +212,6 @@ export function DriverDashboardPage() {
             {displayedTasks.map((task) => {
               const isPast = task.endDate < todayStr;
               const isCancelled = task.bookingStatus === 'Cancelled';
-              const isOperating = !isPast && !isCancelled;
 
               return (
                 <div

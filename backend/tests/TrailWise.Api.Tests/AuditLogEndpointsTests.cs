@@ -332,6 +332,47 @@ public class AuditLogEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
         };
 
         db.Bookings.Add(booking);
+
+        if (status == BookingStatus.Completed)
+        {
+            var totalCost = tier.BasePricePerPerson * booking.GroupSize;
+            var run = new AgentWorkflowRun
+            {
+                Booking = booking,
+                Objective = "Pricing Test",
+                Status = "Completed",
+                StartedAt = DateTimeOffset.UtcNow
+            };
+            db.AgentWorkflowRuns.Add(run);
+
+            var stepLog = new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new
+                {
+                    totalCost,
+                    breakdown = "{}",
+                    validationResult = "Valid"
+                }),
+                DurationMs = 10
+            };
+            db.AgentStepLogs.Add(stepLog);
+
+            var payment = new Payment
+            {
+                Booking = booking,
+                Amount = totalCost,
+                Status = PaymentStatus.FullyPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-5),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-5),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/test.jpg"
+            };
+            db.Payments.Add(payment);
+        }
+
         await db.SaveChangesAsync();
 
         return (client, booking.Id, travelerId);
