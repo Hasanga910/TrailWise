@@ -23,6 +23,7 @@ public class Booking : BaseEntity
     public DateTimeOffset? PaymentDueAt { get; set; }
     public DateTimeOffset? PaymentExpiredAt { get; set; }
     public string? CancellationReason { get; set; }
+    public DateTimeOffset? BalancePaymentDueAt { get; set; }
 
     public bool Attended { get; set; } = false;
     public bool Completed { get; set; } = false;

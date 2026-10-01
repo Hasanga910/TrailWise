@@ -10,4 +10,5 @@ public record PendingPaymentDto(
     string BankSlipUrl,
     DateTimeOffset SubmittedAt,
     string Status,
-    DateTimeOffset? PaymentDueAt = null);
+    DateTimeOffset? PaymentDueAt = null,
+    DateTimeOffset? BalancePaymentDueAt = null);

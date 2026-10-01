@@ -47,9 +47,9 @@ public class PaymentService : IPaymentService
             return SubmitBankTransferResult.Failure("Forbidden. You may only pay for your own booking.", 403);
         }
 
-        if (booking.Status != BookingStatus.Confirmed)
+        if (booking.Status != BookingStatus.Confirmed && booking.Status != BookingStatus.Completed)
         {
-            return SubmitBankTransferResult.Failure("Payment can only be recorded for confirmed bookings.", 400);
+            return SubmitBankTransferResult.Failure("Payment can only be recorded for confirmed or completed bookings.", 400);
         }
 
         var totalCost = await GetAuthoritativeTotalCostAsync(bookingId, ct);
@@ -77,7 +77,15 @@ public class PaymentService : IPaymentService
         var hasApprovedPayment = booking.Payments.Any(p => p.Status == PaymentStatus.DepositPaid || p.Status == PaymentStatus.FullyPaid);
         var now = _clock.UtcNow;
 
-        if (!hasApprovedPayment)
+        if (booking.Status == BookingStatus.Completed)
+        {
+            if (booking.BalancePaymentDueAt.HasValue && now >= booking.BalancePaymentDueAt.Value)
+            {
+                return SubmitBankTransferResult.Failure("Final payment deadline has expired. Please contact support.", 400);
+            }
+        }
+
+        if (booking.Status == BookingStatus.Confirmed && !hasApprovedPayment)
         {
             if (booking.PaymentDueAt.HasValue && now > booking.PaymentDueAt.Value)
             {
@@ -510,7 +518,7 @@ public class PaymentService : IPaymentService
             return PaymentStatusResult.Failure("Forbidden. You do not have access to view this booking's payment status.", 403);
         }
 
-        var totalCost = await GetAuthoritativeTotalCostAsync(bookingId, ct);
+        var (totalCost, pricingBreakdown) = await GetAuthoritativePricingAsync(bookingId, ct);
         if (!totalCost.HasValue)
         {
             return PaymentStatusResult.Failure("Booking pricing is not available yet.", 400);
@@ -576,6 +584,11 @@ public class PaymentService : IPaymentService
             }
         }
 
+        var isBalancePaymentDeadlineExpired = booking.Status == BookingStatus.Completed
+            && booking.BalancePaymentDueAt.HasValue
+            && now >= booking.BalancePaymentDueAt.Value
+            && remainingAmount > 0;
+
         return PaymentStatusResult.Success(
             bookingId,
             totalCost.Value,
@@ -588,10 +601,182 @@ public class PaymentService : IPaymentService
             latestRejectedAt: latestRejectedAt,
             latestRejectedPaymentId: latestRejectedPaymentId,
             paymentDueAt: booking.PaymentDueAt,
-            isPaymentDeadlineExpired: isPaymentDeadlineExpired);
+            isPaymentDeadlineExpired: isPaymentDeadlineExpired,
+            balancePaymentDueAt: booking.BalancePaymentDueAt,
+            isBalancePaymentDeadlineExpired: isBalancePaymentDeadlineExpired,
+            bookingStatus: booking.Status.ToString(),
+            pricingBreakdown: pricingBreakdown);
+    }
+
+    public async Task<Dictionary<Guid, PaymentStatusResult>> GetPaymentStatusesForBookingsAsync(
+        IEnumerable<Guid> bookingIds,
+        Guid requestingUserId,
+        bool isManagerOrAdmin,
+        CancellationToken ct = default)
+    {
+        var idList = bookingIds.Distinct().ToList();
+        if (idList.Count == 0)
+        {
+            return new Dictionary<Guid, PaymentStatusResult>();
+        }
+
+        var bookings = await _db.Bookings
+            .AsNoTracking()
+            .Include(b => b.Payments)
+            .Where(b => idList.Contains(b.Id))
+            .ToListAsync(ct);
+
+        var runs = await _db.AgentWorkflowRuns
+            .AsNoTracking()
+            .Where(r => idList.Contains(r.BookingId))
+            .OrderByDescending(r => r.StartedAt)
+            .ToListAsync(ct);
+
+        var runIds = runs.Select(r => r.Id).Distinct().ToList();
+        var stepLogs = runIds.Count > 0
+            ? await _db.AgentStepLogs
+                .AsNoTracking()
+                .Where(s => runIds.Contains(s.WorkflowRunId) && s.AgentName == "PricingValidationAgent")
+                .ToListAsync(ct)
+            : new List<AgentStepLog>();
+
+        var authoritativeCosts = new Dictionary<Guid, decimal>();
+        var authoritativeBreakdowns = new Dictionary<Guid, PricingBreakdownResult>();
+        foreach (var bookingId in idList)
+        {
+            var bookingRun = runs.FirstOrDefault(r => r.BookingId == bookingId);
+            if (bookingRun != null)
+            {
+                var runStepLogs = stepLogs.Where(s => s.WorkflowRunId == bookingRun.Id).ToList();
+                foreach (var log in runStepLogs)
+                {
+                    if (string.IsNullOrWhiteSpace(log.OutputJson)) continue;
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(log.OutputJson);
+                        if (doc.RootElement.TryGetProperty("totalCost", out var totalCostProp) &&
+                            totalCostProp.TryGetDecimal(out var totalCost))
+                        {
+                            authoritativeCosts[bookingId] = totalCost;
+                            var bd = ParsePricingBreakdown(doc.RootElement, totalCost);
+                            if (bd != null)
+                            {
+                                authoritativeBreakdowns[bookingId] = bd;
+                            }
+                            break;
+                        }
+                    }
+                    catch (JsonException) { }
+                }
+            }
+        }
+
+        var results = new Dictionary<Guid, PaymentStatusResult>();
+        var now = _clock.UtcNow;
+
+        foreach (var booking in bookings)
+        {
+            var isOwner = booking.TravelerId == requestingUserId;
+            if (!isOwner && !isManagerOrAdmin)
+            {
+                results[booking.Id] = PaymentStatusResult.Failure("Forbidden. You do not have access to view this booking's payment status.", 403);
+                continue;
+            }
+
+            if (!authoritativeCosts.TryGetValue(booking.Id, out var totalCost))
+            {
+                results[booking.Id] = PaymentStatusResult.Failure("Booking pricing is not available yet.", 400);
+                continue;
+            }
+
+            var approvedPayments = booking.Payments
+                .Where(p => p.Status == PaymentStatus.DepositPaid || p.Status == PaymentStatus.FullyPaid)
+                .ToList();
+
+            var totalPaid = approvedPayments.Sum(p => p.Amount);
+            var hasPending = booking.Payments.Any(p => p.Status == PaymentStatus.Pending);
+
+            string status;
+            if (totalPaid >= totalCost)
+            {
+                status = "FullyPaid";
+            }
+            else if (totalPaid > 0)
+            {
+                status = "DepositPaid";
+            }
+            else if (hasPending)
+            {
+                status = "Pending";
+            }
+            else
+            {
+                status = "Unpaid";
+            }
+
+            var remainingAmount = Math.Max(totalCost - totalPaid, 0m);
+            var minimumAdvance = totalPaid == 0
+                ? Math.Round(totalCost * 0.50m, 2, MidpointRounding.AwayFromZero)
+                : (decimal?)null;
+
+            var latestRejectedPayment = booking.Payments
+                .Where(p => p.Status == PaymentStatus.Failed)
+                .OrderByDescending(p => p.ReviewedAt)
+                .ThenByDescending(p => p.CreatedAt)
+                .FirstOrDefault();
+
+            var isPaymentDeadlineExpired = false;
+            if (booking.PaymentExpiredAt.HasValue ||
+                (booking.Status == BookingStatus.Cancelled && booking.PaymentDueAt.HasValue && now > booking.PaymentDueAt.Value))
+            {
+                isPaymentDeadlineExpired = true;
+            }
+            else if (booking.Status == BookingStatus.Confirmed && booking.PaymentDueAt.HasValue && now > booking.PaymentDueAt.Value)
+            {
+                var hasQualifying = booking.Payments.Any(p =>
+                    p.SubmittedAt <= booking.PaymentDueAt.Value &&
+                    (p.Status == PaymentStatus.Pending || p.Status == PaymentStatus.DepositPaid || p.Status == PaymentStatus.FullyPaid));
+
+                if (!hasQualifying)
+                {
+                    isPaymentDeadlineExpired = true;
+                }
+            }
+
+            var isBalancePaymentDeadlineExpired = booking.Status == BookingStatus.Completed
+                && booking.BalancePaymentDueAt.HasValue
+                && now >= booking.BalancePaymentDueAt.Value
+                && remainingAmount > 0;
+
+            results[booking.Id] = PaymentStatusResult.Success(
+                booking.Id,
+                totalCost,
+                totalPaid,
+                remainingAmount,
+                status,
+                hasPendingVerification: hasPending,
+                minimumAdvance: minimumAdvance,
+                latestRejectedPaymentReason: latestRejectedPayment?.RejectionReason,
+                latestRejectedAt: latestRejectedPayment?.ReviewedAt,
+                latestRejectedPaymentId: latestRejectedPayment?.Id,
+                paymentDueAt: booking.PaymentDueAt,
+                isPaymentDeadlineExpired: isPaymentDeadlineExpired,
+                balancePaymentDueAt: booking.BalancePaymentDueAt,
+                isBalancePaymentDeadlineExpired: isBalancePaymentDeadlineExpired,
+                bookingStatus: booking.Status.ToString(),
+                pricingBreakdown: authoritativeBreakdowns.TryGetValue(booking.Id, out var bdResult) ? bdResult : null);
+        }
+
+        return results;
     }
 
     private async Task<decimal?> GetAuthoritativeTotalCostAsync(Guid bookingId, CancellationToken ct)
+    {
+        var (totalCost, _) = await GetAuthoritativePricingAsync(bookingId, ct);
+        return totalCost;
+    }
+
+    private async Task<(decimal? TotalCost, PricingBreakdownResult? Breakdown)> GetAuthoritativePricingAsync(Guid bookingId, CancellationToken ct)
     {
         var run = await _db.AgentWorkflowRuns
             .AsNoTracking()
@@ -601,7 +786,7 @@ public class PaymentService : IPaymentService
 
         if (run is null)
         {
-            return null;
+            return (null, null);
         }
 
         var stepLogs = await _db.AgentStepLogs
@@ -619,7 +804,8 @@ public class PaymentService : IPaymentService
                 if (doc.RootElement.TryGetProperty("totalCost", out var totalCostProp) &&
                     totalCostProp.TryGetDecimal(out var totalCost))
                 {
-                    return totalCost;
+                    var breakdown = ParsePricingBreakdown(doc.RootElement, totalCost);
+                    return (totalCost, breakdown);
                 }
             }
             catch (JsonException)
@@ -628,6 +814,94 @@ public class PaymentService : IPaymentService
             }
         }
 
-        return null;
+        return (null, null);
+    }
+
+    private static PricingBreakdownResult? ParsePricingBreakdown(JsonElement root, decimal fallbackTotalCost)
+    {
+        if (!root.TryGetProperty("breakdown", out var bdProp))
+        {
+            return null;
+        }
+
+        try
+        {
+            JsonDocument? innerDoc = null;
+            JsonElement bdElement;
+            if (bdProp.ValueKind == JsonValueKind.String)
+            {
+                var innerJson = bdProp.GetString();
+                if (string.IsNullOrWhiteSpace(innerJson)) return null;
+                innerDoc = JsonDocument.Parse(innerJson);
+                bdElement = innerDoc.RootElement;
+            }
+            else if (bdProp.ValueKind == JsonValueKind.Object)
+            {
+                bdElement = bdProp;
+            }
+            else
+            {
+                return null;
+            }
+
+            if (bdElement.ValueKind != JsonValueKind.Object)
+            {
+                innerDoc?.Dispose();
+                return null;
+            }
+
+            decimal baseCost = 0m;
+            if (bdElement.TryGetProperty("tierBasePrice", out var tp) && tp.TryGetDecimal(out var tpVal))
+                baseCost = tpVal;
+            else if (bdElement.TryGetProperty("basePricePerPerson", out var bpp) && bpp.TryGetDecimal(out var bppVal)
+                     && bdElement.TryGetProperty("groupSize", out var gs) && gs.TryGetInt32(out var gsVal))
+                baseCost = bppVal * gsVal;
+
+            decimal cateringCost = 0m;
+            if (bdElement.TryGetProperty("cateringCost", out var cp) && cp.TryGetDecimal(out var cpVal))
+                cateringCost = cpVal;
+            else if (bdElement.TryGetProperty("cateringSurchargeTotal", out var cst) && cst.TryGetDecimal(out var cstVal))
+                cateringCost = cstVal;
+
+            decimal addOnsCost = 0m;
+            if (bdElement.TryGetProperty("addOnsCost", out var ap) && ap.TryGetDecimal(out var apVal))
+                addOnsCost = apVal;
+
+            decimal subtotal = baseCost + cateringCost + addOnsCost;
+            if (bdElement.TryGetProperty("subtotal", out var sp) && sp.TryGetDecimal(out var spVal))
+                subtotal = spVal;
+
+            decimal discountAmount = 0m;
+            if (bdElement.TryGetProperty("groupDiscount", out var dp) && dp.TryGetDecimal(out var dpVal))
+                discountAmount = dpVal;
+
+            decimal finalTotal = fallbackTotalCost;
+            if (bdElement.TryGetProperty("finalTotal", out var fp) && fp.TryGetDecimal(out var fpVal))
+                finalTotal = fpVal;
+
+            string? discountDescription = null;
+            if (bdElement.TryGetProperty("discountDescription", out var ddp) && ddp.ValueKind == JsonValueKind.String)
+                discountDescription = ddp.GetString();
+
+            decimal? discountPercentage = null;
+            if (bdElement.TryGetProperty("discountPercentage", out var dpp) && dpp.TryGetDecimal(out var dppVal))
+                discountPercentage = dppVal;
+
+            innerDoc?.Dispose();
+
+            return new PricingBreakdownResult(
+                baseCost,
+                cateringCost,
+                addOnsCost,
+                subtotal,
+                discountAmount,
+                finalTotal,
+                discountDescription,
+                discountPercentage);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

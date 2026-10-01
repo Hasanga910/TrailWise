@@ -47,6 +47,12 @@ class _MockAuthProvider extends ChangeNotifier implements AuthProvider {
   Future<void> restoreSession() async {}
 
   @override
+  void updateUser(CurrentUser updatedUser) {
+    user = updatedUser;
+    notifyListeners();
+  }
+
+  @override
   Future<void> logout() async {}
 }
 

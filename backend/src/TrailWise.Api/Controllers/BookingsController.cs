@@ -38,6 +38,9 @@ public class BookingsController : ControllerBase
     private readonly IGuideAvailabilityService _guideAvailabilityService;
     private readonly IBookingNotificationService? _bookingNotificationService;
     private readonly ILogger<BookingsController> _logger;
+    private readonly IPaymentService _paymentService;
+    private readonly IClock _clock;
+    private readonly IBookingLifecycleService _bookingLifecycleService;
 
     public BookingsController(
         TrailWiseDbContext db,
@@ -49,6 +52,9 @@ public class BookingsController : ControllerBase
         IGuideAssignmentService guideAssignmentService,
         IGuideAvailabilityService guideAvailabilityService,
         ILogger<BookingsController> logger,
+        IPaymentService paymentService,
+        IClock? clock = null,
+        IBookingLifecycleService? bookingLifecycleService = null,
         IBookingNotificationService? bookingNotificationService = null)
     {
         _db = db;
@@ -60,6 +66,9 @@ public class BookingsController : ControllerBase
         _guideAssignmentService = guideAssignmentService;
         _guideAvailabilityService = guideAvailabilityService;
         _logger = logger;
+        _paymentService = paymentService;
+        _clock = clock ?? new SystemClock();
+        _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(_clock);
         _bookingNotificationService = bookingNotificationService;
     }
 
@@ -228,7 +237,7 @@ public class BookingsController : ControllerBase
             .ToListAsync(ct);
 
         return Ok(new PagedResult<BookingDto>(
-            bookings.Select(BookingDto.FromEntity).ToList(),
+            bookings.Select(b => BookingDto.FromEntity(b)).ToList(),
             totalCount,
             page,
             pageSize));
@@ -239,6 +248,8 @@ public class BookingsController : ControllerBase
         string? status,
         DateOnly? from,
         DateOnly? to,
+        string? sortBy = "createdAt",
+        string? sortDirection = "desc",
         int page = 1,
         int pageSize = DefaultPageSize,
         CancellationToken ct = default)
@@ -304,15 +315,48 @@ public class BookingsController : ControllerBase
 
         var totalCount = await query.CountAsync(ct);
 
-        var bookings = await query
-            .OrderByDescending(b => b.StartDate)
+        var normalizedSortBy = (sortBy ?? "createdAt").Trim().ToLowerInvariant();
+        var normalizedSortDirection = (sortDirection ?? "desc").Trim().ToLowerInvariant();
+        var isAscending = normalizedSortDirection == "asc";
+
+        IOrderedQueryable<Booking> orderedQuery = normalizedSortBy switch
+        {
+            "startdate" => isAscending
+                ? query.OrderBy(b => b.StartDate).ThenBy(b => b.CreatedAt).ThenBy(b => b.Id)
+                : query.OrderByDescending(b => b.StartDate).ThenByDescending(b => b.CreatedAt).ThenByDescending(b => b.Id),
+            "status" => isAscending
+                ? query.OrderBy(b => b.Status).ThenByDescending(b => b.CreatedAt).ThenBy(b => b.Id)
+                : query.OrderByDescending(b => b.Status).ThenByDescending(b => b.CreatedAt).ThenByDescending(b => b.Id),
+            _ => isAscending
+                ? query.OrderBy(b => b.CreatedAt).ThenBy(b => b.Id)
+                : query.OrderByDescending(b => b.CreatedAt).ThenByDescending(b => b.Id)
+        };
+
+        var bookings = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .AsNoTracking()
             .ToListAsync(ct);
 
+        var statusMap = await _paymentService.GetPaymentStatusesForBookingsAsync(
+            bookings.Select(b => b.Id),
+            travelerId.Value,
+            isManagerOrAdmin: false,
+            ct);
+
+        var dtos = bookings.Select(b =>
+        {
+            statusMap.TryGetValue(b.Id, out var ps);
+            return BookingDto.FromEntity(
+                b,
+                paymentStatus: ps?.Succeeded == true ? ps.Status : null,
+                remainingAmount: ps?.Succeeded == true ? ps.RemainingAmount : null,
+                isFullyPaid: ps?.Succeeded == true && ps.Status == "FullyPaid",
+                hasPendingPayment: ps?.Succeeded == true && ps.HasPendingVerification);
+        }).ToList();
+
         return Ok(new PagedResult<BookingDto>(
-            bookings.Select(BookingDto.FromEntity).ToList(),
+            dtos,
             totalCount,
             page,
             pageSize));
@@ -342,10 +386,24 @@ public class BookingsController : ControllerBase
             return Forbid();
         }
 
-        return Ok(BookingDto.FromEntity(booking));
+        PaymentStatusResult? paymentStatus = null;
+        if (travelerId.HasValue)
+        {
+            paymentStatus = await _paymentService.GetPaymentStatusAsync(booking.Id, travelerId.Value, isManager, ct);
+        }
+
+        var dto = BookingDto.FromEntity(
+            booking,
+            paymentStatus: paymentStatus?.Succeeded == true ? paymentStatus.Status : null,
+            remainingAmount: paymentStatus?.Succeeded == true ? paymentStatus.RemainingAmount : null,
+            isFullyPaid: paymentStatus?.Succeeded == true && paymentStatus.Status == "FullyPaid",
+            hasPendingPayment: paymentStatus?.Succeeded == true && paymentStatus.HasPendingVerification);
+
+        return Ok(dto);
     }
 
     [HttpPatch("{id:guid}/decision")]
+    [HttpPost("{id:guid}/decide")]
     [Authorize(Roles = ManagerRoles)]
     public async Task<ActionResult<BookingDto>> Decide(Guid id, BookingDecisionRequest request, CancellationToken ct)
     {
@@ -372,9 +430,14 @@ public class BookingsController : ControllerBase
             return Unauthorized();
         }
 
-        booking.Status = request.Decision == BookingDecision.Approve
-            ? BookingStatus.Confirmed
-            : BookingStatus.Cancelled;
+        if (request.Decision == BookingDecision.Approve)
+        {
+            _bookingLifecycleService.TransitionToConfirmed(booking);
+        }
+        else
+        {
+            booking.Status = BookingStatus.Cancelled;
+        }
 
         var run = await _db.AgentWorkflowRuns
             .Where(r => r.BookingId == booking.Id)
@@ -579,6 +642,22 @@ public class BookingsController : ControllerBase
 
         booking.Status = BookingStatus.Completed;
 
+        PaymentStatusResult? paymentStatus = null;
+        if (booking.TravelerId != Guid.Empty)
+        {
+            paymentStatus = await _paymentService.GetPaymentStatusAsync(booking.Id, booking.TravelerId, isManagerOrAdmin: true, ct);
+        }
+
+        var balanceDeadlineSet = false;
+        if (paymentStatus?.Succeeded == true && paymentStatus.RemainingAmount > 0)
+        {
+            if (!booking.BalancePaymentDueAt.HasValue)
+            {
+                booking.BalancePaymentDueAt = _clock.UtcNow.AddHours(24);
+                balanceDeadlineSet = true;
+            }
+        }
+
         await using var transaction = _db.Database.IsRelational()
             ? await _db.Database.BeginTransactionAsync(ct)
             : null;
@@ -600,9 +679,24 @@ public class BookingsController : ControllerBase
                     endDate = booking.EndDate.ToString("yyyy-MM-dd"),
                     previousStatus = "Confirmed",
                     newStatus = "Completed",
-                    completedAt = DateTimeOffset.UtcNow
+                    completedAt = _clock.UtcNow
                 },
                 ct: ct);
+
+            if (balanceDeadlineSet && booking.BalancePaymentDueAt.HasValue)
+            {
+                await _auditLogService.LogAsync(
+                    entityType: "Booking",
+                    entityId: booking.Id,
+                    action: "BalancePaymentDeadlineSet",
+                    performedBy: performedBy.Value,
+                    details: new
+                    {
+                        bookingId = booking.Id,
+                        balancePaymentDueAt = booking.BalancePaymentDueAt.Value
+                    },
+                    ct: ct);
+            }
 
             if (transaction is not null)
             {
@@ -618,7 +712,12 @@ public class BookingsController : ControllerBase
             throw;
         }
 
-        return Ok(BookingDto.FromEntity(booking));
+        return Ok(BookingDto.FromEntity(
+            booking,
+            paymentStatus: paymentStatus?.Succeeded == true ? paymentStatus.Status : null,
+            remainingAmount: paymentStatus?.Succeeded == true ? paymentStatus.RemainingAmount : null,
+            isFullyPaid: paymentStatus?.Succeeded == true && paymentStatus.Status == "FullyPaid",
+            hasPendingPayment: paymentStatus?.Succeeded == true && paymentStatus.HasPendingVerification));
     }
 
     [HttpPatch("{id:guid}/cancel")]
@@ -752,7 +851,7 @@ public class BookingsController : ControllerBase
                 title: "Selected guide is no longer available for this booking.");
         }
 
-        booking.Status = BookingStatus.Confirmed;
+        _bookingLifecycleService.TransitionToConfirmed(booking);
         await _db.SaveChangesAsync(ct);
 
         var performedBy = GetUserId();

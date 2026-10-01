@@ -12,14 +12,18 @@ public class FleetReservationService : IFleetReservationService
     private readonly TrailWiseDbContext _db;
     private readonly IServiceScopeFactory? _scopeFactory;
     private readonly ILogger<FleetReservationService> _logger;
+    private readonly IBookingLifecycleService _bookingLifecycleService;
 
     public FleetReservationService(
         TrailWiseDbContext db,
         ILogger<FleetReservationService> logger,
+        IBookingLifecycleService? bookingLifecycleService = null,
+        IClock? clock = null,
         IServiceScopeFactory? scopeFactory = null)
     {
         _db = db;
         _logger = logger;
+        _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(clock ?? new SystemClock());
         _scopeFactory = scopeFactory;
     }
 
@@ -159,8 +163,7 @@ public class FleetReservationService : IFleetReservationService
             // If the booking was pending approval, plan proposed, or required manual intervention, manual vehicle allocation resolves it!
             if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval || booking.Status == BookingStatus.PlanProposed)
             {
-                booking.Status = BookingStatus.Confirmed;
-                transitionedToConfirmed = true;
+                transitionedToConfirmed = _bookingLifecycleService.TransitionToConfirmed(booking);
                 _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator vehicle allocation.", bookingId);
             }
 

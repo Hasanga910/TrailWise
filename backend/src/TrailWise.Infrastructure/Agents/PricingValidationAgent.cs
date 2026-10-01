@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Infrastructure.Agents;
 
@@ -17,10 +18,12 @@ public class PricingValidationAgent : IPricingValidationAgent
     private const decimal DailyCateringRatePerPerson = 15m;
 
     private readonly TrailWiseDbContext _db;
+    private readonly IClock _clock;
 
-    public PricingValidationAgent(TrailWiseDbContext db)
+    public PricingValidationAgent(TrailWiseDbContext db, IClock? clock = null)
     {
         _db = db;
+        _clock = clock ?? new SystemClock();
     }
 
     public async Task<PricingResult> CalculateAsync(
@@ -77,10 +80,18 @@ public class PricingValidationAgent : IPricingValidationAgent
         var subtotal = tierBasePrice + cateringCost + addOnsCost;
 
         // Deterministic Discount Selection:
-        // Apply the best matching Discount where MinGroupSize <= Booking.GroupSize
+        // A discount qualifies only when:
+        // d.IsActive
+        // AND d.MinGroupSize <= booking.GroupSize
+        // AND (d.ValidFrom == null || now >= d.ValidFrom.Value)
+        // AND (d.ValidUntil == null || now <= d.ValidUntil.Value)
+        var now = _clock.UtcNow;
         var bestDiscount = await _db.Discounts
             .AsNoTracking()
-            .Where(d => d.MinGroupSize <= booking.GroupSize)
+            .Where(d => d.IsActive
+                && d.MinGroupSize <= booking.GroupSize
+                && (d.ValidFrom == null || now >= d.ValidFrom.Value)
+                && (d.ValidUntil == null || now <= d.ValidUntil.Value))
             .OrderByDescending(d => d.PercentageOff)
             .ThenByDescending(d => d.MinGroupSize)
             .ThenBy(d => d.CreatedAt)

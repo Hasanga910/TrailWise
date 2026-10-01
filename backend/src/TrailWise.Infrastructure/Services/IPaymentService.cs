@@ -2,6 +2,16 @@ using TrailWise.Domain.Entities;
 
 namespace TrailWise.Infrastructure.Services;
 
+public record PricingBreakdownResult(
+    decimal BaseCost,
+    decimal CateringCost,
+    decimal AddOnCost,
+    decimal Subtotal,
+    decimal DiscountAmount,
+    decimal FinalTotal,
+    string? DiscountDescription = null,
+    decimal? DiscountPercentage = null);
+
 public class SubmitBankTransferResult
 {
     public bool Succeeded { get; init; }
@@ -129,6 +139,10 @@ public class PaymentStatusResult
     public Guid? LatestRejectedPaymentId { get; init; }
     public DateTimeOffset? PaymentDueAt { get; init; }
     public bool IsPaymentDeadlineExpired { get; init; }
+    public DateTimeOffset? BalancePaymentDueAt { get; init; }
+    public bool IsBalancePaymentDeadlineExpired { get; init; }
+    public string BookingStatus { get; init; } = string.Empty;
+    public PricingBreakdownResult? PricingBreakdown { get; init; }
 
     public static PaymentStatusResult Success(
         Guid bookingId,
@@ -142,7 +156,11 @@ public class PaymentStatusResult
         DateTimeOffset? latestRejectedAt = null,
         Guid? latestRejectedPaymentId = null,
         DateTimeOffset? paymentDueAt = null,
-        bool isPaymentDeadlineExpired = false) => new()
+        bool isPaymentDeadlineExpired = false,
+        DateTimeOffset? balancePaymentDueAt = null,
+        bool isBalancePaymentDeadlineExpired = false,
+        string bookingStatus = "",
+        PricingBreakdownResult? pricingBreakdown = null) => new()
     {
         Succeeded = true,
         BookingId = bookingId,
@@ -157,6 +175,10 @@ public class PaymentStatusResult
         LatestRejectedPaymentId = latestRejectedPaymentId,
         PaymentDueAt = paymentDueAt,
         IsPaymentDeadlineExpired = isPaymentDeadlineExpired,
+        BalancePaymentDueAt = balancePaymentDueAt,
+        IsBalancePaymentDeadlineExpired = isBalancePaymentDeadlineExpired,
+        BookingStatus = bookingStatus,
+        PricingBreakdown = pricingBreakdown,
         StatusCode = 200
     };
 
@@ -205,6 +227,12 @@ public interface IPaymentService
 
     Task<PaymentStatusResult> GetPaymentStatusAsync(
         Guid bookingId,
+        Guid requestingUserId,
+        bool isManagerOrAdmin,
+        CancellationToken ct = default);
+
+    Task<Dictionary<Guid, PaymentStatusResult>> GetPaymentStatusesForBookingsAsync(
+        IEnumerable<Guid> bookingIds,
         Guid requestingUserId,
         bool isManagerOrAdmin,
         CancellationToken ct = default);

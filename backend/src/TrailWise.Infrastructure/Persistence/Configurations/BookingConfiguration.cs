@@ -27,6 +27,7 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.HasIndex(b => b.Status);
         builder.HasIndex(b => b.TravelerId);
         builder.HasIndex(b => b.PaymentDueAt);
+        builder.HasIndex(b => b.BalancePaymentDueAt);
 
         builder.HasMany(b => b.BookingAddOns)
             .WithOne(a => a.Booking)

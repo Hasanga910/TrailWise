@@ -1,9 +1,8 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using TrailWise.Api.Contracts.Discounts;
-using TrailWise.Domain.Entities;
-using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
 
@@ -14,55 +13,133 @@ public class DiscountsController : ControllerBase
 {
     private const string ManagerRoles = "OperationsManager,Admin";
 
-    private readonly TrailWiseDbContext _db;
+    private readonly IDiscountService _discountService;
 
-    public DiscountsController(TrailWiseDbContext db)
+    public DiscountsController(IDiscountService discountService)
     {
-        _db = db;
+        _discountService = discountService;
     }
 
     [HttpGet]
     [Authorize(Roles = ManagerRoles)]
     public async Task<ActionResult<IReadOnlyList<DiscountDto>>> GetAll(CancellationToken ct)
     {
-        var discounts = await _db.Discounts
-            .OrderBy(d => d.MinGroupSize)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
+        var discounts = await _discountService.GetAllListAsync(ct);
         return Ok(discounts.Select(DiscountDto.FromEntity).ToList());
+    }
+
+    [HttpGet("active")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IReadOnlyList<ActiveDiscountDto>>> GetActive(CancellationToken ct)
+    {
+        var activeDiscounts = await _discountService.GetActiveDiscountsAsync(ct: ct);
+        return Ok(activeDiscounts.Select(ActiveDiscountDto.FromEntity).ToList());
+    }
+
+    [HttpGet("{id:guid}")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<DiscountDto>> GetById(Guid id, CancellationToken ct)
+    {
+        var discount = await _discountService.GetByIdAsync(id, ct);
+        if (discount is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(DiscountDto.FromEntity(discount));
     }
 
     [HttpPost]
     [Authorize(Roles = ManagerRoles)]
     public async Task<ActionResult<DiscountDto>> Create(CreateDiscountRequest request, CancellationToken ct)
     {
-        var discount = new Discount
+        try
         {
-            Description = request.Description.Trim(),
-            PercentageOff = request.PercentageOff,
-            MinGroupSize = request.MinGroupSize
-        };
+            var discount = await _discountService.CreateAsync(
+                request.Description,
+                request.PercentageOff,
+                request.MinGroupSize,
+                request.IsActive,
+                request.ValidFrom,
+                request.ValidUntil,
+                GetUserId(),
+                ct);
 
-        _db.Discounts.Add(discount);
-        await _db.SaveChangesAsync(ct);
+            return CreatedAtAction(nameof(GetById), new { id = discount.Id }, DiscountDto.FromEntity(discount));
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 
-        return CreatedAtAction(nameof(GetAll), new { }, DiscountDto.FromEntity(discount));
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<DiscountDto>> Update(Guid id, UpdateDiscountRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var discount = await _discountService.UpdateAsync(
+                id,
+                request.Description,
+                request.PercentageOff,
+                request.MinGroupSize,
+                request.IsActive,
+                request.ValidFrom,
+                request.ValidUntil,
+                GetUserId(),
+                ct);
+
+            if (discount is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(DiscountDto.FromEntity(discount));
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("{id:guid}/active")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<DiscountDto>> ToggleActive(Guid id, ToggleDiscountActiveRequest request, CancellationToken ct)
+    {
+        var discount = await _discountService.ToggleActiveAsync(id, request.IsActive, GetUserId(), ct);
+        if (discount is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(DiscountDto.FromEntity(discount));
     }
 
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = ManagerRoles)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        var discount = await _db.Discounts.FirstOrDefaultAsync(d => d.Id == id, ct);
-        if (discount is null)
+        var deleted = await _discountService.DeleteAsync(id, GetUserId(), ct);
+        if (!deleted)
         {
             return NotFound();
         }
 
-        _db.Discounts.Remove(discount);
-        await _db.SaveChangesAsync(ct);
-
         return NoContent();
+    }
+
+    private Guid? GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(claim, out var id) ? id : null;
     }
 }

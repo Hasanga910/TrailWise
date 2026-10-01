@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TrailWise.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace TrailWise.Infrastructure.Persistence.Db
+namespace TrailWise.Infrastructure.Persistence.db
 {
     [DbContext(typeof(TrailWiseDbContext))]
-    partial class TrailWiseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001091749_AddBalancePaymentDueAt")]
+    partial class AddBalancePaymentDueAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -289,11 +292,6 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
                     b.Property<int>("MinGroupSize")
                         .HasColumnType("integer");
 
@@ -304,15 +302,7 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTimeOffset?>("ValidFrom")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("ValidUntil")
-                        .HasColumnType("timestamp with time zone");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("IsActive", "MinGroupSize");
 
                     b.ToTable("Discounts");
                 });

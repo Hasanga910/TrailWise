@@ -142,7 +142,8 @@ public class PaymentsController : ControllerBase
             p.BankSlipUrl,
             p.SubmittedAt,
             p.Status.ToString(),
-            p.Booking?.PaymentDueAt)).ToList();
+            p.Booking?.PaymentDueAt,
+            p.Booking?.BalancePaymentDueAt)).ToList();
 
         return Ok(dtos);
     }
@@ -255,6 +256,18 @@ public class PaymentsController : ControllerBase
             };
         }
 
+        PricingBreakdownDto? pricingBreakdown = result.PricingBreakdown is not null
+            ? new PricingBreakdownDto(
+                result.PricingBreakdown.BaseCost,
+                result.PricingBreakdown.CateringCost,
+                result.PricingBreakdown.AddOnCost,
+                result.PricingBreakdown.Subtotal,
+                result.PricingBreakdown.DiscountAmount,
+                result.PricingBreakdown.FinalTotal,
+                result.PricingBreakdown.DiscountDescription,
+                result.PricingBreakdown.DiscountPercentage)
+            : null;
+
         return Ok(new PaymentStatusDto(
             result.BookingId,
             result.TotalCost,
@@ -267,7 +280,11 @@ public class PaymentsController : ControllerBase
             result.LatestRejectedAt,
             result.LatestRejectedPaymentId,
             result.PaymentDueAt,
-            result.IsPaymentDeadlineExpired));
+            result.IsPaymentDeadlineExpired,
+            result.BalancePaymentDueAt,
+            result.IsBalancePaymentDeadlineExpired,
+            result.BookingStatus,
+            pricingBreakdown));
     }
 
     [HttpPost("api/payments")]

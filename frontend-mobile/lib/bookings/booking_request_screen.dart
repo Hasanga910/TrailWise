@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../auth/current_user.dart';
+import '../models/active_discount.dart';
 import '../models/package_tier.dart';
 import '../models/tour_package.dart';
 
@@ -31,6 +32,36 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
   final _groupSizeController = TextEditingController(text: '1');
   final _budgetController = TextEditingController();
   final _specialRequestsController = TextEditingController();
+
+  List<ActiveDiscount> _activeDiscounts = [];
+  bool _loadingDiscounts = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveDiscounts();
+  }
+
+  Future<void> _loadActiveDiscounts() async {
+    try {
+      final res = await _apiClient.get('/api/discounts/active');
+      if (res is List && mounted) {
+        setState(() {
+          _activeDiscounts = res
+              .map((e) => ActiveDiscount.fromJson(e as Map<String, dynamic>))
+              .toList();
+        });
+      }
+    } catch (_) {
+      // ignore
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingDiscounts = false;
+        });
+      }
+    }
+  }
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -239,6 +270,8 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     errorText: _fieldErrors['groupSize'],
                   ),
                 ),
+                const SizedBox(height: 8),
+                _buildAvailableDiscountsSection(),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _budgetController,
@@ -280,6 +313,98 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAvailableDiscountsSection() {
+    if (_loadingDiscounts) {
+      return const SizedBox(
+        height: 24,
+        child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+
+    if (_activeDiscounts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.teal.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.local_offer, size: 16, color: Colors.teal.shade700),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Available Group Discounts',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: Colors.teal.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ..._activeDiscounts.map((discount) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${discount.percentageOff.toStringAsFixed(0)}% off',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: Colors.teal.shade900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Groups of ${discount.minGroupSize} or more',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                      ),
+                      Text(
+                        discount.formattedValidity,
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )),
+          const SizedBox(height: 4),
+          Text(
+            'Eligible discounts are applied automatically during pricing.',
+            style: TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ],
       ),
     );
   }
