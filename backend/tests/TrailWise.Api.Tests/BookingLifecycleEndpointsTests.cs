@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Bookings;
+using TrailWise.Api.Contracts.Common;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;
@@ -98,6 +99,79 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Decide_Approve_AutoAssignsVehicleAndDriverFromWorkflowStepLog()
+    {
+        var (_, bookingId, _) = await SetupBookingAsync(BookingStatus.PlanProposed);
+
+        Guid vehicleId;
+        Guid driverId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+
+            var vehicle = new Vehicle
+            {
+                Type = VehicleType.Van,
+                RegistrationNumber = $"AUTO-{Guid.NewGuid():N}"[..10],
+                Capacity = 10,
+                HasAC = true,
+                MaintenanceStatus = VehicleMaintenanceStatus.Available
+            };
+            var driver = new Driver
+            {
+                Name = "Auto Driver",
+                ContactInfo = "0771234567"
+            };
+            db.Vehicles.Add(vehicle);
+            db.Drivers.Add(driver);
+            await db.SaveChangesAsync();
+
+            vehicleId = vehicle.Id;
+            driverId = driver.Id;
+
+            var run = new AgentWorkflowRun
+            {
+                BookingId = bookingId,
+                Objective = "Test objective.",
+                PlanJson = "{}",
+                Status = "AwaitingApproval",
+                StartedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            };
+            db.AgentWorkflowRuns.Add(run);
+            await db.SaveChangesAsync();
+
+            db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRunId = run.Id,
+                AgentName = "FleetCapacityAgent",
+                InputJson = "{}",
+                OutputJson = $"{{\"vehicleId\":\"{vehicleId}\",\"driverId\":\"{driverId}\"}}",
+                DurationMs = 10
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var managerClient = await AuthenticatedOperationsManagerAsync();
+        var response = await managerClient.PatchAsJsonAsync($"/api/bookings/{bookingId}/decision", new
+        {
+            Decision = "Approve",
+            Notes = "Approved plan"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using (var verifyScope = _factory.Services.CreateScope())
+        {
+            var verifyDb = verifyScope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var assignment = await verifyDb.VehicleAssignments.FirstOrDefaultAsync(a => a.BookingId == bookingId);
+            Assert.NotNull(assignment);
+            Assert.Equal(vehicleId, assignment.VehicleId);
+            Assert.Equal(driverId, assignment.DriverId);
+        }
     }
 
     [Fact]
@@ -240,6 +314,52 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         var response = await managerClient.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMine_WithStatusPending_ReturnsAllPendingStatuses()
+    {
+        var (client, _, travelerId) = await SetupBookingAsync(BookingStatus.Requested);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FirstAsync(b => b.TravelerId == travelerId);
+            
+            // Add another booking with PlanProposed and another with Confirmed
+            var p2 = new Booking
+            {
+                TravelerId = travelerId,
+                TourPackageId = booking.TourPackageId,
+                PackageTierId = booking.PackageTierId,
+                GroupSize = 2,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
+                EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(13)),
+                BudgetPerPerson = 500m,
+                Status = BookingStatus.PlanProposed
+            };
+            var p3 = new Booking
+            {
+                TravelerId = travelerId,
+                TourPackageId = booking.TourPackageId,
+                PackageTierId = booking.PackageTierId,
+                GroupSize = 2,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20)),
+                EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(23)),
+                BudgetPerPerson = 500m,
+                Status = BookingStatus.Confirmed
+            };
+            db.Bookings.AddRange(p2, p3);
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.GetAsync("/api/bookings/mine?status=Pending");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var paged = await response.Content.ReadFromJsonAsync<PagedResult<BookingDto>>(JsonOptions);
+        Assert.NotNull(paged);
+        Assert.Equal(2, paged.TotalCount);
+        Assert.All(paged.Items, b => Assert.Contains(b.Status, new[] { BookingStatus.Requested, BookingStatus.PlanProposed, BookingStatus.PendingApproval, BookingStatus.NeedsManualReview }));
     }
 
     private async Task<(HttpClient Client, Guid BookingId, Guid TravelerId)> SetupBookingAsync(

@@ -318,4 +318,66 @@ public class FleetCapacityAgentTests
         Assert.Equal(Guid.Empty, result.DriverId);
         Assert.True(result.ConflictCheck);
     }
+
+    [Fact]
+    public async Task MatchAsync_MultipleSuitableVehiclesAvailable_SelectsVehicleWithLeastUnusedCapacity()
+    {
+        var db = TestDbContextFactory.Create();
+
+        // 3 suitable available vehicles with capacities 12, 4, and 8
+        var largeCoach = new Vehicle
+        {
+            Type = VehicleType.Coach,
+            Capacity = 12,
+            HasAC = true,
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        };
+        var smallCar = new Vehicle
+        {
+            Type = VehicleType.SUV,
+            Capacity = 4,
+            HasAC = true,
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        };
+        var mediumVan = new Vehicle
+        {
+            Type = VehicleType.Van,
+            Capacity = 8,
+            HasAC = true,
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        };
+        db.Vehicles.AddRange(largeCoach, smallCar, mediumVan);
+
+        var driver = new Driver { Name = "Available Driver", LicenseNumber = "D-1", ContactInfo = "0771234567" };
+        db.Drivers.Add(driver);
+
+        var package = new TourPackage { Name = "P", Theme = "T", DurationDays = 2, BasePricePerPerson = 100m, MaxGroupSize = 20 };
+        var tier = new PackageTier { TourPackage = package, ClassType = ClassType.First, BasePricePerPerson = 100m, RequiresAC = true };
+        var traveler = new User { Name = "U", Email = $"u-{Guid.NewGuid():N}@test.com", ContactNumber = "+111", PasswordHash = "h", Role = UserRole.Traveler };
+
+        // Booking with 3 guests -> smallCar (Capacity 4) has least unused capacity (1 unused seat)
+        var booking = new Booking
+        {
+            Traveler = traveler,
+            TourPackage = package,
+            PackageTier = tier,
+            GroupSize = 3,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(8)),
+            BudgetPerPerson = 200m
+        };
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+
+        var sut = new FleetCapacityAgent(db, NullLogger<FleetCapacityAgent>.Instance);
+        var result = await sut.MatchAsync(booking.Id);
+
+        // Must assign the 4-seater (smallCar), NOT the 8-seater or 12-seater
+        Assert.Equal(smallCar.Id, result.VehicleId);
+        Assert.Equal(driver.Id, result.DriverId);
+        Assert.True(result.AcMatch);
+        Assert.True(result.SeatConfigMatch);
+        Assert.False(result.ConflictCheck);
+    }
 }
+

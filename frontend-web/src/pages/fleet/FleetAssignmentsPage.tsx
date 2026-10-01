@@ -275,8 +275,11 @@ export function FleetAssignmentsPage() {
 
                       <td className="px-5 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-xs font-semibold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
-                            {item.bookingId.slice(0, 8)}...
+                          <span
+                            title={item.bookingId}
+                            className="font-mono text-xs font-semibold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-100"
+                          >
+                            {item.bookingId.length > 8 ? `${item.bookingId.slice(0, 8)}...` : item.bookingId}
                           </span>
                           {item.travelerName && (
                             <span className="text-xs font-medium text-slate-700">({item.travelerName})</span>

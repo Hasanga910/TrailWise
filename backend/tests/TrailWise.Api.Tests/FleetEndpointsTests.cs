@@ -640,6 +640,154 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.Equal(HttpStatusCode.NotFound, assignmentRes.StatusCode);
     }
 
+    [Fact]
+    public async Task Driver_CanLogin_And_QueryAssignedToursPortal()
+    {
+        var adminClient = await AdminClientAsync();
+
+        // 1. Create a Driver staff user
+        var driverEmail = $"driver-{Guid.NewGuid():N}@example.com";
+        var driverPassword = "P@ssword123!";
+        var driverName = "Perera Driver";
+        var driverContact = "+94778889999";
+
+        var createUserRes = await adminClient.PostAsJsonAsync("/api/auth/admin/users", new
+        {
+            Name = driverName,
+            Email = driverEmail,
+            Password = driverPassword,
+            ContactNumber = driverContact,
+            Role = "Driver"
+        });
+        createUserRes.EnsureSuccessStatusCode();
+
+        // 2. Log in as Driver
+        var driverClient = _factory.CreateClient();
+        var loginRes = await driverClient.PostAsJsonAsync("/api/auth/login", new
+        {
+            Email = driverEmail,
+            Password = driverPassword
+        });
+        loginRes.EnsureSuccessStatusCode();
+        var auth = await loginRes.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        Assert.NotNull(auth);
+        Assert.Equal("Driver", auth.User.Role.ToString());
+        driverClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+
+        // Initially no assignments
+        var initialRes = await driverClient.GetAsync("/api/drivers/me/assignments");
+        initialRes.EnsureSuccessStatusCode();
+        var initialList = await initialRes.Content.ReadFromJsonAsync<List<VehicleAssignmentDetailDto>>(JsonOptions);
+        Assert.NotNull(initialList);
+        Assert.Empty(initialList);
+
+        // 3. Admin creates a vehicle & reserves for a booking assigned to this driver
+        var regNo = NewRegistrationNumber();
+        var vehicleRes = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.Van,
+            RegistrationNumber = regNo,
+            Capacity = 8,
+            HasAC = true,
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        });
+        var vehicle = await vehicleRes.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
+
+        var driversRes = await adminClient.GetAsync("/api/drivers");
+        var drivers = await driversRes.Content.ReadFromJsonAsync<List<DriverDto>>(JsonOptions);
+        var driverProfile = drivers!.FirstOrDefault(d => d.Name == driverName);
+        Assert.NotNull(driverProfile);
+
+        var travelerClient = await TravelerClientAsync();
+        var pkgsRes = await adminClient.GetAsync("/api/packages");
+        var packages = await pkgsRes.Content.ReadFromJsonAsync<List<TourPackageDto>>(JsonOptions);
+        var tier = packages![0].Tiers[0];
+
+        var bookingRes = await travelerClient.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 3,
+            StartDate = new DateOnly(2026, 12, 1),
+            EndDate = new DateOnly(2026, 12, 5),
+            BudgetPerPerson = 400m
+        });
+        var booking = await bookingRes.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+
+        var reserveRes = await adminClient.PostAsJsonAsync($"/api/vehicles/{vehicle!.Id}/reservations", new ReserveVehicleRequest
+        {
+            DriverId = driverProfile.Id,
+            BookingId = booking!.Id,
+            StartDate = new DateOnly(2026, 12, 1),
+            EndDate = new DateOnly(2026, 12, 5)
+        });
+        reserveRes.EnsureSuccessStatusCode();
+
+        // 4. Query driver assignments endpoint
+        var myAssignmentsRes = await driverClient.GetAsync("/api/drivers/me/assignments");
+        myAssignmentsRes.EnsureSuccessStatusCode();
+        var myAssignments = await myAssignmentsRes.Content.ReadFromJsonAsync<List<VehicleAssignmentDetailDto>>(JsonOptions);
+        Assert.NotNull(myAssignments);
+        Assert.Single(myAssignments);
+
+        var assignment = myAssignments[0];
+        Assert.Equal(booking.Id, assignment.BookingId);
+        Assert.Equal(driverProfile.Id, assignment.DriverId);
+        Assert.Equal(vehicle!.RegistrationNumber, assignment.RegistrationNumber);
+        Assert.Equal(VehicleType.Van, assignment.VehicleType);
+        Assert.True(assignment.HasAC);
+        Assert.NotNull(assignment.TravelerName);
+        Assert.NotNull(assignment.TravelerContact);
+        Assert.NotNull(assignment.PackageName);
+        Assert.NotNull(assignment.PackageTier);
+    }
+
+    [Fact]
+    public async Task CreateDriver_WithEmailAndPassword_ProvisionsUserAccountAndEnablesLogin()
+    {
+        var adminClient = await AdminClientAsync();
+
+        // 1. Create a driver with email and password via coordinator/admin endpoint
+        var driverEmail = $"driver-{Guid.NewGuid():N}@trailwise.local";
+        var driverPassword = "DriverPass123!";
+        var driverName = "Dynamic Pro Driver";
+
+        var createDriverRes = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        {
+            Name = driverName,
+            ContactInfo = "+94770001122",
+            LicenseNumber = $"LIC-{Guid.NewGuid():N}"[..10],
+            Email = driverEmail,
+            Password = driverPassword
+        });
+        createDriverRes.EnsureSuccessStatusCode();
+        var createdDriver = await createDriverRes.Content.ReadFromJsonAsync<DriverDto>(JsonOptions);
+        Assert.NotNull(createdDriver);
+        Assert.Equal(driverEmail, createdDriver.Email);
+        Assert.NotNull(createdDriver.UserId);
+
+        // 2. Driver should be able to log in directly using the provisioned credentials
+        var client = _factory.CreateClient();
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            Email = driverEmail,
+            Password = driverPassword
+        });
+        loginResponse.EnsureSuccessStatusCode();
+        var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        Assert.NotNull(auth);
+        Assert.Equal(UserRole.Driver, auth.User.Role);
+
+        // 3. Authenticate with this newly provisioned driver token and check assignments
+        var driverClient = _factory.CreateClient();
+        driverClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.Token);
+
+        var myAssignmentsRes = await driverClient.GetAsync("/api/drivers/me/assignments");
+        myAssignmentsRes.EnsureSuccessStatusCode();
+        var myAssignments = await myAssignmentsRes.Content.ReadFromJsonAsync<List<VehicleAssignmentDetailDto>>(JsonOptions);
+        Assert.NotNull(myAssignments);
+        Assert.Empty(myAssignments);
+    }
+
     private static string NewRegistrationNumber() => $"REG-{Guid.NewGuid():N}"[..12];
 
     private async Task<HttpClient> AdminClientAsync()

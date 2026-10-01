@@ -82,7 +82,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('No schedule steps have been created for this tour yet'), findsOneWidget);
+      expect(find.text('No schedule steps have been created for this tour yet. Detailed milestones will appear here as tour dates approach.'), findsOneWidget);
     });
 
     testWidgets('shows an error state with a retry button on failure', (tester) async {

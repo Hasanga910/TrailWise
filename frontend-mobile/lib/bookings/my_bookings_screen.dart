@@ -368,7 +368,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   ),
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('All')),
-                    ...BookingStatus.all
+                    ...BookingStatus.filterOptions
                         .map((s) => DropdownMenuItem<String?>(value: s, child: Text(s))),
                   ],
                   onChanged: (value) {

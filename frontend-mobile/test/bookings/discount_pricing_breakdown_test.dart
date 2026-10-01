@@ -4,13 +4,10 @@ import 'package:trailwise_mobile/api/api_client.dart';
 import 'package:trailwise_mobile/bookings/booking_request_screen.dart';
 import 'package:trailwise_mobile/bookings/booking_status.dart';
 import 'package:trailwise_mobile/bookings/payment_status_screen.dart';
-import 'package:trailwise_mobile/models/active_discount.dart';
 import 'package:trailwise_mobile/models/booking.dart';
 import 'package:trailwise_mobile/models/package_tier.dart';
 import 'package:trailwise_mobile/models/payment_status.dart';
 import 'package:trailwise_mobile/models/tour_package.dart';
-
-import '../fakes/fake_api_client.dart';
 
 class StubApiClient extends ApiClient {
   StubApiClient({this.getHandler});

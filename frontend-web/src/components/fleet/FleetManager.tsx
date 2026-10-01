@@ -3,10 +3,12 @@ import { extractErrorMessage } from '../../api/apiClient';
 import {
   checkDriverAvailability,
   checkVehicleAvailability,
+  getAssignmentByBookingId,
   getDrivers,
   getVehicles,
   reserveVehicle,
   type DriverDto,
+  type VehicleAssignmentDetailDto,
   type VehicleDto,
   type VehicleMaintenanceStatus,
   type VehicleType,
@@ -137,6 +139,9 @@ export function FleetManager() {
   const [workflowPlan, setWorkflowPlan] = useState<AgentWorkflowDto | null>(null);
   const [workflowLoading, setWorkflowLoading] = useState(false);
 
+  // Active vehicle assignment for the selected booking
+  const [currentAssignment, setCurrentAssignment] = useState<VehicleAssignmentDetailDto | null>(null);
+
   // Allocation modal state
   const [allocatingVehicle, setAllocatingVehicle] = useState<VehicleDto | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState('');
@@ -249,6 +254,18 @@ export function FleetManager() {
       isMounted = false;
     };
   }, [selectedBooking, drivers]);
+
+  // When selectedBooking changes, fetch its existing vehicle assignment if any
+  useEffect(() => {
+    if (!selectedBooking) {
+      setCurrentAssignment(null);
+      return;
+    }
+
+    getAssignmentByBookingId(selectedBooking.id)
+      .then((data) => setCurrentAssignment(data))
+      .catch(() => setCurrentAssignment(null));
+  }, [selectedBooking]);
 
   // When selectedBooking is in PlanProposed status, load its agent workflow details
   useEffect(() => {
@@ -559,6 +576,36 @@ export function FleetManager() {
                   <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-900">
                     <span className="font-bold">Special Requests: </span>
                     {selectedBooking.specialRequests}
+                  </div>
+                )}
+
+                {/* Assigned Vehicle & Driver Display Card */}
+                {currentAssignment && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold">
+                        🚐
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-emerald-900 text-sm">{currentAssignment.vehicleName}</span>
+                          {currentAssignment.registrationNumber && (
+                            <span className="font-mono text-[11px] bg-white border border-emerald-300 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                              {currentAssignment.registrationNumber}
+                            </span>
+                          )}
+                          <span className="text-[10px] font-semibold uppercase bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full">
+                            Vehicle Assigned
+                          </span>
+                        </div>
+                        <p className="text-emerald-700 text-xs mt-0.5">
+                          Assigned Driver: <span className="font-semibold text-emerald-900">{currentAssignment.driverName}</span> {currentAssignment.driverContact ? `(${currentAssignment.driverContact})` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-emerald-800 font-medium bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-200 self-start sm:self-auto">
+                      Confirmed Dispatch
+                    </span>
                   </div>
                 )}
               </div>

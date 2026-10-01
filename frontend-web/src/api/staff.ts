@@ -1,7 +1,7 @@
 import { apiClient } from './apiClient';
 import type { UserRole } from '../auth/types';
 
-export type StaffRole = 'TourGuide' | 'OperationsManager' | 'FleetCoordinator';
+export type StaffRole = 'TourGuide' | 'OperationsManager' | 'FleetCoordinator' | 'Driver';
 
 export interface StaffMember {
   id: string;
