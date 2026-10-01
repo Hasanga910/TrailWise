@@ -75,6 +75,26 @@ public static class DependencyInjection
         services.AddSingleton<BookingPaymentExpiryService>();
         services.AddHostedService(sp => sp.GetRequiredService<BookingPaymentExpiryService>());
 
+        var notifyLkUserId = configuration["NOTIFY_LK_USER_ID"] ?? configuration["NotifyLk:UserId"] ?? string.Empty;
+        var notifyLkApiKey = configuration["NOTIFY_LK_API_KEY"] ?? configuration["NotifyLk:ApiKey"] ?? string.Empty;
+        var notifyLkSenderId = configuration["NOTIFY_LK_SENDER_ID"] ?? configuration["NotifyLk:SenderId"] ?? "NotifyDEMO";
+        var notifyLkEndpoint = configuration["NotifyLk:ApiEndpoint"] ?? "https://app.notify.lk/api/v1/send";
+
+        services.Configure<NotifyLkOptions>(options =>
+        {
+            options.UserId = notifyLkUserId;
+            options.ApiKey = notifyLkApiKey;
+            options.SenderId = notifyLkSenderId;
+            options.ApiEndpoint = notifyLkEndpoint;
+        });
+
+        services.AddHttpClient<ISmsService, NotifyLkSmsService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+
+        services.AddScoped<IBookingNotificationService, BookingNotificationService>();
+
         return services;
     }
 }

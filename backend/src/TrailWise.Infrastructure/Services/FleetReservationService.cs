@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
@@ -9,12 +10,17 @@ namespace TrailWise.Infrastructure.Services;
 public class FleetReservationService : IFleetReservationService
 {
     private readonly TrailWiseDbContext _db;
+    private readonly IServiceScopeFactory? _scopeFactory;
     private readonly ILogger<FleetReservationService> _logger;
 
-    public FleetReservationService(TrailWiseDbContext db, ILogger<FleetReservationService> logger)
+    public FleetReservationService(
+        TrailWiseDbContext db,
+        ILogger<FleetReservationService> logger,
+        IServiceScopeFactory? scopeFactory = null)
     {
         _db = db;
         _logger = logger;
+        _scopeFactory = scopeFactory;
     }
 
     public async Task<bool> IsVehicleAvailableAsync(Guid vehicleId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default)
@@ -149,10 +155,12 @@ public class FleetReservationService : IFleetReservationService
 
             _db.VehicleAssignments.Add(assignment);
 
+            bool transitionedToConfirmed = false;
             // If the booking was pending approval, plan proposed, or required manual intervention, manual vehicle allocation resolves it!
             if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval || booking.Status == BookingStatus.PlanProposed)
             {
                 booking.Status = BookingStatus.Confirmed;
+                transitionedToConfirmed = true;
                 _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator vehicle allocation.", bookingId);
             }
 
@@ -165,6 +173,23 @@ public class FleetReservationService : IFleetReservationService
 
             _logger.LogInformation("Vehicle {VehicleId} successfully reserved for booking {BookingId} from {StartDate} to {EndDate}.",
                 vehicleId, bookingId, startDate, endDate);
+
+            if (transitionedToConfirmed && _scopeFactory is not null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
+                        await notificationService.SendBookingConfirmedNotificationsAsync(bookingId, CancellationToken.None);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", bookingId);
+                    }
+                });
+            }
 
             return ReservationResult.Success(assignment);
         }
