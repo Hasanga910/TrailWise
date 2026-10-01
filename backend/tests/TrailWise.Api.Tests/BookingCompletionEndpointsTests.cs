@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Bookings;
+using TrailWise.Api.Contracts.Payments;
 using TrailWise.Api.Contracts.Reviews;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
@@ -224,6 +225,46 @@ public class BookingCompletionEndpointsTests : IClassFixture<TrailWiseWebApplica
         });
         Assert.Equal(HttpStatusCode.BadRequest, prematureReviewResponse.StatusCode);
 
+        // Seed pricing and full payment so review becomes eligible once completed
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.Include(b => b.PackageTier).FirstAsync(b => b.Id == bookingId);
+            var totalCost = booking.PackageTier.BasePricePerPerson * booking.GroupSize;
+            var run = new AgentWorkflowRun
+            {
+                Booking = booking,
+                Objective = "Pricing Test",
+                Status = "Completed",
+                StartedAt = DateTimeOffset.UtcNow
+            };
+            db.AgentWorkflowRuns.Add(run);
+            db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new
+                {
+                    totalCost,
+                    breakdown = "{}",
+                    validationResult = "Valid"
+                }),
+                DurationMs = 10
+            });
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = totalCost,
+                Status = PaymentStatus.FullyPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-5),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-5),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/test.jpg"
+            });
+            await db.SaveChangesAsync();
+        }
+
         // 2. OperationsManager completes the confirmed booking
         var (opsClient, _) = await AuthenticatedOperationsManagerWithIdAsync();
         var completeResponse = await opsClient.PostAsync($"/api/bookings/{bookingId}/complete", null);
@@ -245,6 +286,135 @@ public class BookingCompletionEndpointsTests : IClassFixture<TrailWiseWebApplica
         Assert.Equal(bookingId, reviewDto.BookingId);
         Assert.Equal(5, reviewDto.Rating);
         Assert.Equal("Superb tour experience! Everything was seamless.", reviewDto.Comment);
+    }
+
+    [Fact]
+    public async Task Test18_Completion_WithOutstandingBalance_SetsBalancePaymentDueAt_AndLogsAudit()
+    {
+        var (travelerClient, travelerId) = await AuthenticatedTravelerWithIdAsync();
+        var (bookingId, _, _, _) = await SeedBookingAsync(BookingStatus.Confirmed, travelerId);
+
+        decimal totalCost = 600m;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+
+            var run = new AgentWorkflowRun
+            {
+                Booking = booking,
+                Objective = "Pricing",
+                Status = "Completed",
+                StartedAt = DateTimeOffset.UtcNow
+            };
+            db.AgentWorkflowRuns.Add(run);
+            db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new { totalCost, validationResult = "Valid" }),
+                DurationMs = 10
+            });
+            // Deposit of 300 paid (outstanding balance 300)
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = 300m,
+                Status = PaymentStatus.DepositPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-2),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-2),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/dep.jpg"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var (opsClient, opsManagerId) = await AuthenticatedOperationsManagerWithIdAsync();
+        var completeResponse = await opsClient.PostAsync($"/api/bookings/{bookingId}/complete", null);
+        Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+            Assert.Equal(BookingStatus.Completed, booking.Status);
+            Assert.NotNull(booking.BalancePaymentDueAt);
+            Assert.True(booking.BalancePaymentDueAt > DateTimeOffset.UtcNow.AddHours(23));
+
+            var auditLog = await db.AuditLogs
+                .FirstOrDefaultAsync(a => a.EntityType == "Booking" && a.EntityId == bookingId && a.Action == "BalancePaymentDeadlineSet");
+            Assert.NotNull(auditLog);
+            Assert.Equal(opsManagerId, auditLog.PerformedBy);
+            Assert.Contains(booking.BalancePaymentDueAt.Value.ToString("yyyy-MM-dd"), auditLog.Details);
+        }
+
+        // Verify PaymentStatus endpoint
+        var statusResp = await travelerClient.GetAsync($"/api/bookings/{bookingId}/payment-status");
+        Assert.Equal(HttpStatusCode.OK, statusResp.StatusCode);
+        var statusDto = await statusResp.Content.ReadFromJsonAsync<PaymentStatusDto>(JsonOptions);
+        Assert.NotNull(statusDto);
+        Assert.NotNull(statusDto.BalancePaymentDueAt);
+        Assert.False(statusDto.IsBalancePaymentDeadlineExpired);
+    }
+
+    [Fact]
+    public async Task Test19_Completion_WhenFullyPaid_LeavesBalancePaymentDueAtNull()
+    {
+        var (travelerClient, travelerId) = await AuthenticatedTravelerWithIdAsync();
+        var (bookingId, _, _, _) = await SeedBookingAsync(BookingStatus.Confirmed, travelerId);
+
+        decimal totalCost = 600m;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+
+            var run = new AgentWorkflowRun
+            {
+                Booking = booking,
+                Objective = "Pricing",
+                Status = "Completed",
+                StartedAt = DateTimeOffset.UtcNow
+            };
+            db.AgentWorkflowRuns.Add(run);
+            db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new { totalCost, validationResult = "Valid" }),
+                DurationMs = 10
+            });
+            // Fully paid
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = totalCost,
+                Status = PaymentStatus.FullyPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-2),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-2),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/full.jpg"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var (opsClient, _) = await AuthenticatedOperationsManagerWithIdAsync();
+        var completeResponse = await opsClient.PostAsync($"/api/bookings/{bookingId}/complete", null);
+        Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+            Assert.Equal(BookingStatus.Completed, booking.Status);
+            Assert.Null(booking.BalancePaymentDueAt);
+        }
     }
 
     private async Task<(Guid BookingId, Guid PackageId, Guid TravelerId, DateTimeOffset OriginalUpdatedAt)> SeedBookingAsync(

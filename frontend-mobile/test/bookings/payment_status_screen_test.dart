@@ -5,6 +5,7 @@ import 'package:trailwise_mobile/bookings/my_bookings_screen.dart';
 import 'package:trailwise_mobile/bookings/payment_status_screen.dart';
 import 'package:trailwise_mobile/models/booking.dart';
 import 'package:trailwise_mobile/models/package_tier.dart';
+import 'package:trailwise_mobile/models/payment_status.dart';
 
 class RecordedMultipartCall {
   final String path;
@@ -1748,5 +1749,773 @@ void main() {
     expect(find.text('Change File'), findsOneWidget);
     expect(find.text('Remove'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('45. Completed + remaining balance shows payment form and allows payment submission', (tester) async {
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+        },
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'Pending',
+          'hasPendingVerification': true,
+        },
+      ],
+      postMultipartResponse: {
+        'id': 'payment-balance-1',
+        'status': 'Pending',
+      },
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        slipPicker: () async => _dummySlip(name: 'balance_slip.png', extension: 'png'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Make a Payment'), findsOneWidget);
+    expect(find.text('Payments can only be made for confirmed or completed bookings.'), findsNothing);
+
+    // Pick slip and submit
+    final pickBtn = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+
+    final submitBtn = find.widgetWithText(FilledButton, 'Submit Payment');
+    await tester.ensureVisible(submitBtn);
+    await tester.tap(submitBtn);
+    await tester.pumpAndSettle();
+
+    expect(client.postMultipartCallCount, 1);
+    expect(client.recordedMultipartCalls.first.fields['amount'], '400.00');
+  });
+
+  testWidgets('46. Completed + pending verification blocks payment form', (tester) async {
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': true,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Payment verification pending'), findsOneWidget);
+    expect(find.text('Make a Payment'), findsNothing);
+  });
+
+  testWidgets('47. Completed + FullyPaid displays settled state', (tester) async {
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 800.0,
+          'remainingAmount': 0.0,
+          'status': 'FullyPaid',
+          'hasPendingVerification': false,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Booking is fully paid.'), findsOneWidget);
+    expect(find.text('Make a Payment'), findsNothing);
+  });
+
+  testWidgets('48. Completed booking does not show advance countdown even if paymentDueAt is set', (tester) async {
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'paymentDueAt': DateTime.now().add(const Duration(hours: 1)).toUtc().toIso8601String(),
+          'isPaymentDeadlineExpired': false,
+          'minimumAdvance': 400.0,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('advance_payment_deadline_card')), findsNothing);
+    expect(find.textContaining('Advance payment due in'), findsNothing);
+    expect(find.text('Make a Payment'), findsOneWidget);
+  });
+
+  testWidgets('49. Completed unpaid + balance deadline future -> final-balance countdown visible', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-02T12:00:00Z',
+          'isBalancePaymentDeadlineExpired': false,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsOneWidget);
+    expect(find.text('Final balance due in 24:00:00'), findsOneWidget);
+    expect(find.text('Remaining balance due in 24:00:00'), findsOneWidget);
+    expect(find.byKey(const Key('advance_payment_deadline_card')), findsNothing);
+  });
+
+  testWidgets('50. Completed countdown decreases on tick', (tester) async {
+    setTestViewport(tester);
+    var currentTime = DateTime.utc(2026, 10, 1, 12, 0, 0);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-02T12:00:00Z',
+          'isBalancePaymentDeadlineExpired': false,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => currentTime,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Final balance due in 24:00:00'), findsOneWidget);
+
+    currentTime = DateTime.utc(2026, 10, 1, 12, 0, 1);
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Final balance due in 23:59:59'), findsOneWidget);
+  });
+
+  testWidgets('51. Completed pending verification -> final countdown hidden', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': true,
+          'balancePaymentDueAt': '2026-10-02T12:00:00Z',
+          'isBalancePaymentDeadlineExpired': false,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsNothing);
+    expect(find.text('Payment verification pending'), findsOneWidget);
+  });
+
+  testWidgets('52. Completed fully paid -> final countdown hidden', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 800.0,
+          'remainingAmount': 0.0,
+          'status': 'FullyPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': null,
+          'isBalancePaymentDeadlineExpired': false,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsNothing);
+    expect(find.text('Booking is fully paid.'), findsOneWidget);
+  });
+
+  testWidgets('53. Completed expired -> payment form hidden and support guidance shown', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-01T10:00:00Z',
+          'isBalancePaymentDeadlineExpired': true,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('completed_balance_deadline_expired_card')), findsOneWidget);
+    expect(find.text('Final payment deadline expired'), findsOneWidget);
+    expect(find.text('Please contact TrailWise Support for assistance with the remaining balance.'), findsOneWidget);
+    expect(find.text('Make a Payment'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Submit Payment'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Choose Bank Slip'), findsNothing);
+    expect(find.byKey(const Key('advance_payment_deadline_card')), findsNothing);
+    expect(find.byKey(const Key('payment_deadline_expired_card')), findsNothing);
+  });
+
+  testWidgets('54. Completed expired -> outstanding balance still displayed in financial summary', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 300.0,
+          'remainingAmount': 500.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-01T10:00:00Z',
+          'isBalancePaymentDeadlineExpired': true,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Financial Summary'), findsOneWidget);
+    expect(find.text('Remaining Balance:'), findsOneWidget);
+    expect(find.text('\$500.00'), findsOneWidget);
+  });
+
+  testWidgets('55. Completed legacy null deadline -> no countdown and compatible payment behavior', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': null,
+          'isBalancePaymentDeadlineExpired': false,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsNothing);
+    expect(find.byKey(const Key('completed_balance_deadline_expired_card')), findsNothing);
+    expect(find.text('Make a Payment'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Submit Payment'), findsOneWidget);
+  });
+
+  testWidgets('56. Completed timer stops at zero, cancels, and refreshes payment status without going negative', (tester) async {
+    setTestViewport(tester);
+    var currentTime = DateTime.utc(2026, 10, 1, 11, 59, 59);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-01T12:00:00Z',
+          'isBalancePaymentDeadlineExpired': false,
+        },
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-01T12:00:00Z',
+          'isBalancePaymentDeadlineExpired': true,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => currentTime,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Final balance due in 00:00:01'), findsOneWidget);
+    expect(client.getCallCount, 1);
+
+    currentTime = DateTime.utc(2026, 10, 1, 12, 0, 0);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+
+    expect(client.getCallCount, 2);
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsNothing);
+    expect(find.textContaining('00:00:-'), findsNothing);
+    expect(find.byKey(const Key('completed_balance_deadline_expired_card')), findsOneWidget);
+  });
+
+  testWidgets('57. Completed timer is disposed safely when screen is unmounted', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-02T12:00:00Z',
+          'isBalancePaymentDeadlineExpired': false,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsNothing);
+  });
+
+  testWidgets('58. Completed balance submission succeeds before deadline', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-02T12:00:00Z',
+          'isBalancePaymentDeadlineExpired': false,
+        },
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'Pending',
+          'hasPendingVerification': true,
+        },
+      ],
+      postMultipartResponse: {
+        'id': 'payment-balance-1',
+        'status': 'Pending',
+      },
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+        slipPicker: () async => _dummySlip(name: 'final_balance_slip.png', extension: 'png'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsOneWidget);
+
+    final pickBtn = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+
+    final submitBtn = find.widgetWithText(FilledButton, 'Submit Payment');
+    await tester.ensureVisible(submitBtn);
+    await tester.tap(submitBtn);
+    await tester.pumpAndSettle();
+
+    expect(client.postMultipartCallCount, 1);
+    expect(client.recordedMultipartCalls.first.fields['amount'], '400.00');
+  });
+
+  testWidgets('59. Completed late submission shows backend deadline error', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 400.0,
+          'remainingAmount': 400.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'balancePaymentDueAt': '2026-10-01T12:00:00Z',
+          'isBalancePaymentDeadlineExpired': false,
+        },
+      ],
+      postError: ApiException(
+        400,
+        'Final payment deadline has expired. Please contact support.',
+      ),
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Completed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 11, 0, 0),
+        slipPicker: () async => _dummySlip(name: 'late_slip.png', extension: 'png'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final pickBtn = find.widgetWithText(OutlinedButton, 'Choose Bank Slip');
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+
+    final submitBtn = find.widgetWithText(FilledButton, 'Submit Payment');
+    await tester.ensureVisible(submitBtn);
+    await tester.tap(submitBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Final payment deadline has expired. Please contact support.'), findsOneWidget);
+  });
+
+  test('60. PaymentStatusDto fromJson parses bookingStatus', () {
+    final json = {
+      'bookingId': 'booking-1',
+      'totalCost': 1000.0,
+      'totalPaid': 500.0,
+      'remainingAmount': 500.0,
+      'status': 'DepositPaid',
+      'bookingStatus': 'Completed',
+    };
+    final dto = PaymentStatusDto.fromJson(json);
+    expect(dto.bookingStatus, 'Completed');
+
+    // Backward compatibility when absent
+    final legacyDto = PaymentStatusDto.fromJson({
+      'bookingId': 'booking-2',
+      'totalCost': 1000.0,
+      'totalPaid': 0.0,
+      'remainingAmount': 1000.0,
+      'status': 'Unpaid',
+    });
+    expect(legacyDto.bookingStatus, isNull);
+  });
+
+  testWidgets('61. Stale widget Confirmed + API Completed uses Completed', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 1000.0,
+          'totalPaid': 500.0,
+          'remainingAmount': 500.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'bookingStatus': 'Completed',
+          'balancePaymentDueAt': '2026-10-02T12:00:00Z',
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Confirmed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Effective status displays Completed, not stale Confirmed
+    expect(find.text('Completed'), findsOneWidget);
+    // Shows balance guidance card
+    expect(find.text('Balance payment'), findsOneWidget);
+  });
+
+  testWidgets('62. Balance countdown appears when API says Completed', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 1000.0,
+          'totalPaid': 500.0,
+          'remainingAmount': 500.0,
+          'status': 'DepositPaid',
+          'hasPendingVerification': false,
+          'bookingStatus': 'Completed',
+          'balancePaymentDueAt': '2026-10-01T14:30:00Z',
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Confirmed'), // stale widget status
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('balance_payment_deadline_card')), findsOneWidget);
+    expect(find.text('Final balance due in 02:30:00'), findsOneWidget);
+  });
+
+  testWidgets('63. Advance countdown appears when API says Confirmed + PaymentDueAt', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 1000.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 1000.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'bookingStatus': 'Confirmed',
+          'paymentDueAt': '2026-10-01T13:00:00Z',
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'PendingApproval'), // stale widget status
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('advance_payment_deadline_card')), findsOneWidget);
+    expect(find.text('Advance payment due in 01:00:00'), findsOneWidget);
+  });
+
+  testWidgets('64. Live API lifecycle status overrides stale widget status', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'bookingStatus': 'Confirmed',
+          'paymentDueAt': '2026-10-01T13:00:00Z',
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Requested'), // Non-payable Requested in widget
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 0, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Since API says Confirmed, payment form is rendered
+    expect(find.text('Make a Payment'), findsOneWidget);
+    expect(find.text('Confirmed'), findsOneWidget);
+  });
+
+  testWidgets('65. Timer still stops at zero', (tester) async {
+    setTestViewport(tester);
+    var currentTime = DateTime.utc(2026, 10, 1, 12, 59, 58);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'bookingStatus': 'Confirmed',
+          'paymentDueAt': '2026-10-01T13:00:00Z',
+        },
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'bookingStatus': 'Confirmed',
+          'paymentDueAt': '2026-10-01T13:00:00Z',
+          'isPaymentDeadlineExpired': true,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Confirmed'),
+        apiClient: client,
+        nowProvider: () => currentTime,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Advance payment due in 00:00:02'), findsOneWidget);
+
+    currentTime = DateTime.utc(2026, 10, 1, 13, 0, 2);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+
+    // Countdown does not show negative time, card transitions to expired
+    expect(find.textContaining('-00:'), findsNothing);
+  });
+
+  testWidgets('66. Expired states remain correct', (tester) async {
+    setTestViewport(tester);
+    final client = RecordingApiClient(
+      getStatusResponses: [
+        {
+          'bookingId': 'booking-1',
+          'totalCost': 800.0,
+          'totalPaid': 0.0,
+          'remainingAmount': 800.0,
+          'status': 'Unpaid',
+          'hasPendingVerification': false,
+          'bookingStatus': 'Confirmed',
+          'paymentDueAt': '2026-10-01T12:00:00Z',
+          'isPaymentDeadlineExpired': true,
+        },
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: PaymentStatusScreen(
+        booking: _fixtureBooking(status: 'Confirmed'),
+        apiClient: client,
+        nowProvider: () => DateTime.utc(2026, 10, 1, 12, 30, 0),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('payment_deadline_expired_card')), findsOneWidget);
+    expect(find.text('Payment deadline expired'), findsOneWidget);
   });
 }

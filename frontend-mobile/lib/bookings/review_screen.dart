@@ -176,6 +176,44 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     ),
                   ),
                 )
+              else if (booking.hasPendingPayment)
+                Card(
+                  color: Colors.amber.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(Icons.hourglass_top, color: Colors.amber.shade800),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Your payment is awaiting verification. You can review this trip after the booking is fully paid.',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (!booking.isFullyPaid)
+                Card(
+                  color: Colors.amber.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.amber.shade800),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Full payment is required before submitting a review.',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               // Success State Banner
               else if (_submitted || widget.booking.hasReview)
                 Card(

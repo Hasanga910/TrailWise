@@ -28,7 +28,15 @@ class RecordingApiClient extends ApiClient {
   }
 }
 
-Booking _fixtureBooking({String status = 'Completed', bool hasReview = false}) => Booking(
+Booking _fixtureBooking({
+  String status = 'Completed',
+  bool hasReview = false,
+  bool isFullyPaid = true,
+  bool hasPendingPayment = false,
+  double? remainingAmount,
+  String? paymentStatus,
+}) =>
+    Booking(
       id: 'booking-1',
       travelerId: 'traveler-1',
       tourPackageId: 'pkg-1',
@@ -47,6 +55,10 @@ Booking _fixtureBooking({String status = 'Completed', bool hasReview = false}) =
       status: status,
       isLargeGroup: false,
       hasReview: hasReview,
+      isFullyPaid: isFullyPaid,
+      hasPendingPayment: hasPendingPayment,
+      remainingAmount: remainingAmount,
+      paymentStatus: paymentStatus,
     );
 
 void main() {
@@ -240,5 +252,92 @@ void main() {
     expect(find.text('Rate your experience'), findsNothing);
     expect(find.widgetWithText(FilledButton, 'Submit Review'), findsNothing);
     expect(client.postCallCount, 0);
+  });
+
+  testWidgets('10. Completed + partial shows full-payment guard, hides review form, makes no POST', (tester) async {
+    final client = RecordingApiClient();
+
+    await tester.pumpWidget(MaterialApp(
+      home: ReviewScreen(
+        booking: _fixtureBooking(
+          status: 'Completed',
+          isFullyPaid: false,
+          remainingAmount: 200.0,
+          paymentStatus: 'DepositPaid',
+        ),
+        apiClient: client,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Full payment is required before submitting a review.'), findsOneWidget);
+    expect(find.text('Rate your experience'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Submit Review'), findsNothing);
+    expect(client.postCallCount, 0);
+  });
+
+  testWidgets('11. Completed + pending payment shows verification guard, hides review form, makes no POST', (tester) async {
+    final client = RecordingApiClient();
+
+    await tester.pumpWidget(MaterialApp(
+      home: ReviewScreen(
+        booking: _fixtureBooking(
+          status: 'Completed',
+          isFullyPaid: false,
+          hasPendingPayment: true,
+          remainingAmount: 200.0,
+          paymentStatus: 'Pending',
+        ),
+        apiClient: client,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your payment is awaiting verification. You can review this trip after the booking is fully paid.'), findsOneWidget);
+    expect(find.text('Rate your experience'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Submit Review'), findsNothing);
+    expect(client.postCallCount, 0);
+  });
+
+  testWidgets('12. Completed + FullyPaid shows review form', (tester) async {
+    final client = RecordingApiClient();
+
+    await tester.pumpWidget(MaterialApp(
+      home: ReviewScreen(
+        booking: _fixtureBooking(
+          status: 'Completed',
+          isFullyPaid: true,
+          remainingAmount: 0.0,
+          paymentStatus: 'FullyPaid',
+        ),
+        apiClient: client,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rate your experience'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Submit Review'), findsOneWidget);
+  });
+
+  testWidgets('13. Completed + FullyPaid + HasReview shows already reviewed state', (tester) async {
+    final client = RecordingApiClient();
+
+    await tester.pumpWidget(MaterialApp(
+      home: ReviewScreen(
+        booking: _fixtureBooking(
+          status: 'Completed',
+          isFullyPaid: true,
+          hasReview: true,
+          remainingAmount: 0.0,
+          paymentStatus: 'FullyPaid',
+        ),
+        apiClient: client,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Review submitted successfully.'), findsOneWidget);
+    expect(find.text('Rate your experience'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Submit Review'), findsNothing);
   });
 }

@@ -119,6 +119,170 @@ public class ReviewsEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
     }
 
     [Fact]
+    public async Task SubmitReview_WhenCompletedAndDepositPaid_ReturnsBadRequest()
+    {
+        var (client, travelerId) = await AuthenticatedTravelerWithIdAsync();
+        Guid bookingId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var package = new TourPackage { Name = "Deposit Tour", Theme = "T", DurationDays = 3, BasePricePerPerson = 200m, MaxGroupSize = 10 };
+            var tier = new PackageTier { TourPackage = package, ClassType = ClassType.Normal, IncludesFood = false, BasePricePerPerson = 200m, RequiresAC = false };
+            var booking = new Booking
+            {
+                TravelerId = travelerId,
+                TourPackage = package,
+                PackageTier = tier,
+                GroupSize = 2,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-10)),
+                EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)),
+                BudgetPerPerson = 500m,
+                Status = BookingStatus.Completed
+            };
+            db.Bookings.Add(booking);
+
+            var run = new AgentWorkflowRun { Booking = booking, Objective = "Pricing", Status = "Completed", StartedAt = DateTimeOffset.UtcNow };
+            db.AgentWorkflowRuns.Add(run);
+            db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new { totalCost = 400m, breakdown = "{}", validationResult = "Valid" }),
+                DurationMs = 10
+            });
+
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = 200m,
+                Status = PaymentStatus.DepositPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-5),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-5),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/test.jpg"
+            });
+            await db.SaveChangesAsync();
+            bookingId = booking.Id;
+        }
+
+        var response = await client.PostAsJsonAsync($"/api/bookings/{bookingId}/reviews", new
+        {
+            Rating = 5,
+            Comment = "Trying to review with deposit only"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Reviews can only be submitted after the booking is fully paid", content);
+    }
+
+    [Fact]
+    public async Task SubmitReview_WhenCompletedAndPendingPayment_ReturnsBadRequest()
+    {
+        var (client, travelerId) = await AuthenticatedTravelerWithIdAsync();
+        Guid bookingId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var package = new TourPackage { Name = "Pending Tour", Theme = "T", DurationDays = 3, BasePricePerPerson = 200m, MaxGroupSize = 10 };
+            var tier = new PackageTier { TourPackage = package, ClassType = ClassType.Normal, IncludesFood = false, BasePricePerPerson = 200m, RequiresAC = false };
+            var booking = new Booking
+            {
+                TravelerId = travelerId,
+                TourPackage = package,
+                PackageTier = tier,
+                GroupSize = 2,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-10)),
+                EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)),
+                BudgetPerPerson = 500m,
+                Status = BookingStatus.Completed
+            };
+            db.Bookings.Add(booking);
+
+            var run = new AgentWorkflowRun { Booking = booking, Objective = "Pricing", Status = "Completed", StartedAt = DateTimeOffset.UtcNow };
+            db.AgentWorkflowRuns.Add(run);
+            db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new { totalCost = 400m, breakdown = "{}", validationResult = "Valid" }),
+                DurationMs = 10
+            });
+
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = 200m,
+                Status = PaymentStatus.DepositPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-5),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-5),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/test.jpg"
+            });
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = 200m,
+                Status = PaymentStatus.Pending,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-1),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/balance.jpg"
+            });
+            await db.SaveChangesAsync();
+            bookingId = booking.Id;
+        }
+
+        var response = await client.PostAsJsonAsync($"/api/bookings/{bookingId}/reviews", new
+        {
+            Rating = 5,
+            Comment = "Trying to review while pending"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Reviews cannot be submitted while payment verification is pending", content);
+    }
+
+    [Fact]
+    public async Task SubmitReview_WhenCompletedAndPricingUnavailable_ReturnsBadRequest()
+    {
+        var (client, travelerId) = await AuthenticatedTravelerWithIdAsync();
+        Guid bookingId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var package = new TourPackage { Name = "No Pricing Tour", Theme = "T", DurationDays = 3, BasePricePerPerson = 200m, MaxGroupSize = 10 };
+            var tier = new PackageTier { TourPackage = package, ClassType = ClassType.Normal, IncludesFood = false, BasePricePerPerson = 200m, RequiresAC = false };
+            var booking = new Booking
+            {
+                TravelerId = travelerId,
+                TourPackage = package,
+                PackageTier = tier,
+                GroupSize = 2,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-10)),
+                EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)),
+                BudgetPerPerson = 500m,
+                Status = BookingStatus.Completed
+            };
+            db.Bookings.Add(booking);
+            await db.SaveChangesAsync();
+            bookingId = booking.Id;
+        }
+
+        var response = await client.PostAsJsonAsync($"/api/bookings/{bookingId}/reviews", new
+        {
+            Rating = 5,
+            Comment = "Trying to review without pricing"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Booking pricing is not available yet", content);
+    }
+
+    [Fact]
     public async Task SubmitReview_WhenNotOwner_ReturnsForbidden()
     {
         var (_, bookingId, _, _) = await SetupBookingAsync(BookingStatus.Completed);
@@ -468,6 +632,47 @@ public class ReviewsEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         };
 
         db.Bookings.Add(booking);
+
+        if (status == BookingStatus.Completed)
+        {
+            var totalCost = tier.BasePricePerPerson * booking.GroupSize;
+            var run = new AgentWorkflowRun
+            {
+                Booking = booking,
+                Objective = "Pricing Test",
+                Status = "Completed",
+                StartedAt = DateTimeOffset.UtcNow
+            };
+            db.AgentWorkflowRuns.Add(run);
+
+            var stepLog = new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new
+                {
+                    totalCost,
+                    breakdown = "{}",
+                    validationResult = "Valid"
+                }),
+                DurationMs = 10
+            };
+            db.AgentStepLogs.Add(stepLog);
+
+            var payment = new Payment
+            {
+                Booking = booking,
+                Amount = totalCost,
+                Status = PaymentStatus.FullyPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-5),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-5),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/test.jpg"
+            };
+            db.Payments.Add(payment);
+        }
+
         await db.SaveChangesAsync();
 
         return (client, booking.Id, packageId, travelerId);
@@ -509,6 +714,47 @@ public class ReviewsEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         };
 
         db.Bookings.Add(booking);
+
+        if (status == BookingStatus.Completed)
+        {
+            var totalCost = tier.BasePricePerPerson * booking.GroupSize;
+            var run = new AgentWorkflowRun
+            {
+                Booking = booking,
+                Objective = "Pricing Test",
+                Status = "Completed",
+                StartedAt = DateTimeOffset.UtcNow
+            };
+            db.AgentWorkflowRuns.Add(run);
+
+            var stepLog = new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new
+                {
+                    totalCost,
+                    breakdown = "{}",
+                    validationResult = "Valid"
+                }),
+                DurationMs = 10
+            };
+            db.AgentStepLogs.Add(stepLog);
+
+            var payment = new Payment
+            {
+                Booking = booking,
+                Amount = totalCost,
+                Status = PaymentStatus.FullyPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-5),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-5),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/test.jpg"
+            };
+            db.Payments.Add(payment);
+        }
+
         await db.SaveChangesAsync();
 
         return (client, booking.Id, package.Id, travelerId);

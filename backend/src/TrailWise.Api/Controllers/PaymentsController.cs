@@ -142,7 +142,8 @@ public class PaymentsController : ControllerBase
             p.BankSlipUrl,
             p.SubmittedAt,
             p.Status.ToString(),
-            p.Booking?.PaymentDueAt)).ToList();
+            p.Booking?.PaymentDueAt,
+            p.Booking?.BalancePaymentDueAt)).ToList();
 
         return Ok(dtos);
     }
@@ -267,7 +268,10 @@ public class PaymentsController : ControllerBase
             result.LatestRejectedAt,
             result.LatestRejectedPaymentId,
             result.PaymentDueAt,
-            result.IsPaymentDeadlineExpired));
+            result.IsPaymentDeadlineExpired,
+            result.BalancePaymentDueAt,
+            result.IsBalancePaymentDeadlineExpired,
+            result.BookingStatus));
     }
 
     [HttpPost("api/payments")]

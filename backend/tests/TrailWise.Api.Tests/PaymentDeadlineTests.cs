@@ -996,7 +996,7 @@ public class PaymentDeadlineTests
 
             Assert.False(result.Succeeded);
             Assert.Equal(400, result.StatusCode);
-            Assert.Equal("Payment can only be recorded for confirmed bookings.", result.Error);
+            Assert.Equal("Payment can only be recorded for confirmed or completed bookings.", result.Error);
         }
     }
 
@@ -1077,6 +1077,676 @@ public class PaymentDeadlineTests
 
             var revenue = await reportService.GetRevenueReportAsync(null, null);
             Assert.Equal(250m, revenue.TotalRevenue); // Only 250m, unaffected by cancelled booking
+        }
+    }
+
+    // 31. Confirmed first-payment deadline still works
+    [Fact]
+    public async Task Test31_ConfirmedBooking_FirstPaymentDeadline_StillWorks()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Confirmed, totalCost: 600m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.PaymentDueAt = clock.UtcNow.AddHours(1);
+            await db.SaveChangesAsync();
+        }
+
+        // Advance time past the 1-hour deadline
+        clock.UtcNow = clock.UtcNow.AddMinutes(65);
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var result = await paymentService.SubmitBankTransferAsync(
+                bookingId, 300m, "/uploads/slips/slip.jpg", travelerId);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(409, result.StatusCode);
+            Assert.Equal("Advance payment deadline has expired.", result.Error);
+
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+            Assert.Equal(BookingStatus.Cancelled, booking.Status);
+            Assert.NotNull(booking.PaymentExpiredAt);
+        }
+    }
+
+    // 32. Completed booking with remaining balance accepts payment before deadline
+    [Fact]
+    public async Task Test32_CompletedBooking_WithRemainingBalance_AcceptsPaymentBeforeDeadline()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 600m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = clock.UtcNow.AddHours(24);
+
+            // 50% deposit was paid
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 300m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/deposit.jpg",
+                PaidAt = clock.UtcNow.AddDays(-2),
+                Status = PaymentStatus.DepositPaid
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 5 hours after completion (well before 24h deadline)
+        clock.UtcNow = clock.UtcNow.AddHours(5);
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var result = await paymentService.SubmitBankTransferAsync(
+                bookingId, 300m, "/uploads/slips/balance.jpg", travelerId);
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(201, result.StatusCode);
+            Assert.NotNull(result.Payment);
+            Assert.Equal(PaymentStatus.Pending, result.Payment.Status);
+            Assert.Equal(300m, result.Payment.Amount);
+
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+            Assert.Equal(BookingStatus.Completed, booking.Status); // Still Completed
+        }
+    }
+
+    // 33. Completed booking after balance deadline rejects payment
+    [Fact]
+    public async Task Test33_CompletedBooking_AfterBalanceDeadline_RejectsPayment()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 600m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = clock.UtcNow.AddHours(24);
+
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 300m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/deposit.jpg",
+                PaidAt = clock.UtcNow.AddDays(-2),
+                Status = PaymentStatus.DepositPaid
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Advance 25 hours (after 24h deadline)
+        clock.UtcNow = clock.UtcNow.AddHours(25);
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var result = await paymentService.SubmitBankTransferAsync(
+                bookingId, 300m, "/uploads/slips/late_balance.jpg", travelerId);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(400, result.StatusCode);
+            Assert.Equal("Final payment deadline has expired. Please contact support.", result.Error);
+
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+            Assert.Equal(BookingStatus.Completed, booking.Status); // Booking NOT cancelled
+        }
+    }
+
+    // 34. Completed booking with pending verification rejects duplicate payment
+    [Fact]
+    public async Task Test34_CompletedBooking_WithPendingVerification_RejectsDuplicatePayment()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 600m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = clock.UtcNow.AddHours(24);
+
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 300m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/deposit.jpg",
+                PaidAt = clock.UtcNow.AddDays(-2),
+                Status = PaymentStatus.DepositPaid
+            });
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 300m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/pending.jpg",
+                SubmittedAt = clock.UtcNow.AddHours(1),
+                Status = PaymentStatus.Pending
+            });
+            await db.SaveChangesAsync();
+        }
+
+        clock.UtcNow = clock.UtcNow.AddHours(2);
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var result = await paymentService.SubmitBankTransferAsync(
+                bookingId, 300m, "/uploads/slips/duplicate.jpg", travelerId);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(409, result.StatusCode);
+            Assert.Equal("A bank transfer slip is already pending review for this booking.", result.Error);
+        }
+    }
+
+    // 35. Completed fully paid booking rejects extra payment
+    [Fact]
+    public async Task Test35_CompletedFullyPaidBooking_RejectsExtraPayment()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 600m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = null;
+
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 600m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/full.jpg",
+                PaidAt = clock.UtcNow.AddDays(-1),
+                Status = PaymentStatus.FullyPaid
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var result = await paymentService.SubmitBankTransferAsync(
+                bookingId, 100m, "/uploads/slips/extra.jpg", travelerId);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(409, result.StatusCode);
+            Assert.Equal("Booking is already fully paid.", result.Error);
+        }
+    }
+
+    // 36. Completed rejected balance payment can retry before deadline
+    [Fact]
+    public async Task Test36_CompletedRejectedBalancePayment_CanRetryBeforeDeadline()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 600m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = clock.UtcNow.AddHours(24);
+
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 300m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/deposit.jpg",
+                PaidAt = clock.UtcNow.AddDays(-2),
+                Status = PaymentStatus.DepositPaid
+            });
+
+            // Rejected balance slip
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 300m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/bad_slip.jpg",
+                SubmittedAt = clock.UtcNow.AddHours(2),
+                ReviewedAt = clock.UtcNow.AddHours(3),
+                Status = PaymentStatus.Failed,
+                RejectionReason = "Unreadable slip"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Retry at 4 hours (still before 24h deadline)
+        clock.UtcNow = clock.UtcNow.AddHours(4);
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var result = await paymentService.SubmitBankTransferAsync(
+                bookingId, 300m, "/uploads/slips/good_slip.jpg", travelerId);
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(201, result.StatusCode);
+            Assert.Equal(PaymentStatus.Pending, result.Payment!.Status);
+        }
+    }
+
+    // 37. Completion with remaining balance sets BalancePaymentDueAt = clock.UtcNow + 24h
+    [Fact]
+    public async Task Test37_Completion_WithRemainingBalance_SetsBalancePaymentDueAt_24Hours()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, _) = await SeedBookingAsync(db, BookingStatus.Confirmed, totalCost: 800m);
+            bookingId = booking.Id;
+
+            // 50% deposit
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 400m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/dep.jpg",
+                PaidAt = clock.UtcNow.AddDays(-1),
+                Status = PaymentStatus.DepositPaid
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+            booking.Status = BookingStatus.Completed;
+
+            var paymentStatus = await paymentService.GetPaymentStatusAsync(booking.Id, booking.TravelerId, true);
+            Assert.True(paymentStatus.Succeeded);
+            Assert.Equal(400m, paymentStatus.RemainingAmount);
+
+            if (paymentStatus.RemainingAmount > 0)
+            {
+                booking.BalancePaymentDueAt ??= clock.UtcNow.AddHours(24);
+            }
+            await db.SaveChangesAsync();
+
+            Assert.Equal(clock.UtcNow.AddHours(24), booking.BalancePaymentDueAt);
+        }
+    }
+
+    // 38. Completion when FullyPaid leaves BalancePaymentDueAt null
+    [Fact]
+    public async Task Test38_Completion_WhenFullyPaid_LeavesBalancePaymentDueAtNull()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, _) = await SeedBookingAsync(db, BookingStatus.Confirmed, totalCost: 800m);
+            bookingId = booking.Id;
+
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 800m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/full.jpg",
+                PaidAt = clock.UtcNow.AddDays(-1),
+                Status = PaymentStatus.FullyPaid
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+            booking.Status = BookingStatus.Completed;
+
+            var paymentStatus = await paymentService.GetPaymentStatusAsync(booking.Id, booking.TravelerId, true);
+            Assert.True(paymentStatus.Succeeded);
+            Assert.Equal(0m, paymentStatus.RemainingAmount);
+
+            if (paymentStatus.RemainingAmount > 0)
+            {
+                booking.BalancePaymentDueAt ??= clock.UtcNow.AddHours(24);
+            }
+            await db.SaveChangesAsync();
+
+            Assert.Null(booking.BalancePaymentDueAt);
+        }
+    }
+
+    // 39. Existing BalancePaymentDueAt is not overwritten
+    [Fact]
+    public async Task Test39_ExistingBalancePaymentDueAt_IsNotOverwritten()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero) };
+        var initialDueAt = new DateTimeOffset(2026, 10, 1, 15, 0, 0, TimeSpan.Zero);
+        Guid bookingId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, _) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 800m);
+            bookingId = booking.Id;
+            booking.BalancePaymentDueAt = initialDueAt;
+            await db.SaveChangesAsync();
+        }
+
+        // Repeated read / completion logic
+        clock.UtcNow = clock.UtcNow.AddHours(5);
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+
+            booking.BalancePaymentDueAt ??= clock.UtcNow.AddHours(24);
+            await db.SaveChangesAsync();
+
+            Assert.Equal(initialDueAt, booking.BalancePaymentDueAt);
+        }
+    }
+
+    // 40. PaymentStatusDto returns BalancePaymentDueAt
+    [Fact]
+    public async Task Test40_PaymentStatusDto_ReturnsBalancePaymentDueAt()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero) };
+        var expectedDeadline = clock.UtcNow.AddHours(24);
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 500m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = expectedDeadline;
+            await db.SaveChangesAsync();
+        }
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var status = await paymentService.GetPaymentStatusAsync(bookingId, travelerId, false);
+            Assert.True(status.Succeeded);
+            Assert.Equal(expectedDeadline, status.BalancePaymentDueAt);
+        }
+    }
+
+    // 41. PaymentStatusDto returns IsBalancePaymentDeadlineExpired correctly
+    [Fact]
+    public async Task Test41_PaymentStatusDto_ReturnsIsBalancePaymentDeadlineExpired_Correctly()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 500m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = clock.UtcNow.AddHours(24);
+            await db.SaveChangesAsync();
+        }
+
+        // Before deadline: not expired
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var status = await paymentService.GetPaymentStatusAsync(bookingId, travelerId, false);
+            Assert.False(status.IsBalancePaymentDeadlineExpired);
+        }
+
+        // Advance past deadline: expired
+        clock.UtcNow = clock.UtcNow.AddHours(25);
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var status = await paymentService.GetPaymentStatusAsync(bookingId, travelerId, false);
+            Assert.True(status.IsBalancePaymentDeadlineExpired);
+        }
+    }
+
+    // 42. Completed expired booking remains Completed
+    // 43. Completed expired booking is not cancelled
+    [Fact]
+    public async Task Test42_43_CompletedExpiredBooking_RemainsCompleted_IsNotCancelled()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 500m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = clock.UtcNow.AddHours(24);
+            await db.SaveChangesAsync();
+        }
+
+        clock.UtcNow = clock.UtcNow.AddHours(30);
+
+        // Attempting to submit payment after deadline
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var result = await paymentService.SubmitBankTransferAsync(
+                bookingId, 500m, "/uploads/slips/slip.jpg", travelerId);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(400, result.StatusCode);
+
+            var booking = await db.Bookings.FindAsync(bookingId);
+            Assert.NotNull(booking);
+            Assert.Equal(BookingStatus.Completed, booking.Status); // Remains Completed
+            Assert.NotEqual(BookingStatus.Cancelled, booking.Status); // NOT Cancelled
+        }
+    }
+
+    // 44. Review remains blocked while balance remains
+    [Fact]
+    public async Task Test44_Review_RemainsBlocked_WhileBalanceRemains()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 500m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = clock.UtcNow.AddHours(24);
+
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 250m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/deposit.jpg",
+                PaidAt = clock.UtcNow.AddDays(-2),
+                Status = PaymentStatus.DepositPaid
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var reviewService = new ReviewService(
+                db,
+                paymentService,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<ReviewService>());
+
+            var reviewResult = await reviewService.SubmitReviewAsync(
+                bookingId, 5, "Great trip!", travelerId);
+
+            Assert.False(reviewResult.Succeeded);
+            Assert.Equal("Reviews can only be submitted after the booking is fully paid.", reviewResult.Error);
+        }
+    }
+
+    // 45. Legacy Completed + null BalancePaymentDueAt behaves according to compatibility rule
+    [Fact]
+    public async Task Test45_LegacyCompletedBooking_WithNullBalancePaymentDueAt_AllowsPayment()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid travelerId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, tId) = await SeedBookingAsync(db, BookingStatus.Completed, totalCost: 500m);
+            bookingId = booking.Id;
+            travelerId = tId;
+            booking.BalancePaymentDueAt = null; // Legacy historical booking
+
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 250m,
+                Method = "BankTransfer",
+                BankSlipUrl = "/uploads/slips/deposit.jpg",
+                PaidAt = clock.UtcNow.AddDays(-10),
+                Status = PaymentStatus.DepositPaid
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var paymentService = new PaymentService(
+                db,
+                fixture.CreateAuditLogService(db),
+                LoggerFactory.CreateLogger<PaymentService>(),
+                clock);
+
+            var status = await paymentService.GetPaymentStatusAsync(bookingId, travelerId, false);
+            Assert.True(status.Succeeded);
+            Assert.Null(status.BalancePaymentDueAt);
+            Assert.False(status.IsBalancePaymentDeadlineExpired);
+
+            // Submitting payment succeeds
+            var payResult = await paymentService.SubmitBankTransferAsync(
+                bookingId, 250m, "/uploads/slips/legacy_slip.jpg", travelerId);
+
+            Assert.True(payResult.Succeeded);
+            Assert.Equal(201, payResult.StatusCode);
         }
     }
 }

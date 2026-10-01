@@ -10,11 +10,17 @@ public class FleetReservationService : IFleetReservationService
 {
     private readonly TrailWiseDbContext _db;
     private readonly ILogger<FleetReservationService> _logger;
+    private readonly IBookingLifecycleService _bookingLifecycleService;
 
-    public FleetReservationService(TrailWiseDbContext db, ILogger<FleetReservationService> logger)
+    public FleetReservationService(
+        TrailWiseDbContext db,
+        ILogger<FleetReservationService> logger,
+        IBookingLifecycleService? bookingLifecycleService = null,
+        IClock? clock = null)
     {
         _db = db;
         _logger = logger;
+        _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(clock ?? new SystemClock());
     }
 
     public async Task<bool> IsVehicleAvailableAsync(Guid vehicleId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default)
@@ -152,7 +158,7 @@ public class FleetReservationService : IFleetReservationService
             // If the booking was pending approval or required manual intervention, manual vehicle allocation resolves it!
             if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval)
             {
-                booking.Status = BookingStatus.Confirmed;
+                _bookingLifecycleService.TransitionToConfirmed(booking);
                 _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator manual allocation.", bookingId);
             }
 

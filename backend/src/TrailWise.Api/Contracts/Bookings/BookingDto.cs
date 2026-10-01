@@ -18,13 +18,23 @@ public record BookingDto(
     BookingStatus Status,
     bool IsLargeGroup,
     string? LanguagePreference = null,
-    bool HasReview = false)
+    bool HasReview = false,
+    string? PaymentStatus = null,
+    decimal? RemainingAmount = null,
+    bool IsFullyPaid = false,
+    bool HasPendingPayment = false,
+    DateTimeOffset? CreatedAt = null)
 {
     // Duplicated by value in TrailWise.Infrastructure.Agents.BookingApprovalEvaluator.LargeGroupThreshold
     // since Infrastructure cannot reference this (Api) project. Keep both in sync if this ever changes.
     public const int LargeGroupThreshold = 10;
 
-    public static BookingDto FromEntity(Booking booking) => new(
+    public static BookingDto FromEntity(
+        Booking booking,
+        string? paymentStatus = null,
+        decimal? remainingAmount = null,
+        bool isFullyPaid = false,
+        bool hasPendingPayment = false) => new(
         Id: booking.Id,
         TravelerId: booking.TravelerId,
         TourPackageId: booking.TourPackageId,
@@ -38,5 +48,10 @@ public record BookingDto(
         Status: booking.Status,
         IsLargeGroup: booking.GroupSize > LargeGroupThreshold,
         LanguagePreference: booking.LanguagePreference,
-        HasReview: booking.Reviews != null && booking.Reviews.Any());
+        HasReview: booking.Reviews != null && booking.Reviews.Any(),
+        PaymentStatus: paymentStatus,
+        RemainingAmount: remainingAmount,
+        IsFullyPaid: isFullyPaid,
+        HasPendingPayment: hasPendingPayment,
+        CreatedAt: booking.CreatedAt);
 }

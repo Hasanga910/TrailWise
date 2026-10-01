@@ -33,6 +33,11 @@ export interface BookingDto {
   status: BookingStatus;
   isLargeGroup: boolean;
   hasReview?: boolean;
+  paymentStatus?: string | null;
+  remainingAmount?: number | null;
+  isFullyPaid?: boolean;
+  hasPendingPayment?: boolean;
+  createdAt?: string;
 }
 
 export interface PagedResult<T> {

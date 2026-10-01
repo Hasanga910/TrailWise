@@ -15,6 +15,11 @@ class Booking {
   final bool isLargeGroup;
   final VehicleAssignment? vehicleAssignment;
   final bool hasReview;
+  final String? paymentStatus;
+  final double? remainingAmount;
+  final bool isFullyPaid;
+  final bool hasPendingPayment;
+  final DateTime? createdAt;
 
   Booking({
     required this.id,
@@ -30,6 +35,11 @@ class Booking {
     required this.isLargeGroup,
     this.vehicleAssignment,
     this.hasReview = false,
+    this.paymentStatus,
+    this.remainingAmount,
+    this.isFullyPaid = false,
+    this.hasPendingPayment = false,
+    this.createdAt,
   });
 
   factory Booking.fromJson(Map<String, dynamic> json) => Booking(
@@ -48,5 +58,16 @@ class Booking {
             ? VehicleAssignment.fromJson(json['vehicleAssignment'] as Map<String, dynamic>)
             : null,
         hasReview: (json['hasReview'] ?? json['HasReview'] ?? false) as bool,
+        paymentStatus: json['paymentStatus'] as String? ?? json['PaymentStatus'] as String?,
+        remainingAmount: json['remainingAmount'] != null
+            ? (json['remainingAmount'] as num).toDouble()
+            : (json['RemainingAmount'] != null ? (json['RemainingAmount'] as num).toDouble() : null),
+        isFullyPaid: (json['isFullyPaid'] ?? json['IsFullyPaid'] ?? false) as bool,
+        hasPendingPayment: (json['hasPendingPayment'] ?? json['HasPendingPayment'] ?? false) as bool,
+        createdAt: json['createdAt'] != null
+            ? DateTime.tryParse(json['createdAt'].toString())
+            : (json['CreatedAt'] != null
+                ? DateTime.tryParse(json['CreatedAt'].toString())
+                : null),
       );
 }

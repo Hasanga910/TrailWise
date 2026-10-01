@@ -11,6 +11,9 @@ class PaymentStatusDto {
   final String? latestRejectedPaymentId;
   final DateTime? paymentDueAt;
   final bool isPaymentDeadlineExpired;
+  final DateTime? balancePaymentDueAt;
+  final bool isBalancePaymentDeadlineExpired;
+  final String? bookingStatus;
 
   PaymentStatusDto({
     required this.bookingId,
@@ -25,6 +28,9 @@ class PaymentStatusDto {
     this.latestRejectedPaymentId,
     this.paymentDueAt,
     this.isPaymentDeadlineExpired = false,
+    this.balancePaymentDueAt,
+    this.isBalancePaymentDeadlineExpired = false,
+    this.bookingStatus,
   });
 
   factory PaymentStatusDto.fromJson(Map<String, dynamic> json) => PaymentStatusDto(
@@ -46,5 +52,10 @@ class PaymentStatusDto {
             ? DateTime.tryParse(json['paymentDueAt'].toString())
             : null,
         isPaymentDeadlineExpired: json['isPaymentDeadlineExpired'] as bool? ?? false,
+        balancePaymentDueAt: json['balancePaymentDueAt'] != null
+            ? DateTime.tryParse(json['balancePaymentDueAt'].toString())
+            : null,
+        isBalancePaymentDeadlineExpired: json['isBalancePaymentDeadlineExpired'] as bool? ?? false,
+        bookingStatus: json['bookingStatus'] as String?,
       );
 }

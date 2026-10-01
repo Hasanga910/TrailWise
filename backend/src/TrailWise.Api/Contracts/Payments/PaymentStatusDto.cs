@@ -12,4 +12,7 @@ public record PaymentStatusDto(
     DateTimeOffset? LatestRejectedAt = null,
     Guid? LatestRejectedPaymentId = null,
     DateTimeOffset? PaymentDueAt = null,
-    bool IsPaymentDeadlineExpired = false);
+    bool IsPaymentDeadlineExpired = false,
+    DateTimeOffset? BalancePaymentDueAt = null,
+    bool IsBalancePaymentDeadlineExpired = false,
+    string? BookingStatus = null);
