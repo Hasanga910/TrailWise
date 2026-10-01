@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../auth/auth_provider.dart';
 import '../bookings/my_bookings_screen.dart';
 import '../guides/assigned_tours_screen.dart';
+import '../guides/guide_profile_screen.dart';
 import '../home/home_screen.dart';
 import '../packages/packages_screen.dart';
 
@@ -26,6 +27,7 @@ class _MainShellState extends State<MainShell> {
         ? const <Widget>[
             HomeScreen(),
             AssignedToursScreen(),
+            GuideProfileScreen(),
           ]
         : const <Widget>[
             HomeScreen(),
@@ -44,6 +46,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.assignment_outlined),
               selectedIcon: Icon(Icons.assignment),
               label: 'Assigned Tours',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ]
         : const <NavigationDestination>[

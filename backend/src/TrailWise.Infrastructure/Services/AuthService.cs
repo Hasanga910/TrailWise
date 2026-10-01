@@ -160,6 +160,30 @@ public class AuthService : IAuthService
             }
         }
 
+        if (user.Role == UserRole.TourGuide)
+        {
+            var guide = await _db.Guides.FirstOrDefaultAsync(g => g.UserId == userId, ct);
+            if (guide != null)
+            {
+                var hasAssignedTours = await _db.Bookings.AnyAsync(b => b.GuideAvailabilities.Any(g => g.GuideId == guide.Id), ct)
+                    || await _db.GuideAvailabilities.AnyAsync(g => g.GuideId == guide.Id && g.AssignedBookingId != null, ct);
+                if (hasAssignedTours)
+                {
+                    return AuthResult.Failure("Guide profile cannot be deleted while assigned tours exist.");
+                }
+
+                var availabilities = await _db.GuideAvailabilities
+                    .Where(a => a.GuideId == guide.Id)
+                    .ToListAsync(ct);
+                if (availabilities.Count > 0)
+                {
+                    _db.GuideAvailabilities.RemoveRange(availabilities);
+                }
+
+                _db.Guides.Remove(guide);
+            }
+        }
+
         _db.Users.Remove(user);
         await _db.SaveChangesAsync(ct);
 
@@ -184,6 +208,17 @@ public class AuthService : IAuthService
         user.Name = name.Trim();
         user.Email = normalizedEmail;
         user.ContactNumber = contactNumber.Trim();
+
+        if (user.Role == UserRole.TourGuide)
+        {
+            var guide = await _db.Guides.FirstOrDefaultAsync(g => g.UserId == userId, ct);
+            if (guide is not null)
+            {
+                guide.Name = user.Name;
+                guide.ContactInfo = user.ContactNumber;
+            }
+        }
+
         await _db.SaveChangesAsync(ct);
 
         return AuthResult.Success(user);

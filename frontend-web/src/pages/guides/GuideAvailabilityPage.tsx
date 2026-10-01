@@ -285,13 +285,36 @@ export function GuideAvailabilityPage() {
           <h1 className="font-heading text-lg font-bold text-slate-900">Guide Availability</h1>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Link
-            to={homeRoute}
-            className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 sm:inline-block"
-          >
-            {user?.role === 'OperationsManager' ? 'Ops Dashboard' : 'Dashboard'}
-          </Link>
+        <div className="flex items-center gap-3">
+          {isTourGuide ? (
+            <>
+              <Link
+                to="/guides/my-tours"
+                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 sm:inline-block"
+              >
+                My Tours
+              </Link>
+              <Link
+                to="/guides/availability"
+                className="rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 sm:inline-block"
+              >
+                Guide Availability
+              </Link>
+              <Link
+                to="/guides/profile"
+                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 sm:inline-block"
+              >
+                Profile
+              </Link>
+            </>
+          ) : (
+            <Link
+              to={homeRoute}
+              className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 sm:inline-block"
+            >
+              {user?.role === 'OperationsManager' ? 'Ops Dashboard' : 'Dashboard'}
+            </Link>
+          )}
 
           <div className="hidden text-right sm:block">
             <p className="text-sm font-semibold text-slate-700">{user?.name}</p>

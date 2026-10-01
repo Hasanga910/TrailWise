@@ -95,6 +95,11 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  void updateUser(CurrentUser updated) {
+    user = updated;
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     await _storage.delete(key: _tokenKey);
     _apiClient.setToken(null);

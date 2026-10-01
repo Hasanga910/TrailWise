@@ -35,6 +35,7 @@ import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSet
 import { GuideAvailabilityPage } from './pages/guides/GuideAvailabilityPage';
 import { AssignedToursPage } from './pages/guides/AssignedToursPage';
 import { TourDetailPage } from './pages/guides/TourDetailPage';
+import { GuideProfilePage } from './pages/guides/GuideProfilePage';
 
 function App() {
   return (
@@ -75,6 +76,15 @@ function App() {
         element={
           <RequireRole allowedRoles={['TourGuide']}>
             <TourDetailPage />
+          </RequireRole>
+        }
+      />
+
+      <Route
+        path="/guides/profile"
+        element={
+          <RequireRole allowedRoles={['TourGuide']}>
+            <GuideProfilePage />
           </RequireRole>
         }
       />

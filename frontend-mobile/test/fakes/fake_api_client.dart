@@ -5,20 +5,28 @@ class FakeApiClient extends ApiClient {
     this.getResponses = const {},
     this.postResponses = const {},
     this.patchResponses = const {},
+    this.putResponses = const {},
     this.getError,
     this.postError,
     this.patchError,
+    this.putError,
+    this.deleteError,
   });
 
   final Map<String, dynamic> getResponses;
   final Map<String, dynamic> postResponses;
   final Map<String, dynamic> patchResponses;
+  final Map<String, dynamic> putResponses;
   final ApiException? getError;
   final ApiException? postError;
   final ApiException? patchError;
+  final ApiException? putError;
+  final ApiException? deleteError;
 
   final List<Map<String, dynamic>> patchCalls = [];
   final List<Map<String, dynamic>> postCalls = [];
+  final List<Map<String, dynamic>> putCalls = [];
+  final List<String> deleteCalls = [];
 
   @override
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
@@ -38,6 +46,20 @@ class FakeApiClient extends ApiClient {
     patchCalls.add({'path': path, 'body': body});
     if (patchError != null) throw patchError!;
     return patchResponses[path];
+  }
+
+  @override
+  Future<dynamic> put(String path, Map<String, dynamic> body) async {
+    putCalls.add({'path': path, 'body': body});
+    if (putError != null) throw putError!;
+    return putResponses[path] ?? body;
+  }
+
+  @override
+  Future<dynamic> delete(String path) async {
+    deleteCalls.add(path);
+    if (deleteError != null) throw deleteError!;
+    return null;
   }
 }
 
