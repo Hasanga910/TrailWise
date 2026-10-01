@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
@@ -9,12 +10,21 @@ namespace TrailWise.Infrastructure.Services;
 public class FleetReservationService : IFleetReservationService
 {
     private readonly TrailWiseDbContext _db;
+    private readonly IServiceScopeFactory? _scopeFactory;
     private readonly ILogger<FleetReservationService> _logger;
+    private readonly IBookingLifecycleService _bookingLifecycleService;
 
-    public FleetReservationService(TrailWiseDbContext db, ILogger<FleetReservationService> logger)
+    public FleetReservationService(
+        TrailWiseDbContext db,
+        ILogger<FleetReservationService> logger,
+        IBookingLifecycleService? bookingLifecycleService = null,
+        IClock? clock = null,
+        IServiceScopeFactory? scopeFactory = null)
     {
         _db = db;
         _logger = logger;
+        _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(clock ?? new SystemClock());
+        _scopeFactory = scopeFactory;
     }
 
     public async Task<bool> IsVehicleAvailableAsync(Guid vehicleId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default)
@@ -149,11 +159,12 @@ public class FleetReservationService : IFleetReservationService
 
             _db.VehicleAssignments.Add(assignment);
 
-            // If the booking was pending approval or required manual intervention, manual vehicle allocation resolves it!
-            if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval)
+            bool transitionedToConfirmed = false;
+            // If the booking was pending approval, plan proposed, or required manual intervention, manual vehicle allocation resolves it!
+            if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval || booking.Status == BookingStatus.PlanProposed)
             {
-                booking.Status = BookingStatus.Confirmed;
-                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator manual allocation.", bookingId);
+                transitionedToConfirmed = _bookingLifecycleService.TransitionToConfirmed(booking);
+                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator vehicle allocation.", bookingId);
             }
 
             await _db.SaveChangesAsync(ct);
@@ -165,6 +176,23 @@ public class FleetReservationService : IFleetReservationService
 
             _logger.LogInformation("Vehicle {VehicleId} successfully reserved for booking {BookingId} from {StartDate} to {EndDate}.",
                 vehicleId, bookingId, startDate, endDate);
+
+            if (transitionedToConfirmed && _scopeFactory is not null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
+                        await notificationService.SendBookingConfirmedNotificationsAsync(bookingId, CancellationToken.None);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", bookingId);
+                    }
+                });
+            }
 
             return ReservationResult.Success(assignment);
         }

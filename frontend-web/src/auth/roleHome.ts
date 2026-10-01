@@ -10,6 +10,8 @@ export function getHomeRouteForRole(role: UserRole): string {
       return '/traveler';
     case 'FleetCoordinator':
       return '/fleet';
+    case 'Driver':
+      return '/driver/dashboard';
     case 'TourGuide':
     default:
       return '/portal';

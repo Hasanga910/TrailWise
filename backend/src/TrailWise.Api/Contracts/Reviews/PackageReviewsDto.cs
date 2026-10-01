@@ -4,4 +4,4 @@ public record PackageReviewsDto(
     Guid TourPackageId,
     double AverageRating,
     int TotalReviews,
-    IReadOnlyList<ReviewDto> Reviews);
+    IReadOnlyList<PublicReviewDto> Reviews);

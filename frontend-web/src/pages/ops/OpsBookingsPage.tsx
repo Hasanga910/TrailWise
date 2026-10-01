@@ -246,8 +246,13 @@ export function OpsBookingsPage() {
             <tbody className="divide-y divide-slate-100">
               {bookings.map((booking) => {
                 const isActioning = actioningId === booking.id;
-                const canApprove = booking.status === 'PendingApproval';
-                const canReject = booking.status === 'PendingApproval' || booking.status === 'NeedsManualReview';
+                const canApprove =
+                  booking.status === 'PendingApproval' ||
+                  booking.status === 'PlanProposed';
+                const canReject =
+                  booking.status === 'PendingApproval' ||
+                  booking.status === 'NeedsManualReview' ||
+                  booking.status === 'PlanProposed';
                 const canComplete = booking.status === 'Confirmed';
                 const canCancel = CANCELLABLE_STATUSES.includes(booking.status);
 

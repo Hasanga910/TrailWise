@@ -10,6 +10,7 @@ import 'booking_status.dart';
 import 'itinerary_screen.dart';
 import 'payment_status_screen.dart';
 import 'review_screen.dart';
+import '../support/create_support_ticket_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key, this.apiClient, this.currentUser});
@@ -43,13 +44,23 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     BookingStatus.confirmed,
   ];
 
+  static const sortOptions = [
+    'Latest to Oldest',
+    'Oldest to Latest',
+    'Trip Date: Soonest',
+    'Trip Date: Latest',
+    'Status',
+  ];
+
   String? _statusFilter;
+  String _sortOption = 'Latest to Oldest';
   DateTime? _from;
   DateTime? _to;
   int _page = 1;
 
   PagedResult<Booking>? _result;
   bool _loading = true;
+  bool _isFetching = false;
   String? _error;
 
   @override
@@ -62,38 +73,68 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _load() async {
+    if (_isFetching) return;
+    _isFetching = true;
+
     final user = _getUser();
     if (user != null && user.role == 'TourGuide') {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
+      _isFetching = false;
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
+      final sortParams = _getSortParams();
       final json = await _apiClient.get('/api/bookings/mine', query: {
         'status': _statusFilter,
         'from': _from == null ? null : _formatDate(_from!),
         'to': _to == null ? null : _formatDate(_to!),
+        'sortBy': sortParams.$1,
+        'sortDirection': sortParams.$2,
         'page': _page,
         'pageSize': _pageSize,
       });
+      if (!mounted) return;
       setState(() {
         _result = PagedResult<Booking>.fromJson(json as Map<String, dynamic>, Booking.fromJson);
         _loading = false;
       });
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.message;
         _loading = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Could not reach the server. Please try again.';
         _loading = false;
       });
+    } finally {
+      _isFetching = false;
+    }
+  }
+
+  (String, String) _getSortParams() {
+    switch (_sortOption) {
+      case 'Oldest to Latest':
+        return ('createdAt', 'asc');
+      case 'Trip Date: Soonest':
+        return ('startDate', 'asc');
+      case 'Trip Date: Latest':
+        return ('startDate', 'desc');
+      case 'Status':
+        return ('status', 'asc');
+      case 'Latest to Oldest':
+      default:
+        return ('createdAt', 'desc');
     }
   }
 
@@ -142,8 +183,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     );
   }
 
-  void _openPayment(Booking booking) {
-    Navigator.of(context).push(
+  Future<void> _openPayment(Booking booking) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PaymentStatusScreen(
           booking: booking,
@@ -151,14 +192,32 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         ),
       ),
     );
+
+    if (mounted) {
+      await _load();
+    }
   }
 
-  void _openReview(Booking booking) {
-    Navigator.of(context).push(
+  Future<void> _openReview(Booking booking) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ReviewScreen(
           booking: booking,
           apiClient: _apiClient,
+        ),
+      ),
+    );
+    if (mounted) {
+      _load();
+    }
+  }
+
+  Future<void> _openSupport(Booking booking) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateSupportTicketScreen(
+          apiClient: _apiClient,
+          preselectedBookingId: booking.id,
         ),
       ),
     );
@@ -268,7 +327,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Bookings')),
+      appBar: AppBar(
+        title: const Text('My Bookings'),
+        actions: [
+          IconButton(
+            key: const Key('my_bookings_refresh_button'),
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: _loading ? null : _load,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           _buildFilters(),
@@ -281,37 +350,107 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   Widget _buildFilters() {
     return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: DropdownButtonFormField<String?>(
-              initialValue: _statusFilter,
-              decoration: const InputDecoration(labelText: 'Status'),
-              items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('All')),
-                ...BookingStatus.all
-                    .map((s) => DropdownMenuItem<String?>(value: s, child: Text(s))),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String?>(
+                  key: const Key('status_filter_dropdown'),
+                  isExpanded: true,
+                  initialValue: _statusFilter,
+                  decoration: const InputDecoration(
+                    labelText: 'Status',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('All')),
+                    ...BookingStatus.filterOptions
+                        .map((s) => DropdownMenuItem<String?>(value: s, child: Text(s))),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _statusFilter = value;
+                      _page = 1;
+                    });
+                    _load();
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: const Key('sort_filter_dropdown'),
+                  isExpanded: true,
+                  initialValue: _sortOption,
+                  decoration: const InputDecoration(
+                    labelText: 'Sort',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    isDense: true,
+                  ),
+                  items: sortOptions
+                      .map((opt) => DropdownMenuItem(
+                            value: opt,
+                            child: Text(opt, overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null && value != _sortOption) {
+                      setState(() {
+                        _sortOption = value;
+                        _page = 1;
+                      });
+                      _load();
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.date_range, size: 20),
+                tooltip: _from == null ? 'From date' : _formatDate(_from!),
+                visualDensity: VisualDensity.compact,
+                onPressed: _pickFrom,
+              ),
+              Text(
+                _from == null ? 'From: Any' : 'From: ${_formatDate(_from!)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.date_range_outlined, size: 20),
+                tooltip: _to == null ? 'To date' : _formatDate(_to!),
+                visualDensity: VisualDensity.compact,
+                onPressed: _pickTo,
+              ),
+              Text(
+                _to == null ? 'To: Any' : 'To: ${_formatDate(_to!)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+              if (_from != null || _to != null) ...[
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  tooltip: 'Clear dates',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    setState(() {
+                      _from = null;
+                      _to = null;
+                      _page = 1;
+                    });
+                    _load();
+                  },
+                ),
               ],
-              onChanged: (value) {
-                setState(() {
-                  _statusFilter = value;
-                  _page = 1;
-                });
-                _load();
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.date_range),
-            tooltip: _from == null ? 'From date' : _formatDate(_from!),
-            onPressed: _pickFrom,
-          ),
-          IconButton(
-            icon: const Icon(Icons.date_range_outlined),
-            tooltip: _to == null ? 'To date' : _formatDate(_to!),
-            onPressed: _pickTo,
+            ],
           ),
         ],
       ),
@@ -336,25 +475,40 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
     final result = _result!;
     if (result.items.isEmpty) {
-      return const Center(child: Text('No bookings match your filters.'));
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 100),
+            Center(child: Text('No bookings match your filters.')),
+          ],
+        ),
+      );
     }
     final totalPages = (result.totalCount / result.pageSize).ceil().clamp(1, 1 << 30);
     final isFirstPage = _page <= 1;
     final isLastPage = _page * result.pageSize >= result.totalCount;
+    final items = result.items;
 
     return Column(
       children: [
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: result.items.length,
-            itemBuilder: (_, i) => _BookingCard(
-              booking: result.items[i],
-              onTap: () => _openBooking(result.items[i]),
-              onPaymentTap: () => _openPayment(result.items[i]),
-              onReviewTap: () => _openReview(result.items[i]),
-              onCancelTap:
-                  _isCancellable(result.items[i]) ? () => _cancelBooking(result.items[i]) : null,
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: items.length,
+              itemBuilder: (_, i) => _BookingCard(
+                booking: items[i],
+                onTap: () => _openBooking(items[i]),
+                onPaymentTap: () => _openPayment(items[i]),
+                onReviewTap: () => _openReview(items[i]),
+                onCancelTap:
+                    _isCancellable(items[i]) ? () => _cancelBooking(items[i]) : null,
+                onSupportTap: () => _openSupport(items[i]),
+              ),
             ),
           ),
         ),
@@ -372,7 +526,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                       },
                 child: const Text('Previous'),
               ),
-              Text('Page $_page of $totalPages'),
+              Flexible(
+                child: Text(
+                  'Page $_page of $totalPages',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               TextButton(
                 onPressed: isLastPage
                     ? null
@@ -397,6 +556,7 @@ class _BookingCard extends StatelessWidget {
     this.onPaymentTap,
     this.onReviewTap,
     this.onCancelTap,
+    this.onSupportTap,
   });
 
   final Booking booking;
@@ -404,12 +564,25 @@ class _BookingCard extends StatelessWidget {
   final VoidCallback? onPaymentTap;
   final VoidCallback? onReviewTap;
   final VoidCallback? onCancelTap;
+  final VoidCallback? onSupportTap;
 
   @override
   Widget build(BuildContext context) {
     final color = BookingStatus.color(booking.status);
     final isConfirmed = booking.status == BookingStatus.confirmed;
     final isCompleted = booking.status == BookingStatus.completed;
+
+    final shouldShowPayment = isConfirmed ||
+        (isCompleted &&
+            (!booking.isFullyPaid ||
+                booking.hasPendingPayment ||
+                (booking.remainingAmount != null && booking.remainingAmount! > 0)));
+
+    final paymentLabel = booking.hasPendingPayment
+        ? 'Payment Status'
+        : (booking.isFullyPaid ? 'Payment Status' : 'Payment');
+
+    final shouldShowReview = isCompleted && booking.isFullyPaid;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -474,27 +647,42 @@ class _BookingCard extends StatelessWidget {
                   ],
                 ),
               ),
-            if ((isConfirmed && onPaymentTap != null) ||
-                (isCompleted && onReviewTap != null) ||
-                onCancelTap != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+              child: SizedBox(
+                width: double.infinity,
                 child: Wrap(
                   alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    if (isConfirmed && onPaymentTap != null)
+                    if (onSupportTap != null)
+                      TextButton.icon(
+                        icon: const Icon(Icons.help_outline, size: 16),
+                        label: const Text('Get Support'),
+                        onPressed: onSupportTap,
+                      ),
+                    if (shouldShowPayment && onPaymentTap != null)
                       OutlinedButton.icon(
                         icon: const Icon(Icons.payment, size: 16),
-                        label: const Text('Payment'),
+                        label: Text(paymentLabel),
                         onPressed: onPaymentTap,
-                      )
-                    else if (isCompleted && onReviewTap != null)
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.rate_review_outlined, size: 16),
-                        label: const Text('Review'),
-                        onPressed: onReviewTap,
                       ),
+                    if (shouldShowReview) ...[
+                      if (booking.hasReview)
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.check_circle_outline, size: 16),
+                          label: const Text('Reviewed'),
+                          onPressed: null,
+                        )
+                      else if (onReviewTap != null)
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.rate_review_outlined, size: 16),
+                          label: const Text('Review'),
+                          onPressed: onReviewTap,
+                        ),
+                    ],
                     if (onCancelTap != null)
                       OutlinedButton.icon(
                         icon: const Icon(Icons.cancel_outlined, size: 16),
@@ -504,6 +692,7 @@ class _BookingCard extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
           ],
         ),
       ),

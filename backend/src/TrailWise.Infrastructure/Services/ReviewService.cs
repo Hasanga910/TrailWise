@@ -9,15 +9,18 @@ namespace TrailWise.Infrastructure.Services;
 public class ReviewService : IReviewService
 {
     private readonly TrailWiseDbContext _db;
+    private readonly IPaymentService _paymentService;
     private readonly IAuditLogService _auditLogService;
     private readonly ILogger<ReviewService> _logger;
 
     public ReviewService(
         TrailWiseDbContext db,
+        IPaymentService paymentService,
         IAuditLogService auditLogService,
         ILogger<ReviewService> logger)
     {
         _db = db;
+        _paymentService = paymentService;
         _auditLogService = auditLogService;
         _logger = logger;
     }
@@ -56,6 +59,26 @@ public class ReviewService : IReviewService
         if (booking.Status != BookingStatus.Completed)
         {
             return SubmitReviewResult.Failure("Reviews can only be submitted for completed bookings.", 400);
+        }
+
+        var paymentStatus = await _paymentService.GetPaymentStatusAsync(bookingId, travelerId, isManagerOrAdmin: false, ct);
+        if (!paymentStatus.Succeeded)
+        {
+            if (paymentStatus.Error == "Booking pricing is not available yet.")
+            {
+                return SubmitReviewResult.Failure("Booking pricing is not available yet.", 400);
+            }
+            return SubmitReviewResult.Failure(paymentStatus.Error ?? "Payment verification failed.", paymentStatus.StatusCode);
+        }
+
+        if (paymentStatus.HasPendingVerification)
+        {
+            return SubmitReviewResult.Failure("Reviews cannot be submitted while payment verification is pending.", 400);
+        }
+
+        if (paymentStatus.Status != "FullyPaid" || paymentStatus.RemainingAmount > 0)
+        {
+            return SubmitReviewResult.Failure("Reviews can only be submitted after the booking is fully paid.", 400);
         }
 
         var reviewExists = await _db.Reviews.AnyAsync(r => r.BookingId == bookingId, ct);
@@ -127,6 +150,7 @@ public class ReviewService : IReviewService
             .AsNoTracking()
             .Where(r => r.Booking.TourPackageId == packageId)
             .OrderByDescending(r => r.SubmittedAt)
+            .ThenByDescending(r => r.Id)
             .ToListAsync(ct);
 
         var totalReviews = reviews.Count;

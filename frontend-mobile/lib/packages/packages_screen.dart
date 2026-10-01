@@ -7,6 +7,7 @@ import '../auth/current_user.dart';
 import '../bookings/booking_request_screen.dart';
 import '../models/package_tier.dart';
 import '../models/tour_package.dart';
+import 'package_reviews_sheet.dart';
 
 class PackagesScreen extends StatefulWidget {
   const PackagesScreen({super.key, this.apiClient, this.currentUser});
@@ -76,6 +77,15 @@ class _PackagesScreenState extends State<PackagesScreen> {
   void _requestBooking(TourPackage package, PackageTier tier) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => BookingRequestScreen(package: package, tier: tier)),
+    );
+  }
+
+  void _openReviews(TourPackage package) {
+    showPackageReviewsBottomSheet(
+      context: context,
+      packageId: package.id,
+      packageName: package.name,
+      apiClient: _apiClient,
     );
   }
 
@@ -150,19 +160,55 @@ class _PackagesScreenState extends State<PackagesScreen> {
     if (packages.isEmpty) {
       return const Center(child: Text('No tour packages yet.'));
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: packages.length,
-      itemBuilder: (_, i) => _PackageCard(package: packages[i], onRequestTier: _requestBooking),
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          color: Colors.teal.shade50,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Icon(Icons.discount_outlined, size: 16, color: Colors.teal.shade700),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Group discounts are available on all tours.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.teal.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: packages.length,
+            itemBuilder: (_, i) => _PackageCard(
+              package: packages[i],
+              onRequestTier: _requestBooking,
+              onReviewsTap: _openReviews,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _PackageCard extends StatelessWidget {
-  const _PackageCard({required this.package, required this.onRequestTier});
+  const _PackageCard({
+    required this.package,
+    required this.onRequestTier,
+    required this.onReviewsTap,
+  });
 
   final TourPackage package;
   final void Function(TourPackage package, PackageTier tier) onRequestTier;
+  final void Function(TourPackage package) onReviewsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -190,6 +236,40 @@ class _PackageCard extends StatelessWidget {
               '${package.durationDays} ${package.durationDays == 1 ? 'day' : 'days'} · '
               'up to ${package.maxGroupSize} travelers',
               style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () => onReviewsTap(package),
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (package.reviewCount > 0) ...[
+                      const Icon(Icons.star, size: 16, color: Colors.amber),
+                      const SizedBox(width: 4),
+                      Text(
+                        '★ ${package.averageRating.toStringAsFixed(1)} (${package.reviewCount} ${package.reviewCount == 1 ? 'review' : 'reviews'})',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ] else ...[
+                      const Text(
+                        'No reviews yet',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
             if (package.locations.isNotEmpty) ...[
               const SizedBox(height: 8),

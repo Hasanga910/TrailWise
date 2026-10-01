@@ -92,6 +92,13 @@ void main() {
         getResponses: {
           '/api/packages': <Map<String, dynamic>>[],
           '/api/bookings/my': <Map<String, dynamic>>[],
+          '/api/support/tickets/mine': {
+            'items': <Map<String, dynamic>>[],
+            'totalCount': 0,
+            'page': 1,
+            'pageSize': 50,
+            'totalPages': 0,
+          },
         },
       );
 

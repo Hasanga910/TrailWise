@@ -47,8 +47,8 @@ class _MockAuthProvider extends ChangeNotifier implements AuthProvider {
   Future<void> restoreSession() async {}
 
   @override
-  void updateUser(CurrentUser updated) {
-    user = updated;
+  void updateUser(CurrentUser updatedUser) {
+    user = updatedUser;
     notifyListeners();
   }
 
@@ -226,6 +226,12 @@ void main() {
           'pageSize': 10,
         },
         '/api/packages': <dynamic>[],
+        '/api/support/tickets/mine': {
+          'items': <dynamic>[],
+          'totalCount': 0,
+          'page': 1,
+          'pageSize': 50,
+        },
       });
       final travelerUser = CurrentUser(
         id: 'traveler-user-1',

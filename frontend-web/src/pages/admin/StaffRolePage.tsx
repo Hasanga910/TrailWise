@@ -25,6 +25,7 @@ const ROLE_ICONS: Record<StaffRole, typeof CompassIcon> = {
   TourGuide: CompassIcon,
   OperationsManager: BriefcaseIcon,
   FleetCoordinator: TruckIcon,
+  Driver: TruckIcon,
 };
 
 export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel: string }) {

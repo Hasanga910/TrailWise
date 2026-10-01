@@ -42,6 +42,12 @@ export interface BookingDto {
   isLargeGroup: boolean;
   languagePreference?: string | null;
   assignedGuide?: AssignedGuideDto | null;
+  hasReview?: boolean;
+  paymentStatus?: string | null;
+  remainingAmount?: number | null;
+  isFullyPaid?: boolean;
+  hasPendingPayment?: boolean;
+  createdAt?: string;
 }
 
 export interface PagedResult<T> {
@@ -52,7 +58,7 @@ export interface PagedResult<T> {
 }
 
 export interface GetMyBookingsParams {
-  status?: BookingStatus;
+  status?: BookingStatus | 'Pending';
   from?: string;
   to?: string;
   page?: number;

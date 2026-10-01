@@ -95,8 +95,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  void updateUser(CurrentUser updated) {
-    user = updated;
+  void updateUser(CurrentUser updatedUser) {
+    user = updatedUser;
     notifyListeners();
   }
 

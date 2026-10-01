@@ -77,6 +77,60 @@ public class AuthService : IAuthService
                 throw;
             }
         }
+        else if (role == UserRole.Driver)
+        {
+            // If an unlinked Driver profile already exists matching name or contact number or license, link it;
+            // otherwise, create a new Driver record linked to this user.
+            var existingDriver = await _db.Drivers
+                .FirstOrDefaultAsync(d => d.UserId == null && (
+                    (!string.IsNullOrEmpty(user.ContactNumber) && d.ContactInfo == user.ContactNumber) ||
+                    (!string.IsNullOrEmpty(user.Name) && d.Name.ToLower() == user.Name.ToLower())
+                ), ct);
+
+            await using var transaction = _db.Database.IsRelational()
+                ? await _db.Database.BeginTransactionAsync(ct)
+                : null;
+
+            try
+            {
+                _db.Users.Add(user);
+
+                if (existingDriver != null)
+                {
+                    existingDriver.UserId = user.Id;
+                    if (string.IsNullOrWhiteSpace(existingDriver.ContactInfo) && !string.IsNullOrWhiteSpace(user.ContactNumber))
+                    {
+                        existingDriver.ContactInfo = user.ContactNumber;
+                    }
+                }
+                else
+                {
+                    var driver = new Driver
+                    {
+                        UserId = user.Id,
+                        Name = user.Name,
+                        ContactInfo = user.ContactNumber,
+                        LicenseNumber = $"LIC-{user.Id.ToString("N")[..8].ToUpperInvariant()}"
+                    };
+                    _db.Drivers.Add(driver);
+                }
+
+                await _db.SaveChangesAsync(ct);
+
+                if (transaction is not null)
+                {
+                    await transaction.CommitAsync(ct);
+                }
+            }
+            catch
+            {
+                if (transaction is not null)
+                {
+                    await transaction.RollbackAsync(ct);
+                }
+                throw;
+            }
+        }
         else
         {
             _db.Users.Add(user);
@@ -184,6 +238,13 @@ public class AuthService : IAuthService
             }
         }
 
+        // If user is linked to a driver profile, clean up or unlink
+        var driver = await _db.Drivers.FirstOrDefaultAsync(d => d.UserId == userId, ct);
+        if (driver is not null)
+        {
+            driver.UserId = null;
+        }
+
         _db.Users.Remove(user);
         await _db.SaveChangesAsync(ct);
 
@@ -216,6 +277,17 @@ public class AuthService : IAuthService
             {
                 guide.Name = user.Name;
                 guide.ContactInfo = user.ContactNumber;
+            }
+        }
+
+        // If driver, sync driver profile details
+        if (user.Role == UserRole.Driver)
+        {
+            var driver = await _db.Drivers.FirstOrDefaultAsync(d => d.UserId == userId, ct);
+            if (driver is not null)
+            {
+                driver.Name = user.Name;
+                driver.ContactInfo = user.ContactNumber;
             }
         }
 

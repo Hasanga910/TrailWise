@@ -3,10 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../auth/auth_provider.dart';
 import '../bookings/my_bookings_screen.dart';
+import '../drivers/driver_profile_screen.dart';
+import '../drivers/driver_tasks_screen.dart';
 import '../guides/assigned_tours_screen.dart';
 import '../guides/guide_profile_screen.dart';
 import '../home/home_screen.dart';
 import '../packages/packages_screen.dart';
+import '../support/support_tickets_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -22,6 +25,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
     final isTourGuide = user?.role == 'TourGuide';
+    final isDriver = user?.role == 'Driver';
 
     final tabs = isTourGuide
         ? const <Widget>[
@@ -29,11 +33,18 @@ class _MainShellState extends State<MainShell> {
             AssignedToursScreen(),
             GuideProfileScreen(),
           ]
-        : const <Widget>[
-            HomeScreen(),
-            PackagesScreen(),
-            MyBookingsScreen(),
-          ];
+        : isDriver
+            ? const <Widget>[
+                HomeScreen(),
+                DriverTasksScreen(),
+                DriverProfileScreen(),
+              ]
+            : const <Widget>[
+                HomeScreen(),
+                PackagesScreen(),
+                MyBookingsScreen(),
+                SupportTicketsScreen(),
+              ];
 
     final destinations = isTourGuide
         ? const <NavigationDestination>[
@@ -53,23 +64,46 @@ class _MainShellState extends State<MainShell> {
               label: 'Profile',
             ),
           ]
-        : const <NavigationDestination>[
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.card_travel_outlined),
-              selectedIcon: Icon(Icons.card_travel),
-              label: 'Packages',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.event_note_outlined),
-              selectedIcon: Icon(Icons.event_note),
-              label: 'My Bookings',
-            ),
-          ];
+        : isDriver
+            ? const <NavigationDestination>[
+                NavigationDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard),
+                  label: 'Dashboard',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.directions_car_outlined),
+                  selectedIcon: Icon(Icons.directions_car),
+                  label: 'Driving Tasks',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
+              ]
+            : const <NavigationDestination>[
+                NavigationDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard),
+                  label: 'Dashboard',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.card_travel_outlined),
+                  selectedIcon: Icon(Icons.card_travel),
+                  label: 'Packages',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.event_note_outlined),
+                  selectedIcon: Icon(Icons.event_note),
+                  label: 'My Bookings',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.support_agent_outlined),
+                  selectedIcon: Icon(Icons.support_agent),
+                  label: 'Support',
+                ),
+              ];
 
     final selectedIndex = _selectedIndex >= destinations.length ? 0 : _selectedIndex;
 

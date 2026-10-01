@@ -13,6 +13,10 @@ class VehicleAssignment {
   final String? vehicleType;
   final int? capacity;
   final bool? hasAC;
+  final String? registrationNumber;
+  final String? guideName;
+  final String? guideContact;
+  final String? specialRequests;
 
   VehicleAssignment({
     required this.id,
@@ -29,6 +33,10 @@ class VehicleAssignment {
     this.vehicleType,
     this.capacity,
     this.hasAC,
+    this.registrationNumber,
+    this.guideName,
+    this.guideContact,
+    this.specialRequests,
   });
 
   factory VehicleAssignment.fromJson(Map<String, dynamic> json) => VehicleAssignment(
@@ -46,6 +54,10 @@ class VehicleAssignment {
         vehicleType: json['vehicleType'] as String?,
         capacity: (json['capacity'] as num?)?.toInt(),
         hasAC: json['hasAC'] as bool?,
+        registrationNumber: json['registrationNumber'] as String?,
+        guideName: json['guideName'] as String?,
+        guideContact: json['guideContact'] as String?,
+        specialRequests: json['specialRequests'] as String?,
       );
 
   Map<String, dynamic> toJson() => {

@@ -80,8 +80,13 @@ export function AgentWorkflowPage() {
     }
   }
 
-  const canApprove = booking?.status === 'PendingApproval';
-  const canReject = booking?.status === 'PendingApproval' || booking?.status === 'NeedsManualReview';
+  const canApprove =
+    booking?.status === 'PendingApproval' ||
+    booking?.status === 'PlanProposed';
+  const canReject =
+    booking?.status === 'PendingApproval' ||
+    booking?.status === 'NeedsManualReview' ||
+    booking?.status === 'PlanProposed';
 
   return (
     <div>

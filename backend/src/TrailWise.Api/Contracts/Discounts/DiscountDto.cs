@@ -7,6 +7,9 @@ public record DiscountDto(
     string Description,
     decimal PercentageOff,
     int MinGroupSize,
+    bool IsActive,
+    DateTimeOffset? ValidFrom,
+    DateTimeOffset? ValidUntil,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
@@ -15,6 +18,9 @@ public record DiscountDto(
         discount.Description,
         discount.PercentageOff,
         discount.MinGroupSize,
+        discount.IsActive,
+        discount.ValidFrom,
+        discount.ValidUntil,
         discount.CreatedAt,
         discount.UpdatedAt);
 }
