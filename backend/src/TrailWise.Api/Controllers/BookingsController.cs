@@ -334,6 +334,20 @@ public class BookingsController : ControllerBase
                 title: $"This booking is already {booking.Status} and cannot be decided again.");
         }
 
+        if (request.Decision == BookingDecision.Approve && booking.Status == BookingStatus.NeedsManualReview)
+        {
+            var hasAssignedGuide = await _db.GuideAvailabilities
+                .AnyAsync(a => a.AssignedBookingId == booking.Id && a.GuideId != Guid.Empty, ct);
+
+            if (!hasAssignedGuide)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "A Tour Guide must be assigned before this booking can be approved.",
+                    detail: "A Tour Guide must be assigned before this booking can be approved.");
+            }
+        }
+
         var performedBy = GetUserId();
         if (performedBy is null)
         {

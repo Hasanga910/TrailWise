@@ -87,6 +87,66 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
     }
 
     [Fact]
+    public async Task Decide_Approve_FromNeedsManualReview_WithoutAssignedGuide_ReturnsConflict_AndKeepsNeedsManualReview()
+    {
+        var (_, bookingId, _) = await SetupBookingAsync(BookingStatus.NeedsManualReview);
+
+        var managerClient = await AuthenticatedOperationsManagerAsync();
+        var response = await managerClient.PatchAsJsonAsync($"/api/bookings/{bookingId}/decision", new
+        {
+            Decision = "Approve",
+            Notes = "Premature approval."
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var freshBooking = await db.Bookings.FindAsync(bookingId);
+        Assert.NotNull(freshBooking);
+        Assert.Equal(BookingStatus.NeedsManualReview, freshBooking.Status);
+    }
+
+    [Fact]
+    public async Task Decide_Approve_FromNeedsManualReview_WithAssignedGuide_SetsConfirmed()
+    {
+        var (_, bookingId, _) = await SetupBookingAsync(BookingStatus.NeedsManualReview);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            var guide = new Guide
+            {
+                Name = "Assigned Guide",
+                Specializations = new[] { "Wildlife" },
+                Languages = new[] { "English" },
+                ContactInfo = "guide@example.com"
+            };
+            db.Guides.Add(guide);
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                Guide = guide,
+                Date = booking!.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = bookingId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var managerClient = await AuthenticatedOperationsManagerAsync();
+        var response = await managerClient.PatchAsJsonAsync($"/api/bookings/{bookingId}/decision", new
+        {
+            Decision = "Approve",
+            Notes = "Guide assigned, approval valid."
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+        Assert.Equal("Confirmed", updated!.Status.ToString());
+    }
+
+    [Fact]
     public async Task Decide_WithoutExistingWorkflowRun_StillSucceeds()
     {
         var (_, bookingId, _) = await SetupBookingAsync(BookingStatus.PendingApproval);

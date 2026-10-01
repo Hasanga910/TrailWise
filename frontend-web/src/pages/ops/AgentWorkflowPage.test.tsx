@@ -127,4 +127,19 @@ describe('AgentWorkflowPage', () => {
 
     await waitFor(() => expect(decideSpy).toHaveBeenCalledWith('booking-1', { decision: 'Approve' }));
   });
+
+  it('shows Reject but NOT Approve for a NeedsManualReview booking', async () => {
+    vi.spyOn(bookingsApi, 'getBookingById').mockResolvedValue(
+      sampleBooking({ status: 'NeedsManualReview' }),
+    );
+    vi.spyOn(agentWorkflowsApi, 'getAgentWorkflow').mockResolvedValue(
+      sampleWorkflow({ status: 'Failed' }),
+    );
+
+    renderPage();
+    await screen.findByRole('button', { name: /^reject$/i });
+
+    expect(screen.queryByRole('button', { name: /^approve$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^reject$/i })).toBeInTheDocument();
+  });
 });

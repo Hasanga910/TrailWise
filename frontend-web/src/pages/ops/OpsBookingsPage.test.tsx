@@ -85,7 +85,7 @@ describe('OpsBookingsPage', () => {
     expect(await screen.findByText(/could not load bookings/i)).toBeInTheDocument();
   });
 
-  it('shows Approve/Reject only for PendingApproval or NeedsManualReview bookings, not Confirmed', async () => {
+  it('shows Approve only for PendingApproval, Reject for PendingApproval or NeedsManualReview, and not Confirmed', async () => {
     vi.spyOn(bookingsApi, 'getAllBookings').mockResolvedValue([
       sampleBooking({ id: 'pending-1', status: 'PendingApproval' }),
       sampleBooking({ id: 'confirmed-1', status: 'Confirmed' }),
@@ -97,6 +97,21 @@ describe('OpsBookingsPage', () => {
     expect(screen.getAllByRole('button', { name: /^approve$/i })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: /^reject$/i })).toHaveLength(1);
     expect(screen.getByRole('button', { name: /mark completed/i })).toBeInTheDocument();
+  });
+
+  it('shows Assign Tour Guide, Reject, and Cancel for NeedsManualReview, but does NOT show active Approve action', async () => {
+    vi.spyOn(bookingsApi, 'getAllBookings').mockResolvedValue([
+      sampleBooking({ id: 'review-1', status: 'NeedsManualReview' }),
+    ]);
+
+    renderPage();
+
+    await screen.findByText('NeedsManualReview');
+    expect(screen.queryByRole('button', { name: /^approve$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^reject$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /assign tour guide/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /view agent workflow/i })).toBeInTheDocument();
   });
 
   it('approves a pending booking and updates its status in place', async () => {
@@ -289,6 +304,8 @@ describe('OpsBookingsPage', () => {
       expect(assignSpy).toHaveBeenCalledWith('review-1', 'guide-1'),
     );
     expect(await screen.findByText(/guide successfully assigned/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Confirmed')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /assign tour guide/i })).not.toBeInTheDocument();
   });
 
   it('displays error message on assignment conflict and reloads available guides', async () => {
