@@ -211,6 +211,8 @@ public class BookingsController : ControllerBase
         var query = _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .AsNoTracking();
 
         if (status.HasValue)
@@ -274,6 +276,8 @@ public class BookingsController : ControllerBase
         var query = _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .Include(b => b.Reviews)
             .Where(b => b.TravelerId == travelerId.Value);
 
@@ -368,6 +372,8 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .Include(b => b.Reviews)
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == id, ct);
@@ -410,6 +416,8 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
@@ -422,6 +430,20 @@ public class BookingsController : ControllerBase
             return Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: $"This booking is already {booking.Status} and cannot be decided again.");
+        }
+
+        if (request.Decision == BookingDecision.Approve && booking.Status == BookingStatus.NeedsManualReview)
+        {
+            var hasAssignedGuide = await _db.GuideAvailabilities
+                .AnyAsync(a => a.AssignedBookingId == booking.Id && a.GuideId != Guid.Empty, ct);
+
+            if (!hasAssignedGuide)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "A Tour Guide must be assigned before this booking can be approved.",
+                    detail: "A Tour Guide must be assigned before this booking can be approved.");
+            }
         }
 
         var performedBy = GetUserId();
@@ -603,6 +625,8 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .Include(b => b.Reviews)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
@@ -726,6 +750,8 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
             .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)

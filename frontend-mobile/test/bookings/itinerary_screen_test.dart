@@ -98,5 +98,64 @@ void main() {
       expect(find.text('Failed to load itinerary. Please try again.'), findsOneWidget);
       expect(find.text('Retry schedule'), findsOneWidget);
     });
+
+    testWidgets('displays assigned tour guide card with guide info when guide is assigned', (tester) async {
+      final bookingWithGuide = Booking(
+        id: 'booking-guide-1',
+        travelerId: 'traveler-1',
+        tourPackageId: 'pkg-1',
+        tourPackageName: 'Sigiriya & Dambulla Explorer',
+        packageTier: PackageTier(
+          id: 'tier-1',
+          classType: 'Normal',
+          includesFood: true,
+          basePricePerPerson: 250,
+          requiresAC: false,
+        ),
+        groupSize: 2,
+        startDate: '2026-11-01',
+        endDate: '2026-11-03',
+        budgetPerPerson: 300,
+        status: 'Confirmed',
+        isLargeGroup: false,
+        assignedGuide: AssignedGuide(
+          id: 'guide-1',
+          name: 'Janindu',
+          contactInfo: '0775645000',
+          languages: const ['Sinhala', 'English'],
+          specializations: const ['Cultural'],
+        ),
+      );
+
+      final fake = FakeApiClient(getResponses: {
+        '/api/bookings/booking-guide-1/itinerary': <Map<String, dynamic>>[],
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        home: ItineraryScreen(booking: bookingWithGuide, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assigned Tour Guide'), findsOneWidget);
+      expect(find.text('Janindu'), findsOneWidget);
+      expect(find.text('0775645000'), findsOneWidget);
+      expect(find.text('Sinhala'), findsOneWidget);
+      expect(find.text('English'), findsOneWidget);
+      expect(find.text('Cultural'), findsOneWidget);
+    });
+
+    testWidgets('displays Tour Guide not assigned yet when guide is null', (tester) async {
+      final fake = FakeApiClient(getResponses: {
+        '/api/bookings/booking-123/itinerary': <Map<String, dynamic>>[],
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        home: ItineraryScreen(booking: _sampleBooking(), apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Assigned Tour Guide'), findsOneWidget);
+      expect(find.text('Tour Guide not assigned yet'), findsOneWidget);
+    });
   });
 }

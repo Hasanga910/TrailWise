@@ -30,12 +30,20 @@ export function PortalFallbackPage() {
             Open Guide Availability
           </Link>
           {user?.role === 'TourGuide' && (
-            <Link
-              to="/guides/my-tours"
-              className="mt-3 ml-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              View My Assigned Tours
-            </Link>
+            <>
+              <Link
+                to="/guides/my-tours"
+                className="mt-3 ml-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                View My Assigned Tours
+              </Link>
+              <Link
+                to="/guides/profile"
+                className="mt-3 ml-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Profile & Settings
+              </Link>
+            </>
           )}
         </div>
       )}

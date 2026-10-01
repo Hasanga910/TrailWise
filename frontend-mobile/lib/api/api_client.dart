@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/assigned_tour.dart';
 import '../models/driver_assignment.dart';
+import '../models/guide_profile.dart';
 import '../models/itinerary_step.dart';
 
 class FieldError {
@@ -125,6 +126,42 @@ class ApiClient {
     final streamedResponse = await _httpClient.send(request);
     final response = await http.Response.fromStream(streamedResponse);
     return _decode(response);
+  }
+
+  Future<GuideProfile> getGuideProfile() async {
+    final response = await get('/api/guides/me');
+    return GuideProfile.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<GuideProfile> updateGuideProfile({
+    required String name,
+    required String email,
+    required String contactInfo,
+    required List<String> languages,
+    required List<String> specializations,
+  }) async {
+    final response = await put('/api/guides/me/profile', {
+      'name': name,
+      'email': email,
+      'contactInfo': contactInfo,
+      'languages': languages,
+      'specializations': specializations,
+    });
+    return GuideProfile.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<void> deleteGuideProfile() async {
+    await delete('/api/guides/me/profile');
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await put('/api/auth/me/password', {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
   }
 
   Future<List<AssignedTour>> getAssignedTours() async {

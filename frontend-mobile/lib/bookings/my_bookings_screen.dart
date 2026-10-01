@@ -615,6 +615,38 @@ class _BookingCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (booking.status != BookingStatus.cancelled)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      booking.assignedGuide != null
+                          ? Icons.person_pin_circle
+                          : Icons.person_search,
+                      size: 16,
+                      color: booking.assignedGuide != null
+                          ? Colors.teal
+                          : Colors.amber.shade800,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        booking.assignedGuide != null
+                            ? 'Tour Guide: ${booking.assignedGuide!.name}'
+                            : 'Tour Guide not assigned yet',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: booking.assignedGuide != null
+                              ? Colors.teal.shade800
+                              : Colors.amber.shade900,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
               child: SizedBox(
