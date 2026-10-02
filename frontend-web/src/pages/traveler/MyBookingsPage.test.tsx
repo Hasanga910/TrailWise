@@ -192,4 +192,73 @@ describe('MyBookingsPage', () => {
 
     expect(screen.queryByRole('button', { name: /view itinerary/i })).not.toBeInTheDocument();
   });
+
+  it('displays assigned tour guide details including name, contact, languages, and specializations', async () => {
+    vi.spyOn(bookingsApi, 'getMyBookings').mockResolvedValue({
+      items: [
+        sampleBooking({
+          status: 'Confirmed',
+          assignedGuide: {
+            id: 'guide-1',
+            name: 'Janindu',
+            contactInfo: '0775645',
+            languages: ['Sinhala', 'English'],
+            specializations: ['Cultural', 'Wildlife'],
+          },
+        }),
+      ],
+      totalCount: 1,
+      page: 1,
+      pageSize: 10,
+    });
+
+    renderPage();
+    await screen.findByText(/Cultural Triangle Explorer/);
+
+    expect(screen.getByText('Assigned Tour Guide')).toBeInTheDocument();
+    expect(screen.getByText('Janindu')).toBeInTheDocument();
+    expect(screen.getByText('0775645')).toBeInTheDocument();
+    expect(screen.getByText('Sinhala • English')).toBeInTheDocument();
+    expect(screen.getByText('Cultural, Wildlife')).toBeInTheDocument();
+  });
+
+  it('displays "Tour Guide not assigned yet" when booking has no assigned guide', async () => {
+    vi.spyOn(bookingsApi, 'getMyBookings').mockResolvedValue({
+      items: [
+        sampleBooking({
+          status: 'Requested',
+          assignedGuide: null,
+        }),
+      ],
+      totalCount: 1,
+      page: 1,
+      pageSize: 10,
+    });
+
+    renderPage();
+    await screen.findByText(/Cultural Triangle Explorer/);
+
+    expect(screen.getByText('Tour Guide not assigned yet')).toBeInTheDocument();
+    expect(screen.queryByText('Assigned Tour Guide')).not.toBeInTheDocument();
+  });
+
+  it('does not display guide info or unassigned note for cancelled booking', async () => {
+    vi.spyOn(bookingsApi, 'getMyBookings').mockResolvedValue({
+      items: [
+        sampleBooking({
+          status: 'Cancelled',
+          assignedGuide: null,
+        }),
+      ],
+      totalCount: 1,
+      page: 1,
+      pageSize: 10,
+    });
+
+    renderPage();
+    await screen.findByText(/Cultural Triangle Explorer/);
+
+    expect(screen.queryByText('Tour Guide not assigned yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Assigned Tour Guide')).not.toBeInTheDocument();
+  });
 });

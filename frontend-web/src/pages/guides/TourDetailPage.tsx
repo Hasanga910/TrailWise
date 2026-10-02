@@ -95,7 +95,13 @@ export function TourDetailPage() {
             &larr; My Tours
           </Link>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/guides/profile"
+            className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 sm:inline-block"
+          >
+            Profile
+          </Link>
           <div className="hidden text-right sm:block">
             <p className="text-sm font-semibold text-slate-700">{user?.name}</p>
             <p className="text-xs text-slate-500">{user?.role}</p>

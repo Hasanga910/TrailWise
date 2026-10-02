@@ -7,6 +7,7 @@ import '../models/booking.dart';
 import '../models/itinerary_step.dart';
 import '../models/vehicle_assignment.dart';
 import 'booking_status.dart';
+import 'guide_info_card.dart';
 import 'transport_info_card.dart';
 
 class ItineraryScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
   late final ApiClient _apiClient =
       widget.apiClient ?? context.read<AuthProvider>().apiClient;
 
+  late Booking _booking = widget.booking;
   VehicleAssignment? _assignment;
   bool _loadingAssignment = true;
 
@@ -37,8 +39,9 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.booking.vehicleAssignment != null) {
-      _assignment = widget.booking.vehicleAssignment;
+    _booking = widget.booking;
+    if (_booking.vehicleAssignment != null) {
+      _assignment = _booking.vehicleAssignment;
       _loadingAssignment = false;
     } else {
       _fetchAssignment();
@@ -48,9 +51,23 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
 
   Future<void> _refreshAll() async {
     await Future.wait([
+      _fetchBooking(),
       _fetchAssignment(),
       _loadSteps(),
     ]);
+  }
+
+  Future<void> _fetchBooking() async {
+    try {
+      final res = await _apiClient.get('/api/bookings/${_booking.id}');
+      if (mounted && res is Map<String, dynamic>) {
+        setState(() {
+          _booking = Booking.fromJson(res);
+        });
+      }
+    } catch (_) {
+      // ignore
+    }
   }
 
   Future<void> _fetchAssignment() async {
@@ -120,7 +137,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final booking = widget.booking;
+    final booking = _booking;
     final statusColor = BookingStatus.color(booking.status);
 
     return Scaffold(
@@ -209,6 +226,12 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
               ),
             ),
             const SizedBox(height: 16),
+
+            // Assigned Tour Guide Card
+            if (booking.status != BookingStatus.cancelled) ...[
+              GuideInfoCard(guide: booking.assignedGuide),
+              const SizedBox(height: 16),
+            ],
 
             // Person 3 Fleet & Transport Integration Card
             TransportInfoCard(

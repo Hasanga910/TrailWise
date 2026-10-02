@@ -6,6 +6,7 @@ import '../bookings/my_bookings_screen.dart';
 import '../drivers/driver_profile_screen.dart';
 import '../drivers/driver_tasks_screen.dart';
 import '../guides/assigned_tours_screen.dart';
+import '../guides/guide_profile_screen.dart';
 import '../home/home_screen.dart';
 import '../packages/packages_screen.dart';
 import '../support/support_tickets_screen.dart';
@@ -30,6 +31,7 @@ class _MainShellState extends State<MainShell> {
         ? const <Widget>[
             HomeScreen(),
             AssignedToursScreen(),
+            GuideProfileScreen(),
           ]
         : isDriver
             ? const <Widget>[
@@ -55,6 +57,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.assignment_outlined),
               selectedIcon: Icon(Icons.assignment),
               label: 'Assigned Tours',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ]
         : isDriver

@@ -47,6 +47,27 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
 
         var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview);
 
+        using (var guideScope = _factory.Services.CreateScope())
+        {
+            var guideDb = guideScope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var guide = new Guide
+            {
+                Name = "Guide Approver",
+                ContactInfo = "+94771112233",
+                Specializations = new[] { "Cultural" },
+                Languages = new[] { "English" }
+            };
+            guideDb.Guides.Add(guide);
+            guideDb.GuideAvailabilities.Add(new GuideAvailability
+            {
+                Guide = guide,
+                Date = booking.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = booking.Id
+            });
+            await guideDb.SaveChangesAsync();
+        }
+
         var response = await opsManager.PostAsJsonAsync(
             $"/api/bookings/{booking.Id}/decide",
             new BookingDecisionRequest { Decision = BookingDecision.Approve, Notes = "Manual approval test" });

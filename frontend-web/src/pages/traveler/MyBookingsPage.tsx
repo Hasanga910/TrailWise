@@ -291,6 +291,54 @@ export function MyBookingsPage() {
                   </div>
                 </div>
 
+                {booking.status !== 'Cancelled' && (
+                  booking.assignedGuide ? (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Assigned Tour Guide
+                          </span>
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            Assigned
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                          <span className="block text-xs font-medium text-slate-500">Name</span>
+                          <span className="font-semibold text-slate-900">{booking.assignedGuide.name}</span>
+                        </div>
+                        <div>
+                          <span className="block text-xs font-medium text-slate-500">Contact Number</span>
+                          <span className="text-slate-700">{booking.assignedGuide.contactInfo || 'Not provided'}</span>
+                        </div>
+                        <div>
+                          <span className="block text-xs font-medium text-slate-500">Languages</span>
+                          <span className="text-slate-700">
+                            {booking.assignedGuide.languages.length > 0
+                              ? booking.assignedGuide.languages.join(' • ')
+                              : 'None specified'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-xs font-medium text-slate-500">Specializations</span>
+                          <span className="text-slate-700">
+                            {booking.assignedGuide.specializations.length > 0
+                              ? booking.assignedGuide.specializations.join(', ')
+                              : 'General'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      <span>Tour Guide not assigned yet</span>
+                    </div>
+                  )
+                )}
+
                 {expandedBookingId === booking.id && (
                   <div className="mt-4 border-t border-slate-100 pt-4 space-y-4">
                     {assignmentCache[booking.id] && (

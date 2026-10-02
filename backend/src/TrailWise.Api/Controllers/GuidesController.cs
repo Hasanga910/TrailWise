@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,6 +25,214 @@ public class GuidesController : ControllerBase
     {
         _db = db;
         _logger = logger;
+    }
+
+    [HttpGet("me")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<ActionResult<GuideProfileDto>> GetMyProfile(CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides
+            .Include(g => g.User)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+        if (guide is null)
+        {
+            return Problem(statusCode: StatusCodes.Status404NotFound, title: "Guide profile not found for current user.");
+        }
+
+        var email = guide.User?.Email ?? string.Empty;
+        return Ok(new GuideProfileDto(
+            guide.Id,
+            guide.UserId,
+            guide.Name,
+            email,
+            guide.ContactInfo,
+            guide.Languages,
+            guide.Specializations,
+            guide.CreatedAt,
+            guide.UpdatedAt));
+    }
+
+    [HttpPut("me/profile")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<ActionResult<GuideProfileDto>> UpdateMyProfile(UpdateGuideProfileRequest request, CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides
+            .Include(g => g.User)
+            .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+        if (guide is null)
+        {
+            return Problem(statusCode: StatusCodes.Status404NotFound, title: "Guide profile not found for current user.");
+        }
+
+        var name = request.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return BadRequest(new { errors = new[] { new FieldValidationError("name", "Guide name is required.") } });
+        }
+
+        if (name.Length > 200)
+        {
+            return BadRequest(new { errors = new[] { new FieldValidationError("name", "Guide name cannot exceed 200 characters.") } });
+        }
+
+        var email = request.Email?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return BadRequest(new { errors = new[] { new FieldValidationError("email", "Email is required.") } });
+        }
+
+        var emailValidator = new EmailAddressAttribute();
+        if (!emailValidator.IsValid(email) || !email.Contains('@'))
+        {
+            return BadRequest(new { errors = new[] { new FieldValidationError("email", "Invalid email format.") } });
+        }
+
+        var normalizedEmail = email.ToLowerInvariant();
+        var emailTaken = await _db.Users.AnyAsync(u => u.Id != currentUserId.Value && u.Email == normalizedEmail, ct);
+        if (emailTaken)
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict, title: "A user with this email already exists.");
+        }
+
+        var contactInfo = request.ContactInfo?.Trim() ?? string.Empty;
+        if (contactInfo.Length > 200)
+        {
+            return BadRequest(new { errors = new[] { new FieldValidationError("contactInfo", "Contact info cannot exceed 200 characters.") } });
+        }
+
+        guide.Name = name;
+        guide.ContactInfo = contactInfo;
+        guide.Languages = NormalizeArray(request.Languages);
+        guide.Specializations = NormalizeArray(request.Specializations);
+
+        var user = guide.User ?? await _db.Users.FirstOrDefaultAsync(u => u.Id == currentUserId.Value, ct);
+        if (user != null)
+        {
+            user.Name = name;
+            user.Email = normalizedEmail;
+            user.ContactNumber = contactInfo;
+        }
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        _logger.LogInformation("TourGuide {GuideId} updated their profile.", guide.Id);
+
+        return Ok(new GuideProfileDto(
+            guide.Id,
+            guide.UserId,
+            guide.Name,
+            user?.Email ?? normalizedEmail,
+            guide.ContactInfo,
+            guide.Languages,
+            guide.Specializations,
+            guide.CreatedAt,
+            guide.UpdatedAt));
+    }
+
+    [HttpDelete("me/profile")]
+    [Authorize(Roles = "TourGuide")]
+    public async Task<IActionResult> DeleteMyProfile(CancellationToken ct)
+    {
+        var currentUserId = GetUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var guide = await _db.Guides
+            .Include(g => g.User)
+            .FirstOrDefaultAsync(g => g.UserId == currentUserId.Value, ct);
+
+        if (guide is null)
+        {
+            return Problem(statusCode: StatusCodes.Status404NotFound, title: "Guide profile not found for current user.");
+        }
+
+        var hasAssignedTours = await _db.Bookings.AnyAsync(b => b.GuideAvailabilities.Any(g => g.GuideId == guide.Id), ct)
+            || await _db.GuideAvailabilities.AnyAsync(g => g.GuideId == guide.Id && g.AssignedBookingId != null, ct);
+
+        if (hasAssignedTours)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Guide profile cannot be deleted while assigned tours exist.");
+        }
+
+        var user = guide.User ?? await _db.Users.FirstOrDefaultAsync(u => u.Id == currentUserId.Value, ct);
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+
+        try
+        {
+            var availabilities = await _db.GuideAvailabilities
+                .Where(a => a.GuideId == guide.Id)
+                .ToListAsync(ct);
+            if (availabilities.Count > 0)
+            {
+                _db.GuideAvailabilities.RemoveRange(availabilities);
+            }
+
+            _db.Guides.Remove(guide);
+
+            if (user != null)
+            {
+                _db.Users.Remove(user);
+            }
+
+            await _db.SaveChangesAsync(ct);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        _logger.LogInformation("TourGuide {GuideId} deleted their profile.", guide.Id);
+
+        return NoContent();
     }
 
     [HttpGet]

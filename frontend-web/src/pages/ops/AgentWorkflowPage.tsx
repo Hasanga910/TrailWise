@@ -80,7 +80,10 @@ export function AgentWorkflowPage() {
     }
   }
 
-  const canDecide =
+  const canApprove =
+    booking?.status === 'PendingApproval' ||
+    booking?.status === 'PlanProposed';
+  const canReject =
     booking?.status === 'PendingApproval' ||
     booking?.status === 'NeedsManualReview' ||
     booking?.status === 'PlanProposed';
@@ -152,24 +155,28 @@ export function AgentWorkflowPage() {
               </ul>
             )}
 
-            {canDecide && (
+            {(canApprove || canReject) && (
               <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  disabled={deciding}
-                  onClick={handleApprove}
-                  className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
-                >
-                  Approve
-                </button>
-                <button
-                  type="button"
-                  disabled={deciding}
-                  onClick={() => setShowRejectPrompt(true)}
-                  className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
-                >
-                  Reject
-                </button>
+                {canApprove && (
+                  <button
+                    type="button"
+                    disabled={deciding}
+                    onClick={handleApprove}
+                    className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                )}
+                {canReject && (
+                  <button
+                    type="button"
+                    disabled={deciding}
+                    onClick={() => setShowRejectPrompt(true)}
+                    className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                )}
               </div>
             )}
           </section>
