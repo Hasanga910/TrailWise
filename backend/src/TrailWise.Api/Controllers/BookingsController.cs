@@ -36,6 +36,7 @@ public class BookingsController : ControllerBase
     private readonly IFleetCapacityAgent _fleetAgent;
     private readonly IGuideAssignmentService _guideAssignmentService;
     private readonly IGuideAvailabilityService _guideAvailabilityService;
+    private readonly IGuideMatchingAgent? _guideMatchingAgent;
     private readonly IBookingNotificationService? _bookingNotificationService;
     private readonly ILogger<BookingsController> _logger;
     private readonly IPaymentService _paymentService;
@@ -55,7 +56,8 @@ public class BookingsController : ControllerBase
         IPaymentService paymentService,
         IClock? clock = null,
         IBookingLifecycleService? bookingLifecycleService = null,
-        IBookingNotificationService? bookingNotificationService = null)
+        IBookingNotificationService? bookingNotificationService = null,
+        IGuideMatchingAgent? guideMatchingAgent = null)
     {
         _db = db;
         _scopeFactory = scopeFactory;
@@ -65,6 +67,7 @@ public class BookingsController : ControllerBase
         _fleetAgent = fleetAgent;
         _guideAssignmentService = guideAssignmentService;
         _guideAvailabilityService = guideAvailabilityService;
+        _guideMatchingAgent = guideMatchingAgent;
         _logger = logger;
         _paymentService = paymentService;
         _clock = clock ?? new SystemClock();
@@ -432,31 +435,13 @@ public class BookingsController : ControllerBase
                 title: $"This booking is already {booking.Status} and cannot be decided again.");
         }
 
-        if (request.Decision == BookingDecision.Approve && booking.Status == BookingStatus.NeedsManualReview)
-        {
-            var hasAssignedGuide = await _db.GuideAvailabilities
-                .AnyAsync(a => a.AssignedBookingId == booking.Id && a.GuideId != Guid.Empty, ct);
-
-            if (!hasAssignedGuide)
-            {
-                return Problem(
-                    statusCode: StatusCodes.Status409Conflict,
-                    title: "A Tour Guide must be assigned before this booking can be approved.",
-                    detail: "A Tour Guide must be assigned before this booking can be approved.");
-            }
-        }
-
         var performedBy = GetUserId();
         if (performedBy is null)
         {
             return Unauthorized();
         }
 
-        if (request.Decision == BookingDecision.Approve)
-        {
-            _bookingLifecycleService.TransitionToConfirmed(booking);
-        }
-        else
+        if (request.Decision != BookingDecision.Approve)
         {
             booking.Status = BookingStatus.Cancelled;
         }
@@ -569,6 +554,102 @@ public class BookingsController : ControllerBase
                         _logger.LogWarning("No suitable available vehicle or driver could be assigned to booking {BookingId} upon approval",
                             booking.Id);
                     }
+                }
+
+                // Auto-assign Guide if not already assigned
+                var alreadyHasGuide = await _db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == booking.Id, ct);
+                if (!alreadyHasGuide)
+                {
+                    Guid guideId = request.GuideId ?? Guid.Empty;
+
+                    if (guideId == Guid.Empty && run is not null)
+                    {
+                        var guideStepLog = await _db.AgentStepLogs
+                            .Where(s => s.WorkflowRunId == run.Id && s.AgentName == "GuideMatchingAgent")
+                            .OrderByDescending(s => s.CreatedAt)
+                            .FirstOrDefaultAsync(ct);
+
+                        if (guideStepLog != null && !string.IsNullOrWhiteSpace(guideStepLog.OutputJson))
+                        {
+                            try
+                            {
+                                using var gDoc = JsonDocument.Parse(guideStepLog.OutputJson);
+                                if (gDoc.RootElement.TryGetProperty("guideId", out var gProp) && gProp.TryGetGuid(out var gGuid))
+                                    guideId = gGuid;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to parse guideStepLog OutputJson for booking {BookingId}", booking.Id);
+                            }
+                        }
+                    }
+
+                    // Check guide availability or re-match if necessary
+                    bool isGuideAvail = guideId != Guid.Empty && await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
+
+                    if (!isGuideAvail && _guideMatchingAgent != null)
+                    {
+                        var rematchGuide = await _guideMatchingAgent.MatchAsync(booking.Id, ct);
+                        if (rematchGuide.GuideId != Guid.Empty)
+                        {
+                            guideId = rematchGuide.GuideId;
+                            isGuideAvail = await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
+                        }
+                    }
+
+                    // Fallback to any available guide in the system for these dates if still not matched
+                    if (!isGuideAvail || guideId == Guid.Empty)
+                    {
+                        var allGuides = await _db.Guides.Select(g => g.Id).ToListAsync(ct);
+                        foreach (var gId in allGuides)
+                        {
+                            if (await _guideAvailabilityService.IsGuideAvailableAsync(gId, booking.StartDate, booking.EndDate, ct))
+                            {
+                                guideId = gId;
+                                isGuideAvail = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isGuideAvail && guideId != Guid.Empty)
+                    {
+                        await _guideAssignmentService.AssignGuideAsync(booking.Id, guideId, ct);
+                        _logger.LogInformation("Auto-assigned tour guide {GuideId} to approved booking {BookingId}", guideId, booking.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No available tour guide could be auto-assigned to booking {BookingId} upon approval", booking.Id);
+                    }
+                }
+
+                // Strictly verify all 3 resources before transitioning to Confirmed:
+                var hasAssignedGuide = _db.GuideAvailabilities.Local.Any(a => a.AssignedBookingId == booking.Id && a.GuideId != Guid.Empty) ||
+                    await _db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == booking.Id && a.GuideId != Guid.Empty, ct);
+                var hasVehicleAndDriver = _db.VehicleAssignments.Local.Any(a => a.BookingId == booking.Id && a.VehicleId != Guid.Empty && a.DriverId != Guid.Empty) ||
+                    await _db.VehicleAssignments.AnyAsync(a => a.BookingId == booking.Id && a.VehicleId != Guid.Empty && a.DriverId != Guid.Empty, ct);
+
+                if (hasAssignedGuide && hasVehicleAndDriver)
+                {
+                    _bookingLifecycleService.TransitionToConfirmed(booking);
+                }
+                else
+                {
+                    var missingResources = new List<string>();
+                    if (!hasVehicleAndDriver) missingResources.Add("Vehicle & Driver");
+                    if (!hasAssignedGuide) missingResources.Add("Tour Guide");
+
+                    var message = $"A booking cannot be confirmed until all resources are allocated. Missing: {string.Join(", ", missingResources)}.";
+                    _logger.LogWarning("Decide conflict on booking {BookingId}: {Message}. hasAssignedGuide={HasGuide}, hasVehicleAndDriver={HasVehicleAndDriver}",
+                        booking.Id, message, hasAssignedGuide, hasVehicleAndDriver);
+                    if (transaction is not null)
+                    {
+                        await transaction.RollbackAsync(ct);
+                    }
+                    return Problem(
+                        statusCode: StatusCodes.Status409Conflict,
+                        title: message,
+                        detail: message);
                 }
             }
 
@@ -886,7 +967,14 @@ public class BookingsController : ControllerBase
                 title: "Selected guide is no longer available for this booking.");
         }
 
-        _bookingLifecycleService.TransitionToConfirmed(booking);
+        var hasVehicleAndDriver = await _db.VehicleAssignments
+            .AnyAsync(a => a.BookingId == booking.Id && a.VehicleId != Guid.Empty && a.DriverId != Guid.Empty, ct);
+
+        bool transitionedToConfirmed = false;
+        if (hasVehicleAndDriver)
+        {
+            transitionedToConfirmed = _bookingLifecycleService.TransitionToConfirmed(booking);
+        }
         await _db.SaveChangesAsync(ct);
 
         var performedBy = GetUserId();
@@ -902,19 +990,22 @@ public class BookingsController : ControllerBase
             request.GuideId, booking.Id, performedBy);
 
         var assignedBookingId = booking.Id;
-        _ = Task.Run(async () =>
+        if (transitionedToConfirmed)
         {
-            try
+            _ = Task.Run(async () =>
             {
-                using var scope = _scopeFactory.CreateScope();
-                var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
-                await notificationService.SendBookingConfirmedNotificationsAsync(assignedBookingId, CancellationToken.None);
-            }
-            catch (Exception notifEx)
-            {
-                _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", assignedBookingId);
-            }
-        });
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
+                    await notificationService.SendBookingConfirmedNotificationsAsync(assignedBookingId, CancellationToken.None);
+                }
+                catch (Exception notifEx)
+                {
+                    _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", assignedBookingId);
+                }
+            });
+        }
 
         return Ok(new AssignGuideResponse(booking.Id, request.GuideId, booking.Status));
     }

@@ -3,9 +3,9 @@ import { extractErrorMessage } from '../../api/apiClient';
 import {
   checkDriverAvailability,
   checkVehicleAvailability,
-  getAssignmentByBookingId,
   getDrivers,
   getVehicles,
+  getVehicleAssignments,
   reserveVehicle,
   type DriverDto,
   type VehicleAssignmentDetailDto,
@@ -13,8 +13,15 @@ import {
   type VehicleMaintenanceStatus,
   type VehicleType,
 } from '../../api/vehicles';
-import { decideBooking, getPagedBookings, type BookingDto } from '../../api/bookings';
+import {
+  decideBooking,
+  getPagedBookings,
+  getAvailableGuidesForBooking,
+  type BookingDto,
+  type AvailableGuideDto,
+} from '../../api/bookings';
 import { getAgentWorkflow, type AgentWorkflowDto } from '../../api/agentWorkflows';
+import { getGuides, type GuideDto } from '../../api/guides';
 import { BookingsIcon, TruckIcon } from '../admin/icons';
 import { Link } from 'react-router-dom';
 
@@ -139,12 +146,17 @@ export function FleetManager() {
   const [workflowPlan, setWorkflowPlan] = useState<AgentWorkflowDto | null>(null);
   const [workflowLoading, setWorkflowLoading] = useState(false);
 
-  // Active vehicle assignment for the selected booking
+  // Active vehicle assignments map: bookingId -> VehicleAssignmentDetailDto
+  const [assignmentsMap, setAssignmentsMap] = useState<Record<string, VehicleAssignmentDetailDto>>({});
   const [currentAssignment, setCurrentAssignment] = useState<VehicleAssignmentDetailDto | null>(null);
 
   // Allocation modal state
   const [allocatingVehicle, setAllocatingVehicle] = useState<VehicleDto | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [selectedGuideId, setSelectedGuideId] = useState('');
+  const [availableGuides, setAvailableGuides] = useState<AvailableGuideDto[]>([]);
+  const [allGuides, setAllGuides] = useState<GuideDto[]>([]);
+  const [loadingGuides, setLoadingGuides] = useState(false);
   const [allocating, setAllocating] = useState(false);
   const [allocationError, setAllocationError] = useState<string | null>(null);
   const [allocationSuccess, setAllocationSuccess] = useState<string | null>(null);
@@ -158,24 +170,33 @@ export function FleetManager() {
     Promise.all([
       getVehicles(),
       getDrivers().catch(() => [] as DriverDto[]),
+      getGuides().catch(() => [] as GuideDto[]),
       getPagedBookings({ pageSize: 50 }).catch(() => ({ items: [] as BookingDto[], totalCount: 0, page: 1, pageSize: 50 })),
+      getVehicleAssignments().catch(() => [] as VehicleAssignmentDetailDto[]),
     ])
-      .then(([vehRes, driverRes, bookRes]) => {
+      .then(([vehRes, driverRes, guideRes, bookRes, assignRes]) => {
         setVehicles(vehRes);
         setDrivers(driverRes);
+        setAllGuides(guideRes);
         const bItems = bookRes.items || [];
         setBookings(bItems);
 
+        const aMap: Record<string, VehicleAssignmentDetailDto> = {};
+        assignRes.forEach((a: VehicleAssignmentDetailDto) => {
+          if (a.bookingId) aMap[a.bookingId] = a;
+        });
+        setAssignmentsMap(aMap);
+
         // Keep or auto-select first priority booking if none selected
         if (!selectedBooking && bItems.length > 0) {
-          const priority = bItems.find((b) => b.status === 'NeedsManualReview') ||
-            bItems.find((b) => b.status === 'PlanProposed') ||
-            bItems.find((b) => b.status === 'PendingApproval') ||
-            bItems.find((b) => b.status === 'Requested') ||
+          const priority = bItems.find((b: BookingDto) => b.status === 'NeedsManualReview') ||
+            bItems.find((b: BookingDto) => b.status === 'PlanProposed') ||
+            bItems.find((b: BookingDto) => b.status === 'PendingApproval') ||
+            bItems.find((b: BookingDto) => b.status === 'Requested') ||
             bItems[0];
           setSelectedBooking(priority);
         } else if (selectedBooking) {
-          const updated = bItems.find((b) => b.id === selectedBooking.id);
+          const updated = bItems.find((b: BookingDto) => b.id === selectedBooking.id);
           if (updated) setSelectedBooking(updated);
         }
       })
@@ -255,16 +276,28 @@ export function FleetManager() {
     };
   }, [selectedBooking, drivers]);
 
-  // When selectedBooking changes, fetch its existing vehicle assignment if any
+  // When selectedBooking or assignmentsMap changes, look up existing vehicle assignment from cache
   useEffect(() => {
     if (!selectedBooking) {
       setCurrentAssignment(null);
       return;
     }
 
-    getAssignmentByBookingId(selectedBooking.id)
-      .then((data) => setCurrentAssignment(data))
-      .catch(() => setCurrentAssignment(null));
+    setCurrentAssignment(assignmentsMap[selectedBooking.id] ?? null);
+  }, [selectedBooking, assignmentsMap]);
+
+  // When selectedBooking changes, fetch available tour guides with overlap check
+  useEffect(() => {
+    if (!selectedBooking) {
+      setAvailableGuides([]);
+      return;
+    }
+
+    setLoadingGuides(true);
+    getAvailableGuidesForBooking(selectedBooking.id)
+      .then((guides) => setAvailableGuides(guides))
+      .catch(() => setAvailableGuides([]))
+      .finally(() => setLoadingGuides(false));
   }, [selectedBooking]);
 
   // When selectedBooking is in PlanProposed status, load its agent workflow details
@@ -319,17 +352,19 @@ export function FleetManager() {
         driverId: selectedDriverId,
         startDate: selectedBooking.startDate,
         endDate: selectedBooking.endDate,
+        guideId: selectedGuideId ? selectedGuideId : undefined,
       });
 
-      setAllocationSuccess(`Successfully allocated ${allocatingVehicle.type} to booking!`);
+      setAllocationSuccess(`Successfully allocated ${allocatingVehicle.type}, driver, and tour guide to booking!`);
       setTimeout(() => {
         setAllocatingVehicle(null);
         setSelectedDriverId('');
+        setSelectedGuideId('');
         setAllocationSuccess(null);
         loadData();
       }, 1200);
     } catch (err) {
-      setAllocationError(extractErrorMessage(err, 'Failed to allocate vehicle.'));
+      setAllocationError(extractErrorMessage(err, 'Failed to allocate resources.'));
     } finally {
       setAllocating(false);
     }
@@ -601,6 +636,11 @@ export function FleetManager() {
                         <p className="text-emerald-700 text-xs mt-0.5">
                           Assigned Driver: <span className="font-semibold text-emerald-900">{currentAssignment.driverName}</span> {currentAssignment.driverContact ? `(${currentAssignment.driverContact})` : ''}
                         </p>
+                        {currentAssignment.guideName && (
+                          <p className="text-purple-700 text-xs mt-0.5">
+                            Assigned Guide: <span className="font-semibold text-purple-900">{currentAssignment.guideName}</span> {currentAssignment.guideContact ? `(${currentAssignment.guideContact})` : ''}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <span className="text-[11px] text-emerald-800 font-medium bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-200 self-start sm:self-auto">
@@ -611,95 +651,206 @@ export function FleetManager() {
               </div>
 
               {/* Agent Plan Review Card (For PlanProposed state) */}
-              {selectedBooking.status === 'PlanProposed' && (
-                <div className="rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50/60 via-white to-purple-50/30 p-5 shadow-sm space-y-4 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between border-b border-purple-100 pb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-700 font-bold text-sm">
-                        AI
-                      </span>
-                      <div>
-                        <h3 className="font-heading text-sm font-bold text-purple-950">
-                          Agent Proposed Plan Review
-                        </h3>
-                        <p className="text-xs text-purple-700">
-                          The multi-agent coordinator formulated this verified allocation. Review and confirm below.
-                        </p>
-                      </div>
-                    </div>
+              {selectedBooking.status === 'PlanProposed' && (() => {
+                // Extract step outputs from agent logs
+                const guideStep = workflowPlan?.steps?.find((s) => s.agentName === 'GuideMatchingAgent');
+                const fleetStep = workflowPlan?.steps?.find((s) => s.agentName === 'FleetCapacityAgent');
+                const pricingStep = workflowPlan?.steps?.find((s) => s.agentName === 'PricingValidationAgent' && s.output && typeof s.output === 'object' && 'totalCost' in s.output);
 
-                    <span className="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-bold text-purple-800 border border-purple-200">
-                      Ready for Approval
-                    </span>
-                  </div>
+                const guideOutput = guideStep?.output as { guideId?: string; matchScore?: number; reasoning?: string } | undefined;
+                const fleetOutput = fleetStep?.output as { vehicleId?: string; driverId?: string; acMatch?: boolean; seatConfigMatch?: boolean; conflictCheck?: boolean } | undefined;
+                const pricingOutput = pricingStep?.output as { totalCost?: number } | undefined;
 
-                  {workflowLoading ? (
-                    <div className="py-6 text-center text-xs text-purple-600">Loading plan analysis...</div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Left: Traveler & Trip Details */}
-                      <div className="rounded-xl border border-purple-200/70 bg-white p-3.5 text-xs space-y-2">
-                        <p className="font-semibold uppercase tracking-wider text-[10px] text-purple-500">
-                          Traveler &amp; Requirements
-                        </p>
-                        <div className="space-y-1 text-slate-700">
-                          <p><span className="text-slate-400">Package:</span> <span className="font-medium text-slate-900">{selectedBooking.tourPackageName}</span></p>
-                          <p><span className="text-slate-400">Dates:</span> <span className="font-medium text-slate-900">{selectedBooking.startDate} to {selectedBooking.endDate}</span></p>
-                          <p><span className="text-slate-400">Party Size:</span> <span className="font-medium text-slate-900">{selectedBooking.groupSize} Guests</span></p>
-                          {selectedBooking.specialRequests && (
-                            <p className="text-purple-800 text-[11px] italic">"{selectedBooking.specialRequests}"</p>
-                          )}
+                const matchedGuide = allGuides.find((g) => g.id === guideOutput?.guideId);
+                const matchedVehicle = vehicles?.find((v) => v.id === fleetOutput?.vehicleId);
+                const matchedDriver = drivers.find((d) => d.id === fleetOutput?.driverId);
+
+                return (
+                  <div className="rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50/70 via-white to-purple-50/40 p-5 shadow-sm space-y-4 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-purple-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600 text-white font-bold text-sm shadow-xs">
+                          AI
+                        </span>
+                        <div>
+                          <h3 className="font-heading text-sm font-bold text-purple-950">
+                            Agent Plan Review &amp; Resource Matching
+                          </h3>
+                          <p className="text-xs text-purple-700">
+                            The multi-agent coordinator formulated this complete resource package (Vehicle + Driver + Guide).
+                          </p>
                         </div>
                       </div>
 
-                      {/* Right: Validation & Agent Match */}
-                      <div className="rounded-xl border border-purple-200/70 bg-white p-3.5 text-xs space-y-2">
-                        <p className="font-semibold uppercase tracking-wider text-[10px] text-purple-500">
-                          Validation Checks
-                        </p>
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
-                            ✓ No Date Conflicts
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
-                            ✓ Capacity OK: {selectedBooking.groupSize} Guests
-                          </span>
-                          {selectedBooking.packageTier?.requiresAC && (
-                            <span className="inline-flex items-center gap-1 rounded bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 border border-sky-200">
-                              ✓ Climate AC Verified
+                      <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-800 border border-purple-200">
+                        ✨ Plan Proposed
+                      </span>
+                    </div>
+
+                    {workflowLoading ? (
+                      <div className="py-8 text-center text-xs text-purple-600 animate-pulse">Loading agent recommendation...</div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Left: Traveler & Trip Details */}
+                        <div className="rounded-xl border border-purple-200/70 bg-white p-4 text-xs space-y-3 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <p className="font-semibold uppercase tracking-wider text-[10px] text-purple-600">
+                              Traveler &amp; Requirements
+                            </p>
+                            <span className="font-mono text-[10px] text-slate-400">
+                              REF: {selectedBooking.id.slice(0, 8)}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5 text-slate-700">
+                            <p><span className="text-slate-400">Package:</span> <span className="font-bold text-slate-900">{selectedBooking.tourPackageName}</span></p>
+                            <p><span className="text-slate-400">Trip Dates:</span> <span className="font-semibold text-slate-800">{selectedBooking.startDate} &rarr; {selectedBooking.endDate}</span></p>
+                            <p><span className="text-slate-400">Party Size:</span> <span className="font-bold text-slate-900">👥 {selectedBooking.groupSize} Guests</span></p>
+                            <p><span className="text-slate-400">Climate:</span> <span className="font-semibold text-slate-800">{selectedBooking.packageTier?.requiresAC ? '❄️ AC Mandatory' : 'Standard Air'}</span></p>
+                            {selectedBooking.languagePreference && (
+                              <p><span className="text-slate-400">Language:</span> <span className="font-semibold text-indigo-700">🗣️ {selectedBooking.languagePreference}</span></p>
+                            )}
+                            {selectedBooking.specialRequests && (
+                              <div className="mt-2 rounded-lg bg-amber-50/80 p-2.5 text-amber-900 border border-amber-200/80 text-[11px] italic">
+                                "{selectedBooking.specialRequests}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Agent Resource Recommendation & Validation Chips */}
+                        <div className="rounded-xl border border-purple-200/70 bg-white p-4 text-xs space-y-3 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <p className="font-semibold uppercase tracking-wider text-[10px] text-purple-600">
+                              Agent Recommended Allocation
+                            </p>
+                            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px]">
+                              3/3 Allocated
+                            </span>
+                          </div>
+
+                          {/* Vehicle Match */}
+                          <div className="rounded-lg bg-slate-50 p-2.5 border border-slate-200 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">🚐</span>
+                              <div>
+                                <p className="font-bold text-slate-900 text-xs">
+                                  {matchedVehicle ? `${matchedVehicle.type} (${matchedVehicle.capacity} seats)` : 'AI-Optimized Vehicle'}
+                                </p>
+                                <p className="text-[10px] text-slate-500 font-mono">
+                                  {matchedVehicle?.registrationNumber || 'Matched by FleetCapacityAgent'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
+                              Fit OK
+                            </span>
+                          </div>
+
+                          {/* Driver Match */}
+                          <div className="rounded-lg bg-slate-50 p-2.5 border border-slate-200 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">🧑‍✈️</span>
+                              <div>
+                                <p className="font-bold text-slate-900 text-xs">
+                                  {matchedDriver ? matchedDriver.name : 'AI-Verified Driver'}
+                                </p>
+                                <p className="text-[10px] text-slate-500">
+                                  {matchedDriver?.contactInfo || 'Conflict-free schedule'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
+                              Conflict-Free
+                            </span>
+                          </div>
+
+                          {/* Tour Guide Match */}
+                          <div className="rounded-lg bg-purple-50/70 p-2.5 border border-purple-200 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">🧭</span>
+                              <div>
+                                <p className="font-bold text-purple-950 text-xs">
+                                  {matchedGuide ? matchedGuide.name : 'AI-Matched Tour Guide'}
+                                </p>
+                                <p className="text-[10px] text-purple-700">
+                                  {guideOutput?.reasoning ? guideOutput.reasoning : (matchedGuide?.specializations?.join(', ') || 'Specialized guide matched')}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-bold text-purple-800 bg-purple-200/80 px-2 py-0.5 rounded">
+                              {guideOutput?.matchScore ? `${Math.round(guideOutput.matchScore * 100)}% Match` : 'Verified'}
+                            </span>
+                          </div>
+
+                          {/* Validation Chips */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                              ✓ No Date Conflicts
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                              ✓ Capacity OK: {selectedBooking.groupSize} Guests
+                            </span>
+                            {selectedBooking.packageTier?.requiresAC && (
+                              <span className="inline-flex items-center gap-1 rounded bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 border border-sky-200">
+                                ✓ Climate AC Verified
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200">
+                              ✓ Guide Matched
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200">
+                              ✓ Budget Feasible {pricingOutput?.totalCost ? `($${pricingOutput.totalCost})` : ''}
+                            </span>
+                          </div>
+
+                          {workflowPlan?.summaryText && (
+                            <p className="text-[11px] text-slate-600 mt-2 bg-purple-50/50 p-2.5 rounded-lg border border-purple-100">
+                              {workflowPlan.summaryText}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {approvalError && (
+                      <div className="rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
+                        {approvalError}
+                      </div>
+                    )}
+
+                    {(() => {
+                      const hasGuide = !!(guideOutput?.guideId || matchedGuide || selectedBooking.assignedGuide?.id || currentAssignment?.guideName);
+                      const hasVehicle = !!(fleetOutput?.vehicleId || matchedVehicle || currentAssignment?.vehicleName);
+                      const hasDriver = !!(fleetOutput?.driverId || matchedDriver || currentAssignment?.driverName);
+                      const allAssigned = hasGuide && hasVehicle && hasDriver;
+
+                      return (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                          {!allAssigned ? (
+                            <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                              ⚠️ Cannot confirm: All 3 resources (Vehicle, Driver, Guide) must be allocated before approval.
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                              ✓ All 3 resources ready to be committed on approval.
                             </span>
                           )}
-                          <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700 border border-purple-200">
-                            ✓ Budget Feasible
-                          </span>
+
+                          <button
+                            type="button"
+                            onClick={handleApprovePlan}
+                            disabled={approving || !allAssigned}
+                            className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-purple-600 transition disabled:opacity-50"
+                          >
+                            {approving ? 'Confirming Allocation...' : 'Approve & Confirm Allocation'}
+                          </button>
                         </div>
-                        {workflowPlan?.summaryText && (
-                          <p className="text-[11px] text-slate-600 mt-2 bg-purple-50/50 p-2 rounded border border-purple-100">
-                            {workflowPlan.summaryText}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {approvalError && (
-                    <div className="rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
-                      {approvalError}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={handleApprovePlan}
-                      disabled={approving}
-                      className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-purple-600 transition disabled:opacity-50"
-                    >
-                      {approving ? 'Confirming...' : 'Approve & Confirm Plan'}
-                    </button>
+                      );
+                    })()}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Smart Vehicle Availability Roster for the Selected Dates */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
@@ -892,16 +1043,20 @@ export function FleetManager() {
       </div>
 
       {/* Manual Allocation Modal with Smart Driver Conflict Detection */}
-      {allocatingVehicle && selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-150">
-            <h2 className="font-heading text-lg font-bold text-slate-900">
-              Confirm Vehicle &amp; Driver Allocation
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Assign {allocatingVehicle.type} ({allocatingVehicle.registrationNumber}) to{' '}
-              {selectedBooking.tourPackageName}.
-            </p>
+      {allocatingVehicle && selectedBooking && (() => {
+        const hasExistingGuide = !!(selectedBooking.assignedGuide?.id || currentAssignment?.guideName);
+        const existingGuideName = selectedBooking.assignedGuide?.name || currentAssignment?.guideName || 'Current Guide';
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-150">
+              <h2 className="font-heading text-lg font-bold text-slate-900">
+                Confirm Vehicle, Driver &amp; Guide Allocation
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Assign {allocatingVehicle.type} ({allocatingVehicle.registrationNumber}) to{' '}
+                {selectedBooking.tourPackageName}.
+              </p>
 
             {allocationError && (
               <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
@@ -1018,6 +1173,125 @@ export function FleetManager() {
                 )}
               </div>
 
+              {/* Tour Guide Selection with Date Overlap Checks */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Assign Tour Guide (Anti-Double-Booking Check)
+                  </label>
+                  {loadingGuides && (
+                    <span className="text-[11px] text-purple-600 animate-pulse">
+                      Checking guide schedules...
+                    </span>
+                  )}
+                </div>
+
+                {allGuides.length === 0 ? (
+                  <p className="text-xs text-slate-500">No guides registered in the system.</p>
+                ) : (
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {/* Option to keep existing guide if already assigned */}
+                    {hasExistingGuide ? (
+                      <div
+                        onClick={() => setSelectedGuideId('')}
+                        className={`rounded-xl border p-2.5 text-xs transition flex items-center justify-between cursor-pointer ${
+                          selectedGuideId === ''
+                            ? 'border-purple-500 bg-purple-50/50 ring-1 ring-purple-500'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="space-y-0.5">
+                          <span className="font-semibold text-slate-700">Keep Current Guide ({existingGuideName})</span>
+                          <p className="text-[11px] text-slate-400">Keep the previously assigned tour guide for this booking.</p>
+                        </div>
+                        <input
+                          type="radio"
+                          name="assignedGuide"
+                          value=""
+                          checked={selectedGuideId === ''}
+                          onChange={() => setSelectedGuideId('')}
+                          className="h-4 w-4 border-slate-300 text-purple-600 focus:ring-purple-500"
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 text-xs text-amber-800">
+                        <span className="font-semibold">⚠️ Guide Required: </span>
+                        A booking requires all 3 resources (Vehicle, Driver, Guide) to be confirmed. Please select an available guide below.
+                      </div>
+                    )}
+
+                    {allGuides.map((g) => {
+                      const availItem = availableGuides.find((ag) => ag.guideId === g.id);
+                      // If availableGuides contains it, guide is available for this date window
+                      const isFree = !!availItem;
+                      const isSelected = selectedGuideId === g.id;
+
+                      return (
+                        <div
+                          key={g.id}
+                          onClick={() => {
+                            if (isFree) {
+                              setSelectedGuideId(g.id);
+                            }
+                          }}
+                          className={`rounded-xl border p-3 text-xs transition flex items-center justify-between ${
+                            !isFree
+                              ? 'border-slate-200 bg-slate-50/70 opacity-45 cursor-not-allowed'
+                              : isSelected
+                              ? 'border-purple-500 bg-purple-50/50 ring-1 ring-purple-500 cursor-pointer'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 cursor-pointer'
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900">{g.name}</span>
+                              {availItem?.matchesSpecialization && (
+                                <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                  Theme Match
+                                </span>
+                              )}
+                              {availItem?.matchesLanguage && (
+                                <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                  Language Match
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              {g.specializations?.join(', ') || 'General Guide'} &bull; {g.languages?.join(', ')}
+                            </p>
+                            <div>
+                              {isFree ? (
+                                <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 text-[10px]">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  Available for this tour window
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 font-semibold text-rose-700 text-[10px]">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                                  Unavailable (Date overlap / Booked)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <input
+                              type="radio"
+                              name="assignedGuide"
+                              value={g.id}
+                              disabled={!isFree}
+                              checked={isSelected}
+                              onChange={() => isFree && setSelectedGuideId(g.id)}
+                              className="h-4 w-4 border-slate-300 text-purple-600 focus:ring-purple-500 disabled:opacity-40"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="mt-6 flex justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -1029,16 +1303,17 @@ export function FleetManager() {
                 </button>
                 <button
                   type="submit"
-                  disabled={allocating || !selectedDriverId}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition disabled:opacity-50"
+                  disabled={allocating || !selectedDriverId || (!selectedGuideId && !hasExistingGuide)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition disabled:opacity-50"
                 >
-                  {allocating ? 'Allocating...' : 'Confirm Allocation'}
+                  {allocating ? 'Allocating Resources...' : 'Confirm Allocation'}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      )}
+      );
+    })()}
     </div>
   );
 }

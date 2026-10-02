@@ -13,7 +13,7 @@ namespace TrailWise.Api.Controllers;
 [Authorize(Roles = ManagerRoles)]
 public class AgentWorkflowsController : ControllerBase
 {
-    private const string ManagerRoles = "OperationsManager,Admin";
+    private const string ManagerRoles = "OperationsManager,FleetCoordinator,Admin";
 
     private readonly TrailWiseDbContext _db;
 

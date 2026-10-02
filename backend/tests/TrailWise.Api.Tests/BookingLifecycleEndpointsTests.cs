@@ -38,6 +38,48 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+
+            var v = new Vehicle
+            {
+                Type = VehicleType.Van,
+                RegistrationNumber = $"REG-{Guid.NewGuid():N}"[..10],
+                Capacity = 8,
+                HasAC = true,
+                SeatConfiguration = "2-2-2-2",
+                MaintenanceStatus = VehicleMaintenanceStatus.Available
+            };
+            var d = new Driver
+            {
+                Name = "Pending Driver",
+                LicenseNumber = $"DL-{Guid.NewGuid():N}"[..10],
+                ContactInfo = "+94770000003"
+            };
+            var g = new Guide
+            {
+                Name = "Pending Guide",
+                Specializations = new[] { "General" },
+                Languages = new[] { "English" }
+            };
+            db.Vehicles.Add(v);
+            db.Drivers.Add(d);
+            db.Guides.Add(g);
+            db.VehicleAssignments.Add(new VehicleAssignment
+            {
+                Vehicle = v,
+                Driver = d,
+                BookingId = bookingId,
+                StartDate = booking!.StartDate,
+                EndDate = booking.EndDate
+            });
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                Guide = g,
+                Date = booking.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = bookingId
+            });
+
             db.AgentWorkflowRuns.Add(new AgentWorkflowRun
             {
                 BookingId = bookingId,
@@ -124,7 +166,32 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
                 Languages = new[] { "English" },
                 ContactInfo = "guide@example.com"
             };
+            var vehicle = new Vehicle
+            {
+                Type = VehicleType.Van,
+                RegistrationNumber = $"REG-{Guid.NewGuid():N}"[..10],
+                Capacity = 8,
+                HasAC = true,
+                SeatConfiguration = "2-2-2-2",
+                MaintenanceStatus = VehicleMaintenanceStatus.Available
+            };
+            var driver = new Driver
+            {
+                Name = "Needs Review Driver",
+                LicenseNumber = $"DL-{Guid.NewGuid():N}"[..10],
+                ContactInfo = "+94770000004"
+            };
+            db.Vehicles.Add(vehicle);
+            db.Drivers.Add(driver);
             db.Guides.Add(guide);
+            db.VehicleAssignments.Add(new VehicleAssignment
+            {
+                Vehicle = vehicle,
+                Driver = driver,
+                BookingId = bookingId,
+                StartDate = booking!.StartDate,
+                EndDate = booking.EndDate
+            });
             db.GuideAvailabilities.Add(new GuideAvailability
             {
                 Guide = guide,
@@ -152,6 +219,52 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
     {
         var (_, bookingId, _) = await SetupBookingAsync(BookingStatus.PendingApproval);
 
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
+            var vehicle = new Vehicle
+            {
+                Type = VehicleType.Van,
+                RegistrationNumber = $"REG-{Guid.NewGuid():N}"[..10],
+                Capacity = 8,
+                HasAC = true,
+                SeatConfiguration = "2-2-2-2",
+                MaintenanceStatus = VehicleMaintenanceStatus.Available
+            };
+            var driver = new Driver
+            {
+                Name = "Direct Driver",
+                LicenseNumber = $"DL-{Guid.NewGuid():N}"[..10],
+                ContactInfo = "+94770000005"
+            };
+            var guide = new Guide
+            {
+                Name = "Direct Guide",
+                Specializations = new[] { "General" },
+                Languages = new[] { "English" }
+            };
+            db.Vehicles.Add(vehicle);
+            db.Drivers.Add(driver);
+            db.Guides.Add(guide);
+            db.VehicleAssignments.Add(new VehicleAssignment
+            {
+                Vehicle = vehicle,
+                Driver = driver,
+                BookingId = bookingId,
+                StartDate = booking!.StartDate,
+                EndDate = booking.EndDate
+            });
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                Guide = guide,
+                Date = booking.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = bookingId
+            });
+            await db.SaveChangesAsync();
+        }
+
         var managerClient = await AuthenticatedOperationsManagerAsync();
         var response = await managerClient.PatchAsJsonAsync($"/api/bookings/{bookingId}/decision", new
         {
@@ -172,6 +285,7 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var booking = await db.Bookings.FindAsync(bookingId);
 
             var vehicle = new Vehicle
             {
@@ -186,8 +300,22 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
                 Name = "Auto Driver",
                 ContactInfo = "0771234567"
             };
+            var guide = new Guide
+            {
+                Name = "Auto Guide",
+                Specializations = new[] { "General" },
+                Languages = new[] { "English" }
+            };
             db.Vehicles.Add(vehicle);
             db.Drivers.Add(driver);
+            db.Guides.Add(guide);
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                Guide = guide,
+                Date = booking!.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = bookingId
+            });
             await db.SaveChangesAsync();
 
             vehicleId = vehicle.Id;
