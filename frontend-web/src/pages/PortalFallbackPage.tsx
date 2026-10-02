@@ -1,11 +1,15 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { Logo } from '../components/Logo';
 
 export function PortalFallbackPage() {
   const { user, logout } = useAuth();
+
+  if (user?.role === 'TourGuide') {
+    return <Navigate to="/guides" replace />;
+  }
+
   const canAccessAvailability =
-    user?.role === 'TourGuide' ||
     user?.role === 'OperationsManager' ||
     user?.role === 'FleetCoordinator';
 
@@ -21,7 +25,7 @@ export function PortalFallbackPage() {
         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Available Features</p>
           <p className="mt-1 text-sm font-medium text-slate-800">
-            {user?.role === 'TourGuide' ? 'Manage your availability calendar' : 'Review guide schedules'}
+            Review guide schedules
           </p>
           <Link
             to="/guides/availability"
@@ -29,22 +33,6 @@ export function PortalFallbackPage() {
           >
             Open Guide Availability
           </Link>
-          {user?.role === 'TourGuide' && (
-            <>
-              <Link
-                to="/guides/my-tours"
-                className="mt-3 ml-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                View My Assigned Tours
-              </Link>
-              <Link
-                to="/guides/profile"
-                className="mt-3 ml-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Profile & Settings
-              </Link>
-            </>
-          )}
         </div>
       )}
 

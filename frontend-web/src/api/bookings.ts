@@ -77,6 +77,7 @@ export interface BookingSummaryDto {
   endDate?: string;
   groupSize: number;
   languagePreference?: string | null;
+  assignedGuide?: AssignedGuideDto | null;
 }
 
 export interface AvailableGuideDto {

@@ -42,6 +42,8 @@ import { TourDetailPage } from './pages/guides/TourDetailPage';
 import { GuideProfilePage } from './pages/guides/GuideProfilePage';
 import { DriverDashboardPage } from './pages/driver/DriverDashboardPage';
 import { DriverProfileSettingsPage } from './pages/driver/DriverProfileSettingsPage';
+import { GuideLayout } from './components/guides/GuideLayout';
+import { GuideDashboardPage } from './pages/guides/GuideDashboardPage';
 
 function App() {
   return (
@@ -58,6 +60,18 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/guides"
+        element={
+          <RequireRole allowedRoles={['TourGuide']}>
+            <GuideLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<GuideDashboardPage />} />
+        <Route path="dashboard" element={<GuideDashboardPage />} />
+      </Route>
 
       <Route
         path="/guides/availability"
