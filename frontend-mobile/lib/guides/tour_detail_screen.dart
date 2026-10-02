@@ -209,7 +209,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   Future<void> _startTour() async {
-    if (_saving || _lifecycleLoading) return;
+    if (_saving || _lifecycleLoading || !_tour.isAdvancePaid) return;
 
     setState(() {
       _lifecycleLoading = true;
@@ -815,11 +815,38 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           ),
                         ),
                       ] else ...[
+                        if (!_tour.isAdvancePaid) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade300),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.amber.shade900, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Waiting for advance payment. Advance payment must be completed before starting this tour.',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.amber.shade900,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         SizedBox(
                           width: double.infinity,
                           height: 48,
                           child: FilledButton(
-                            onPressed: (_lifecycleLoading || _saving) ? null : _startTour,
+                            onPressed: (_lifecycleLoading || _saving || !_tour.isAdvancePaid) ? null : _startTour,
                             style: FilledButton.styleFrom(backgroundColor: Colors.teal),
                             child: _lifecycleLoading
                                 ? const SizedBox(

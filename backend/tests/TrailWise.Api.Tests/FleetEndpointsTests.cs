@@ -220,7 +220,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
 
         // 2. Check initial availability: should be true
         var client = _factory.CreateClient();
-        var availRes1 = await client.GetAsync($"/api/vehicles/{vehicle!.Id}/availability?from=2026-10-01&to=2026-10-05");
+        var availRes1 = await client.GetAsync($"/api/vehicles/{vehicle!.Id}/availability?from=2026-11-01&to=2026-11-05");
         availRes1.EnsureSuccessStatusCode();
         var avail1 = await availRes1.Content.ReadFromJsonAsync<VehicleAvailabilityResponse>(JsonOptions);
         Assert.NotNull(avail1);
@@ -245,29 +245,29 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         {
             PackageTierId = tier.Id,
             GroupSize = 2,
-            StartDate = new DateOnly(2026, 10, 1),
-            EndDate = new DateOnly(2026, 10, 5),
+            StartDate = new DateOnly(2026, 11, 1),
+            EndDate = new DateOnly(2026, 11, 5),
             BudgetPerPerson = 500m
         });
         var booking = await bookingRes.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
 
-        // Reserve vehicle for 2026-10-02 to 2026-10-04 (overlapping with 10-01..10-05)
+        // Reserve vehicle for 2026-11-02 to 2026-11-04 (overlapping with 11-01..11-05)
         var reserveRes = await adminClient.PostAsJsonAsync($"/api/vehicles/{vehicle.Id}/reservations", new ReserveVehicleRequest
         {
             DriverId = driver!.Id,
             BookingId = booking!.Id,
-            StartDate = new DateOnly(2026, 10, 2),
-            EndDate = new DateOnly(2026, 10, 4)
+            StartDate = new DateOnly(2026, 11, 2),
+            EndDate = new DateOnly(2026, 11, 4)
         });
         reserveRes.EnsureSuccessStatusCode();
 
-        // 4. Overlap query: 2026-10-01 to 2026-10-03 (overlaps 2026-10-02..2026-10-04) -> false
-        var availRes2 = await client.GetAsync($"/api/vehicles/{vehicle.Id}/availability?from=2026-10-01&to=2026-10-03");
+        // 4. Overlap query: 2026-11-01 to 2026-11-03 (overlaps 2026-11-02..2026-11-04) -> false
+        var availRes2 = await client.GetAsync($"/api/vehicles/{vehicle.Id}/availability?from=2026-11-01&to=2026-11-03");
         var avail2 = await availRes2.Content.ReadFromJsonAsync<VehicleAvailabilityResponse>(JsonOptions);
         Assert.False(avail2!.IsAvailable);
 
-        // 5. Non-overlapping query: 2026-10-05 to 2026-10-07 -> true
-        var availRes3 = await client.GetAsync($"/api/vehicles/{vehicle.Id}/availability?from=2026-10-05&to=2026-10-07");
+        // 5. Non-overlapping query: 2026-11-05 to 2026-11-07 -> true
+        var availRes3 = await client.GetAsync($"/api/vehicles/{vehicle.Id}/availability?from=2026-11-05&to=2026-11-07");
         var avail3 = await availRes3.Content.ReadFromJsonAsync<VehicleAvailabilityResponse>(JsonOptions);
         Assert.True(avail3!.IsAvailable);
 
@@ -276,8 +276,8 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         {
             DriverId = driver.Id,
             BookingId = booking.Id,
-            StartDate = new DateOnly(2026, 10, 3),
-            EndDate = new DateOnly(2026, 10, 6)
+            StartDate = new DateOnly(2026, 11, 3),
+            EndDate = new DateOnly(2026, 11, 6)
         });
         Assert.Equal(HttpStatusCode.Conflict, doubleBookRes.StatusCode);
     }

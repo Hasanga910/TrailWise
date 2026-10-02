@@ -21,6 +21,8 @@ Map<String, dynamic> _bookingJson({
   double? remainingAmount,
   bool isFullyPaid = false,
   bool hasPendingPayment = false,
+  String? tourStartedAt,
+  String? tourEndedAt,
 }) =>
     {
       'id': id,
@@ -45,6 +47,8 @@ Map<String, dynamic> _bookingJson({
       'remainingAmount': remainingAmount,
       'isFullyPaid': isFullyPaid,
       'hasPendingPayment': hasPendingPayment,
+      'tourStartedAt': tourStartedAt,
+      'tourEndedAt': tourEndedAt,
       'createdAt': createdAt,
     };
 
@@ -247,6 +251,44 @@ void main() {
     final fake = FakeApiClient(getResponses: {
       '/api/bookings/mine': {
         'items': [_bookingJson(status: 'Completed')],
+        'totalCount': 1,
+        'page': 1,
+        'pageSize': 10,
+      },
+    });
+
+    await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cancel Booking'), findsNothing);
+  });
+
+  testWidgets('does not show a Cancel Booking button if tour has started', (tester) async {
+    final fake = FakeApiClient(getResponses: {
+      '/api/bookings/mine': {
+        'items': [_bookingJson(status: 'Confirmed', tourStartedAt: '2030-01-01T08:00:00Z')],
+        'totalCount': 1,
+        'page': 1,
+        'pageSize': 10,
+      },
+    });
+
+    await tester.pumpWidget(MaterialApp(home: MyBookingsScreen(apiClient: fake)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cancel Booking'), findsNothing);
+  });
+
+  testWidgets('does not show a Cancel Booking button if tour has ended', (tester) async {
+    final fake = FakeApiClient(getResponses: {
+      '/api/bookings/mine': {
+        'items': [
+          _bookingJson(
+            status: 'Confirmed',
+            tourStartedAt: '2030-01-01T08:00:00Z',
+            tourEndedAt: '2030-01-05T18:00:00Z',
+          ),
+        ],
         'totalCount': 1,
         'page': 1,
         'pageSize': 10,
