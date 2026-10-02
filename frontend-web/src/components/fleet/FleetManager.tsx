@@ -3,9 +3,9 @@ import { extractErrorMessage } from '../../api/apiClient';
 import {
   checkDriverAvailability,
   checkVehicleAvailability,
-  getAssignmentByBookingId,
   getDrivers,
   getVehicles,
+  getVehicleAssignments,
   reserveVehicle,
   type DriverDto,
   type VehicleAssignmentDetailDto,
@@ -146,7 +146,8 @@ export function FleetManager() {
   const [workflowPlan, setWorkflowPlan] = useState<AgentWorkflowDto | null>(null);
   const [workflowLoading, setWorkflowLoading] = useState(false);
 
-  // Active vehicle assignment for the selected booking
+  // Active vehicle assignments map: bookingId -> VehicleAssignmentDetailDto
+  const [assignmentsMap, setAssignmentsMap] = useState<Record<string, VehicleAssignmentDetailDto>>({});
   const [currentAssignment, setCurrentAssignment] = useState<VehicleAssignmentDetailDto | null>(null);
 
   // Allocation modal state
@@ -171,24 +172,31 @@ export function FleetManager() {
       getDrivers().catch(() => [] as DriverDto[]),
       getGuides().catch(() => [] as GuideDto[]),
       getPagedBookings({ pageSize: 50 }).catch(() => ({ items: [] as BookingDto[], totalCount: 0, page: 1, pageSize: 50 })),
+      getVehicleAssignments().catch(() => [] as VehicleAssignmentDetailDto[]),
     ])
-      .then(([vehRes, driverRes, guideRes, bookRes]) => {
+      .then(([vehRes, driverRes, guideRes, bookRes, assignRes]) => {
         setVehicles(vehRes);
         setDrivers(driverRes);
         setAllGuides(guideRes);
         const bItems = bookRes.items || [];
         setBookings(bItems);
 
+        const aMap: Record<string, VehicleAssignmentDetailDto> = {};
+        assignRes.forEach((a: VehicleAssignmentDetailDto) => {
+          if (a.bookingId) aMap[a.bookingId] = a;
+        });
+        setAssignmentsMap(aMap);
+
         // Keep or auto-select first priority booking if none selected
         if (!selectedBooking && bItems.length > 0) {
-          const priority = bItems.find((b) => b.status === 'NeedsManualReview') ||
-            bItems.find((b) => b.status === 'PlanProposed') ||
-            bItems.find((b) => b.status === 'PendingApproval') ||
-            bItems.find((b) => b.status === 'Requested') ||
+          const priority = bItems.find((b: BookingDto) => b.status === 'NeedsManualReview') ||
+            bItems.find((b: BookingDto) => b.status === 'PlanProposed') ||
+            bItems.find((b: BookingDto) => b.status === 'PendingApproval') ||
+            bItems.find((b: BookingDto) => b.status === 'Requested') ||
             bItems[0];
           setSelectedBooking(priority);
         } else if (selectedBooking) {
-          const updated = bItems.find((b) => b.id === selectedBooking.id);
+          const updated = bItems.find((b: BookingDto) => b.id === selectedBooking.id);
           if (updated) setSelectedBooking(updated);
         }
       })
@@ -268,17 +276,15 @@ export function FleetManager() {
     };
   }, [selectedBooking, drivers]);
 
-  // When selectedBooking changes, fetch its existing vehicle assignment if any
+  // When selectedBooking or assignmentsMap changes, look up existing vehicle assignment from cache
   useEffect(() => {
     if (!selectedBooking) {
       setCurrentAssignment(null);
       return;
     }
 
-    getAssignmentByBookingId(selectedBooking.id)
-      .then((data) => setCurrentAssignment(data))
-      .catch(() => setCurrentAssignment(null));
-  }, [selectedBooking]);
+    setCurrentAssignment(assignmentsMap[selectedBooking.id] ?? null);
+  }, [selectedBooking, assignmentsMap]);
 
   // When selectedBooking changes, fetch available tour guides with overlap check
   useEffect(() => {
@@ -813,16 +819,35 @@ export function FleetManager() {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-end gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={handleApprovePlan}
-                        disabled={approving}
-                        className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-purple-600 transition disabled:opacity-50"
-                      >
-                        {approving ? 'Confirming Allocation...' : 'Approve & Confirm Allocation'}
-                      </button>
-                    </div>
+                    {(() => {
+                      const hasGuide = !!(guideOutput?.guideId || matchedGuide || selectedBooking.assignedGuide?.id || currentAssignment?.guideName);
+                      const hasVehicle = !!(fleetOutput?.vehicleId || matchedVehicle || currentAssignment?.vehicleName);
+                      const hasDriver = !!(fleetOutput?.driverId || matchedDriver || currentAssignment?.driverName);
+                      const allAssigned = hasGuide && hasVehicle && hasDriver;
+
+                      return (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                          {!allAssigned ? (
+                            <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                              ⚠️ Cannot confirm: All 3 resources (Vehicle, Driver, Guide) must be allocated before approval.
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                              ✓ All 3 resources ready to be committed on approval.
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleApprovePlan}
+                            disabled={approving || !allAssigned}
+                            className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-purple-600 transition disabled:opacity-50"
+                          >
+                            {approving ? 'Confirming Allocation...' : 'Approve & Confirm Allocation'}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
@@ -1018,16 +1043,20 @@ export function FleetManager() {
       </div>
 
       {/* Manual Allocation Modal with Smart Driver Conflict Detection */}
-      {allocatingVehicle && selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-150">
-            <h2 className="font-heading text-lg font-bold text-slate-900">
-              Confirm Vehicle &amp; Driver Allocation
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Assign {allocatingVehicle.type} ({allocatingVehicle.registrationNumber}) to{' '}
-              {selectedBooking.tourPackageName}.
-            </p>
+      {allocatingVehicle && selectedBooking && (() => {
+        const hasExistingGuide = !!(selectedBooking.assignedGuide?.id || currentAssignment?.guideName);
+        const existingGuideName = selectedBooking.assignedGuide?.name || currentAssignment?.guideName || 'Current Guide';
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-150">
+              <h2 className="font-heading text-lg font-bold text-slate-900">
+                Confirm Vehicle, Driver &amp; Guide Allocation
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Assign {allocatingVehicle.type} ({allocatingVehicle.registrationNumber}) to{' '}
+                {selectedBooking.tourPackageName}.
+              </p>
 
             {allocationError && (
               <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
@@ -1161,28 +1190,35 @@ export function FleetManager() {
                   <p className="text-xs text-slate-500">No guides registered in the system.</p>
                 ) : (
                   <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                    {/* Option to leave unassigned / keep existing */}
-                    <div
-                      onClick={() => setSelectedGuideId('')}
-                      className={`rounded-xl border p-2.5 text-xs transition flex items-center justify-between cursor-pointer ${
-                        selectedGuideId === ''
-                          ? 'border-purple-500 bg-purple-50/50 ring-1 ring-purple-500'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="space-y-0.5">
-                        <span className="font-semibold text-slate-700">No Guide / Keep Current</span>
-                        <p className="text-[11px] text-slate-400">Do not assign a new guide during this allocation.</p>
+                    {/* Option to keep existing guide if already assigned */}
+                    {hasExistingGuide ? (
+                      <div
+                        onClick={() => setSelectedGuideId('')}
+                        className={`rounded-xl border p-2.5 text-xs transition flex items-center justify-between cursor-pointer ${
+                          selectedGuideId === ''
+                            ? 'border-purple-500 bg-purple-50/50 ring-1 ring-purple-500'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="space-y-0.5">
+                          <span className="font-semibold text-slate-700">Keep Current Guide ({existingGuideName})</span>
+                          <p className="text-[11px] text-slate-400">Keep the previously assigned tour guide for this booking.</p>
+                        </div>
+                        <input
+                          type="radio"
+                          name="assignedGuide"
+                          value=""
+                          checked={selectedGuideId === ''}
+                          onChange={() => setSelectedGuideId('')}
+                          className="h-4 w-4 border-slate-300 text-purple-600 focus:ring-purple-500"
+                        />
                       </div>
-                      <input
-                        type="radio"
-                        name="assignedGuide"
-                        value=""
-                        checked={selectedGuideId === ''}
-                        onChange={() => setSelectedGuideId('')}
-                        className="h-4 w-4 border-slate-300 text-purple-600 focus:ring-purple-500"
-                      />
-                    </div>
+                    ) : (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 text-xs text-amber-800">
+                        <span className="font-semibold">⚠️ Guide Required: </span>
+                        A booking requires all 3 resources (Vehicle, Driver, Guide) to be confirmed. Please select an available guide below.
+                      </div>
+                    )}
 
                     {allGuides.map((g) => {
                       const availItem = availableGuides.find((ag) => ag.guideId === g.id);
@@ -1267,7 +1303,7 @@ export function FleetManager() {
                 </button>
                 <button
                   type="submit"
-                  disabled={allocating || !selectedDriverId}
+                  disabled={allocating || !selectedDriverId || (!selectedGuideId && !hasExistingGuide)}
                   className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition disabled:opacity-50"
                 >
                   {allocating ? 'Allocating Resources...' : 'Confirm Allocation'}
@@ -1276,7 +1312,8 @@ export function FleetManager() {
             </form>
           </div>
         </div>
-      )}
+      );
+    })()}
     </div>
   );
 }

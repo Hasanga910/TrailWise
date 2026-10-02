@@ -232,13 +232,21 @@ public class FleetReservationService : IFleetReservationService
             _db.VehicleAssignments.Add(assignment);
 
             // Check resource allocation completeness:
-            // A booking can transition to Confirmed when vehicle + driver are assigned,
-            // and guide is assigned if provided or already attached to the booking, or if none was explicitly required.
+            // A booking can ONLY transition to Confirmed when vehicle, driver, AND tour guide are all assigned.
+            bool hasGuide = (guideId.HasValue && guideId.Value != Guid.Empty) ||
+                            await _db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == bookingId && a.GuideId != Guid.Empty, ct);
+            bool hasVehicleAndDriver = vehicleId != Guid.Empty && driverId != Guid.Empty;
+
             bool transitionedToConfirmed = false;
-            if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval || booking.Status == BookingStatus.PlanProposed)
+            if (hasGuide && hasVehicleAndDriver && (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval || booking.Status == BookingStatus.PlanProposed))
             {
                 transitionedToConfirmed = _bookingLifecycleService.TransitionToConfirmed(booking);
-                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator fleet and guide allocation.", bookingId);
+                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after complete allocation (Vehicle, Driver, Guide).", bookingId);
+            }
+            else
+            {
+                _logger.LogInformation("Booking {BookingId} vehicle/driver assigned but not transitioned to Confirmed (HasGuide: {HasGuide}, HasVehicleAndDriver: {HasVehicleAndDriver}, Status: {Status}).",
+                    bookingId, hasGuide, hasVehicleAndDriver, booking.Status);
             }
 
             await _db.SaveChangesAsync(ct);
