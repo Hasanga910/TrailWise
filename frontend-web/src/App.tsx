@@ -33,6 +33,7 @@ import { FleetProfileSettingsPage } from './pages/fleet/FleetProfileSettingsPage
 import { FleetDriversPage } from './pages/fleet/FleetDriversPage';
 import { FleetVehiclesPage } from './pages/fleet/FleetVehiclesPage';
 import { FleetAssignmentsPage } from './pages/fleet/FleetAssignmentsPage';
+import { FleetGuideAssignmentsPage } from './pages/fleet/FleetGuideAssignmentsPage';
 import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
 import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
 import { GuideAvailabilityPage } from './pages/guides/GuideAvailabilityPage';
@@ -159,6 +160,7 @@ function App() {
         <Route path="vehicles" element={<FleetVehiclesPage />} />
         <Route path="drivers" element={<FleetDriversPage />} />
         <Route path="assignments" element={<FleetAssignmentsPage />} />
+        <Route path="guide-assignments" element={<FleetGuideAssignmentsPage />} />
         <Route path="profile" element={<FleetProfileSettingsPage />} />
       </Route>
 

@@ -22,6 +22,7 @@ namespace TrailWise.Api.Controllers;
 public class BookingsController : ControllerBase
 {
     private const string ManagerRoles = "OperationsManager,FleetCoordinator,Admin";
+    private const string FleetCoordinatorOrAdmin = "FleetCoordinator,Admin";
     private const int MaxAdvanceBookingDays = 365;
     private const int DefaultPageSize = 10;
     private const int MaxPageSize = 50;
@@ -918,7 +919,7 @@ public class BookingsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/assign-guide")]
-    [Authorize(Roles = ManagerRoles)]
+    [Authorize(Roles = FleetCoordinatorOrAdmin)]
     public async Task<ActionResult<AssignGuideResponse>> AssignGuide(
         Guid id,
         AssignGuideRequest request,
@@ -981,7 +982,7 @@ public class BookingsController : ControllerBase
         await _auditLogService.LogAsync(
             entityType: "Booking",
             entityId: booking.Id,
-            action: "Guide manually assigned by Operations Manager",
+            action: "Guide manually assigned by Fleet Coordinator",
             performedBy: performedBy,
             details: new { guideId = request.GuideId },
             ct: ct);
@@ -1011,7 +1012,7 @@ public class BookingsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/available-guides")]
-    [Authorize(Roles = ManagerRoles)]
+    [Authorize(Roles = FleetCoordinatorOrAdmin)]
     public async Task<ActionResult<IReadOnlyList<AvailableGuideDto>>> GetAvailableGuides(
         Guid id,
         CancellationToken ct)

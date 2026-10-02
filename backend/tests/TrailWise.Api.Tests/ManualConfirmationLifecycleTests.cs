@@ -120,7 +120,7 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
     public async Task Test02_AssignGuide_Confirmation_Sets_Confirmed_And_PaymentDueAt()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
 
         var guide = await CreateGuideAsync("Guide Sunimal");
         var startDate = new DateOnly(2026, 12, 1);
@@ -159,7 +159,7 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
             await vDb.SaveChangesAsync();
         }
 
-        var response = await opsManager.PostAsJsonAsync(
+        var response = await fleetCoordinator.PostAsJsonAsync(
             $"/api/bookings/{booking.Id}/assign-guide",
             new { GuideId = guide.Id });
 
@@ -498,6 +498,33 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
             Password = password,
             ContactNumber = "+14155550333",
             Role = "OperationsManager"
+        });
+        createResponse.EnsureSuccessStatusCode();
+
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            Email = email,
+            Password = password
+        });
+        loginResponse.EnsureSuccessStatusCode();
+        var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
+        return client;
+    }
+
+    private async Task<HttpClient> FleetCoordinatorClientAsync(HttpClient adminClient)
+    {
+        var client = _factory.CreateClient();
+        var email = $"fleet-{Guid.NewGuid():N}@example.com";
+        var password = "P@ssword123";
+
+        var createResponse = await adminClient.PostAsJsonAsync("/api/auth/admin/users", new
+        {
+            Name = "Test Fleet Coordinator",
+            Email = email,
+            Password = password,
+            ContactNumber = "+14155550222",
+            Role = "FleetCoordinator"
         });
         createResponse.EnsureSuccessStatusCode();
 
