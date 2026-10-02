@@ -856,6 +856,15 @@ public class BookingsController : ControllerBase
                 title: $"This booking is {booking.Status} and cannot be cancelled.");
         }
 
+        if (booking.TourStartedAt.HasValue || booking.TourEndedAt.HasValue)
+        {
+            return Conflict(new
+            {
+                message = "This booking cannot be cancelled after the tour has started.",
+                title = "This booking cannot be cancelled after the tour has started."
+            });
+        }
+
         if (!isManager && booking.StartDate <= DateOnly.FromDateTime(DateTime.UtcNow))
         {
             return Problem(
@@ -1095,6 +1104,7 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
                 .ThenInclude(p => p.Locations)
+            .Include(b => b.Payments)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
@@ -1153,6 +1163,7 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
                 .ThenInclude(p => p.Locations)
+            .Include(b => b.Payments)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
@@ -1192,6 +1203,16 @@ public class BookingsController : ControllerBase
             });
         }
 
+        var hasAdvancePayment = booking.Payments.Any(p => p.Status == PaymentStatus.DepositPaid || p.Status == PaymentStatus.FullyPaid);
+        if (!hasAdvancePayment)
+        {
+            return Conflict(new
+            {
+                message = "Advance payment must be completed before the tour can start.",
+                title = "Advance payment must be completed before the tour can start."
+            });
+        }
+
         booking.TourStartedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
 
@@ -1223,6 +1244,7 @@ public class BookingsController : ControllerBase
         var booking = await _db.Bookings
             .Include(b => b.TourPackage)
                 .ThenInclude(p => p.Locations)
+            .Include(b => b.Payments)
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
         if (booking is null)
@@ -1334,6 +1356,15 @@ public class BookingsController : ControllerBase
             return BadRequest(new
             {
                 errors = new[] { new FieldValidationError("status", "Itineraries can only be created for confirmed bookings.") }
+            });
+        }
+
+        if (booking.Completed || booking.TourEndedAt.HasValue)
+        {
+            return BadRequest(new
+            {
+                message = "Itinerary cannot be modified after the tour is completed.",
+                errors = new[] { new FieldValidationError("booking", "Itinerary cannot be modified after the tour is completed.") }
             });
         }
 

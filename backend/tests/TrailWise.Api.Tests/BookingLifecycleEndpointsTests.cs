@@ -634,6 +634,61 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
     }
 
     [Fact]
+    public async Task Cancel_WhenTourStarted_ReturnsConflict()
+    {
+        var (client, bookingId, _) = await SetupBookingAsync(
+            BookingStatus.Confirmed,
+            startDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)));
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.FindAsync(bookingId);
+            b!.TourStartedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { Reason = "Cancel started tour" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.FindAsync(bookingId);
+            Assert.Equal(BookingStatus.Confirmed, b!.Status);
+        }
+    }
+
+    [Fact]
+    public async Task Cancel_WhenTourEnded_ReturnsConflict()
+    {
+        var (client, bookingId, _) = await SetupBookingAsync(
+            BookingStatus.Confirmed,
+            startDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)));
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.FindAsync(bookingId);
+            b!.TourStartedAt = DateTime.UtcNow.AddHours(-5);
+            b!.TourEndedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { Reason = "Cancel ended tour" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.FindAsync(bookingId);
+            Assert.Equal(BookingStatus.Confirmed, b!.Status);
+        }
+    }
+
+    [Fact]
     public async Task GetMine_WithStatusPending_ReturnsAllPendingStatuses()
     {
         var (client, _, travelerId) = await SetupBookingAsync(BookingStatus.Requested);

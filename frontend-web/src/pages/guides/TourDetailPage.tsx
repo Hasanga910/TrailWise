@@ -8,7 +8,6 @@ import {
 } from '../../api/assignedTours';
 import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
 import { useAuth } from '../../auth/AuthContext';
-import { ItineraryEditor } from '../../components/itinerary/ItineraryEditor';
 import { ItineraryList } from '../../components/itinerary/ItineraryList';
 
 function formatDateTime(dtStr?: string | null) {
@@ -32,7 +31,6 @@ export function TourDetailPage() {
 
   const [itinerarySteps, setItinerarySteps] = useState<ItineraryStepDto[] | null>(null);
   const [itineraryError, setItineraryError] = useState<string | null>(null);
-  const [editingItinerary, setEditingItinerary] = useState(false);
 
   useEffect(() => {
     if (!bookingId) return;
@@ -222,18 +220,7 @@ export function TourDetailPage() {
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h3 className="font-heading text-base font-bold text-slate-900">Itinerary</h3>
-                {tour.status === 'Confirmed' && !editingItinerary && (
-                  <button
-                    type="button"
-                    onClick={() => setEditingItinerary(true)}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    {itinerarySteps && itinerarySteps.length > 0 ? 'Edit Itinerary' : 'Set Itinerary'}
-                  </button>
-                )}
-              </div>
+              <h3 className="font-heading text-base font-bold text-slate-900">Itinerary</h3>
 
               {tour.status !== 'Confirmed' && (
                 <p className="mt-3 text-sm text-slate-500">Available once this booking is confirmed.</p>
@@ -249,23 +236,9 @@ export function TourDetailPage() {
                 <div className="mt-3 h-16 animate-pulse rounded-lg bg-slate-100" />
               )}
 
-              {tour.status === 'Confirmed' && itinerarySteps !== null && !editingItinerary && (
+              {tour.status === 'Confirmed' && itinerarySteps !== null && (
                 <div className="mt-3">
                   <ItineraryList steps={itinerarySteps} />
-                </div>
-              )}
-
-              {tour.status === 'Confirmed' && itinerarySteps !== null && editingItinerary && (
-                <div className="mt-3">
-                  <ItineraryEditor
-                    bookingId={tour.bookingId}
-                    initialSteps={itinerarySteps}
-                    onSaved={(saved) => {
-                      setItinerarySteps(saved);
-                      setEditingItinerary(false);
-                    }}
-                    onCancel={() => setEditingItinerary(false)}
-                  />
                 </div>
               )}
             </div>

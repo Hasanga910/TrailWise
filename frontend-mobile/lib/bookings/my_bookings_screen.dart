@@ -229,7 +229,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   }
 
   bool _isCancellable(Booking booking) =>
-      _cancellableStatuses.contains(booking.status) && _isUpcoming(booking);
+      _cancellableStatuses.contains(booking.status) &&
+      _isUpcoming(booking) &&
+      booking.tourStartedAt == null &&
+      booking.tourEndedAt == null;
 
   Future<void> _cancelBooking(Booking booking) async {
     final reasonController = TextEditingController();

@@ -1,4 +1,5 @@
 import 'package:trailwise_mobile/api/api_client.dart';
+import 'package:trailwise_mobile/models/itinerary_step.dart';
 
 class FakeApiClient extends ApiClient {
   FakeApiClient({
@@ -39,6 +40,31 @@ class FakeApiClient extends ApiClient {
     postCalls.add({'path': path, 'body': body});
     if (postError != null) throw postError!;
     return (postResponses[path] as Map<String, dynamic>?) ?? <String, dynamic>{};
+  }
+
+  @override
+  Future<List<ItineraryStep>> setItinerary(
+    String bookingId,
+    List<Map<String, dynamic>> steps,
+  ) async {
+    final path = '/api/bookings/$bookingId/itinerary';
+    postCalls.add({'path': path, 'body': {'steps': steps}});
+    if (postError != null) throw postError!;
+    final resp = postResponses[path];
+    if (resp is List) {
+      return resp
+          .whereType<Map<String, dynamic>>()
+          .map(ItineraryStep.fromJson)
+          .toList();
+    }
+    return steps.map((s) => ItineraryStep(
+      id: 'step-${s['dayNumber']}',
+      bookingId: bookingId,
+      dayNumber: (s['dayNumber'] as num).toInt(),
+      activity: s['activity'] as String,
+      location: s['location'] as String,
+      startTime: s['startTime'] as String,
+    )).toList();
   }
 
   @override

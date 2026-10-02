@@ -47,6 +47,8 @@ export interface BookingDto {
   remainingAmount?: number | null;
   isFullyPaid?: boolean;
   hasPendingPayment?: boolean;
+  tourStartedAt?: string | null;
+  tourEndedAt?: string | null;
   createdAt?: string;
 }
 
