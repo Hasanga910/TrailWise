@@ -3,6 +3,7 @@ import {
   IdCardIcon,
   ProfileIcon,
   TruckIcon,
+  UsersIcon,
 } from '../admin/icons';
 import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
 
@@ -11,6 +12,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/fleet/vehicles', label: 'Vehicles', icon: TruckIcon },
   { to: '/fleet/drivers', label: 'Drivers', icon: IdCardIcon },
   { to: '/fleet/assignments', label: 'Vehicle Assignments', icon: CalendarIcon },
+  { to: '/fleet/guide-assignments', label: 'Guide Assignments', icon: UsersIcon },
   { to: '/fleet/profile', label: 'Profile', icon: ProfileIcon },
 ];
 
@@ -19,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/fleet/vehicles': 'Vehicle Management & Fleet Roster',
   '/fleet/drivers': 'Driver Roster & Management',
   '/fleet/assignments': 'Vehicle Assignments & Schedules',
+  '/fleet/guide-assignments': 'Tour Guide Fallback Assignment',
   '/fleet/profile': 'Profile Settings',
 };
 

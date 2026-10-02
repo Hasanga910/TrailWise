@@ -30,10 +30,10 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
     }
 
     [Fact]
-    public async Task AssignGuide_OperationsManager_AssignsGuideToNeedsManualReviewBooking_ConfirmsAndReservesAvailability()
+    public async Task AssignGuide_FleetCoordinator_AssignsGuideToNeedsManualReviewBooking_ConfirmsAndReservesAvailability()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
 
         var guide = await CreateGuideAsync("Guide Kasun", specializations: new[] { "Wildlife" });
 
@@ -73,7 +73,7 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
             await vDb.SaveChangesAsync();
         }
 
-        var response = await opsManager.PostAsJsonAsync(
+        var response = await fleetCoordinator.PostAsJsonAsync(
             $"/api/bookings/{booking.Id}/assign-guide",
             new AssignGuideRequest(guide.Id));
 
@@ -101,6 +101,21 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
             Assert.False(a.IsAvailable);
             Assert.Equal(booking.Id, a.AssignedBookingId);
         });
+    }
+
+    [Fact]
+    public async Task AssignGuide_OperationsManagerRole_ReturnsForbidden()
+    {
+        var admin = await AdminClientAsync();
+        var opsManager = await OperationsManagerClientAsync(admin);
+        var guide = await CreateGuideAsync("Guide Ops");
+        var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview, new DateOnly(2026, 11, 4), new DateOnly(2026, 11, 5));
+
+        var response = await opsManager.PostAsJsonAsync(
+            $"/api/bookings/{booking.Id}/assign-guide",
+            new AssignGuideRequest(guide.Id));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -136,10 +151,10 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
     public async Task AssignGuide_NonexistentBooking_ReturnsNotFound()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
         var guide = await CreateGuideAsync("Guide Kamal");
 
-        var response = await opsManager.PostAsJsonAsync(
+        var response = await fleetCoordinator.PostAsJsonAsync(
             $"/api/bookings/{Guid.NewGuid()}/assign-guide",
             new AssignGuideRequest(guide.Id));
 
@@ -150,10 +165,10 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
     public async Task AssignGuide_NonexistentGuide_ReturnsNotFound()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
         var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview, new DateOnly(2026, 11, 9), new DateOnly(2026, 11, 10));
 
-        var response = await opsManager.PostAsJsonAsync(
+        var response = await fleetCoordinator.PostAsJsonAsync(
             $"/api/bookings/{booking.Id}/assign-guide",
             new AssignGuideRequest(Guid.NewGuid()));
 
@@ -164,11 +179,11 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
     public async Task AssignGuide_BookingNotNeedsManualReview_ReturnsBadRequest()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
         var guide = await CreateGuideAsync("Guide Ruwan");
         var confirmedBooking = await SeedBookingAsync(BookingStatus.Confirmed, new DateOnly(2026, 11, 11), new DateOnly(2026, 11, 12));
 
-        var response = await opsManager.PostAsJsonAsync(
+        var response = await fleetCoordinator.PostAsJsonAsync(
             $"/api/bookings/{confirmedBooking.Id}/assign-guide",
             new AssignGuideRequest(guide.Id));
 
@@ -179,7 +194,7 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
     public async Task AssignGuide_ConflictingGuide_ReturnsConflict_AndKeepsNeedsManualReview()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
         var guide = await CreateGuideAsync("Guide Anura");
 
         var startDate = new DateOnly(2026, 11, 15);
@@ -201,7 +216,7 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
 
         var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview, startDate, endDate);
 
-        var response = await opsManager.PostAsJsonAsync(
+        var response = await fleetCoordinator.PostAsJsonAsync(
             $"/api/bookings/{booking.Id}/assign-guide",
             new AssignGuideRequest(guide.Id));
 
@@ -220,7 +235,7 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
     public async Task AssignGuide_DoubleBookingProtection_SecondBookingFailsWithConflict()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
         var guide = await CreateGuideAsync("Guide Chamara");
 
         var startDate = new DateOnly(2026, 11, 20);
@@ -229,22 +244,22 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
         var booking1 = await SeedBookingAsync(BookingStatus.NeedsManualReview, startDate, endDate);
         var booking2 = await SeedBookingAsync(BookingStatus.NeedsManualReview, startDate, endDate);
 
-        var res1 = await opsManager.PostAsJsonAsync(
+        var res1 = await fleetCoordinator.PostAsJsonAsync(
             $"/api/bookings/{booking1.Id}/assign-guide",
             new AssignGuideRequest(guide.Id));
         Assert.Equal(HttpStatusCode.OK, res1.StatusCode);
 
-        var res2 = await opsManager.PostAsJsonAsync(
+        var res2 = await fleetCoordinator.PostAsJsonAsync(
             $"/api/bookings/{booking2.Id}/assign-guide",
             new AssignGuideRequest(guide.Id));
         Assert.Equal(HttpStatusCode.Conflict, res2.StatusCode);
     }
 
     [Fact]
-    public async Task GetAvailableGuides_ReturnsAvailableGuidesAndExcludesConflicting()
+    public async Task GetAvailableGuides_FleetCoordinator_ReturnsAvailableGuidesAndExcludesConflicting()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
 
         var guideFree = await CreateGuideAsync("Guide Free", specializations: new[] { "Cultural" }, languages: new[] { "English" });
         var guideBusy = await CreateGuideAsync("Guide Busy", specializations: new[] { "Cultural" });
@@ -273,7 +288,7 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
             theme: "Cultural",
             languagePreference: "English");
 
-        var response = await opsManager.GetAsync($"/api/bookings/{booking.Id}/available-guides");
+        var response = await fleetCoordinator.GetAsync($"/api/bookings/{booking.Id}/available-guides");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var availableGuides = await response.Content.ReadFromJsonAsync<List<AvailableGuideDto>>(JsonOptions);
@@ -289,22 +304,38 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
     }
 
     [Fact]
+    public async Task GetAvailableGuides_OperationsManagerRole_ReturnsForbidden()
+    {
+        var admin = await AdminClientAsync();
+        var opsManager = await OperationsManagerClientAsync(admin);
+        var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview, new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 12));
+
+        var response = await opsManager.GetAsync($"/api/bookings/{booking.Id}/available-guides");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetAvailableGuides_TravelerOrTourGuide_ReturnsForbidden()
     {
         var traveler = await TravelerClientAsync();
         var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview, new DateOnly(2026, 12, 10), new DateOnly(2026, 12, 12));
 
-        var response = await traveler.GetAsync($"/api/bookings/{booking.Id}/available-guides");
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var travelerResponse = await traveler.GetAsync($"/api/bookings/{booking.Id}/available-guides");
+        Assert.Equal(HttpStatusCode.Forbidden, travelerResponse.StatusCode);
+
+        var admin = await AdminClientAsync();
+        var (tourGuide, _) = await TourGuideClientAsync(admin);
+        var guideResponse = await tourGuide.GetAsync($"/api/bookings/{booking.Id}/available-guides");
+        Assert.Equal(HttpStatusCode.Forbidden, guideResponse.StatusCode);
     }
 
     [Fact]
     public async Task GetAvailableGuides_NonexistentBooking_ReturnsNotFound()
     {
         var admin = await AdminClientAsync();
-        var opsManager = await OperationsManagerClientAsync(admin);
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
 
-        var response = await opsManager.GetAsync($"/api/bookings/{Guid.NewGuid()}/available-guides");
+        var response = await fleetCoordinator.GetAsync($"/api/bookings/{Guid.NewGuid()}/available-guides");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -413,6 +444,33 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
             Password = password,
             ContactNumber = "+14155550333",
             Role = "OperationsManager"
+        });
+        createResponse.EnsureSuccessStatusCode();
+
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            Email = email,
+            Password = password
+        });
+        loginResponse.EnsureSuccessStatusCode();
+        var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
+        return client;
+    }
+
+    private async Task<HttpClient> FleetCoordinatorClientAsync(HttpClient adminClient)
+    {
+        var client = _factory.CreateClient();
+        var email = $"fleet-{Guid.NewGuid():N}@example.com";
+        var password = "P@ssword123";
+
+        var createResponse = await adminClient.PostAsJsonAsync("/api/auth/admin/users", new
+        {
+            Name = "Test Fleet Coordinator",
+            Email = email,
+            Password = password,
+            ContactNumber = "+14155550222",
+            Role = "FleetCoordinator"
         });
         createResponse.EnsureSuccessStatusCode();
 
