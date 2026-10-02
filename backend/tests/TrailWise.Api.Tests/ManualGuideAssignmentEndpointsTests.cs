@@ -256,6 +256,31 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
     }
 
     [Fact]
+    public async Task AssignGuide_AlreadyHasAssignedGuide_ReturnsConflict()
+    {
+        var admin = await AdminClientAsync();
+        var fleetCoordinator = await FleetCoordinatorClientAsync(admin);
+
+        var guide1 = await CreateGuideAsync("Guide First");
+        var guide2 = await CreateGuideAsync("Guide Second");
+
+        var startDate = new DateOnly(2026, 12, 20);
+        var endDate = new DateOnly(2026, 12, 22);
+        var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview, startDate, endDate);
+
+        var res1 = await fleetCoordinator.PostAsJsonAsync(
+            $"/api/bookings/{booking.Id}/assign-guide",
+            new AssignGuideRequest(guide1.Id));
+        Assert.Equal(HttpStatusCode.OK, res1.StatusCode);
+
+        // Attempting second assignment to same booking
+        var res2 = await fleetCoordinator.PostAsJsonAsync(
+            $"/api/bookings/{booking.Id}/assign-guide",
+            new AssignGuideRequest(guide2.Id));
+        Assert.Equal(HttpStatusCode.Conflict, res2.StatusCode);
+    }
+
+    [Fact]
     public async Task GetAvailableGuides_FleetCoordinator_ReturnsAvailableGuidesAndExcludesConflicting()
     {
         var admin = await AdminClientAsync();

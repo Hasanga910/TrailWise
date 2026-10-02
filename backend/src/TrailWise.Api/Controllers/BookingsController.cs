@@ -137,6 +137,8 @@ public class BookingsController : ControllerBase
         var bookings = await _db.Bookings
             .Include(b => b.Traveler)
             .Include(b => b.TourPackage)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
             .OrderByDescending(b => b.CreatedAt)
             .AsNoTracking()
             .ToListAsync(ct);
@@ -958,6 +960,16 @@ public class BookingsController : ControllerBase
             {
                 errors = new[] { new FieldValidationError("status", $"Only bookings in NeedsManualReview status can be assigned a guide. Current status is {booking.Status}.") }
             });
+        }
+
+        var alreadyHasGuide = await _db.GuideAvailabilities
+            .AnyAsync(ga => ga.AssignedBookingId == id, ct);
+
+        if (alreadyHasGuide)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "A tour guide is already assigned to this booking.");
         }
 
         var assigned = await _guideAssignmentService.AssignGuideAsync(id, request.GuideId, ct);
