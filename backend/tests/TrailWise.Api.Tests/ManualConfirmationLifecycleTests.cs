@@ -146,6 +146,85 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
         Assert.True(updated.PaymentDueAt > DateTimeOffset.UtcNow);
     }
 
+    [Fact]
+    public async Task Test03B_UnifiedFleetAndGuideAllocation_AssignsAllThreeResources_AndConfirms()
+    {
+        var adminClient = await AdminClientAsync();
+
+        // 1. Create a vehicle
+        var vanResponse = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.Van,
+            RegistrationNumber = $"REG-{Guid.NewGuid():N}"[..12],
+            Capacity = 8,
+            HasAC = true,
+            SeatConfiguration = "2-2-2-2",
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        });
+        vanResponse.EnsureSuccessStatusCode();
+        var vehicle = await vanResponse.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
+
+        // 2. Create a driver
+        var driverResponse = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        {
+            Name = "Unified Driver",
+            LicenseNumber = $"DL-{Guid.NewGuid():N}"[..10],
+            ContactInfo = "+94719999999"
+        });
+        driverResponse.EnsureSuccessStatusCode();
+        var driver = await driverResponse.Content.ReadFromJsonAsync<DriverDto>(JsonOptions);
+
+        // 3. Create a guide
+        var guide = await CreateGuideAsync("Unified Guide");
+
+        // 4. Seed booking in NeedsManualReview
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
+        var endDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33));
+        var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview, startDate, endDate);
+
+        // 5. Reserve vehicle, driver, and guide simultaneously
+        var reserveRes = await adminClient.PostAsJsonAsync($"/api/vehicles/{vehicle!.Id}/reservations", new ReserveVehicleRequest
+        {
+            DriverId = driver!.Id,
+            BookingId = booking.Id,
+            StartDate = startDate,
+            EndDate = endDate,
+            GuideId = guide.Id
+        });
+        reserveRes.EnsureSuccessStatusCode();
+
+        // 6. Verify booking is Confirmed and both VehicleAssignment and GuideAvailability exist
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var updated = await db.Bookings.FindAsync(booking.Id);
+            Assert.NotNull(updated);
+            Assert.Equal(BookingStatus.Confirmed, updated.Status);
+
+            var vehicleAssignment = await db.VehicleAssignments.FirstOrDefaultAsync(a => a.BookingId == booking.Id);
+            Assert.NotNull(vehicleAssignment);
+            Assert.Equal(vehicle.Id, vehicleAssignment.VehicleId);
+            Assert.Equal(driver.Id, vehicleAssignment.DriverId);
+
+            var guideAvailabilities = await db.GuideAvailabilities
+                .Where(a => a.GuideId == guide.Id && a.AssignedBookingId == booking.Id)
+                .ToListAsync();
+            Assert.NotEmpty(guideAvailabilities);
+        }
+
+        // 7. Attempting to assign the same guide to another booking in overlapping dates fails with conflict
+        var overlappingBooking = await SeedBookingAsync(BookingStatus.NeedsManualReview, startDate, endDate);
+        var secondReserveRes = await adminClient.PostAsJsonAsync($"/api/vehicles/{vehicle!.Id}/reservations", new ReserveVehicleRequest
+        {
+            DriverId = driver!.Id,
+            BookingId = overlappingBooking.Id,
+            StartDate = startDate,
+            EndDate = endDate,
+            GuideId = guide.Id
+        });
+        Assert.Equal(HttpStatusCode.Conflict, secondReserveRes.StatusCode);
+    }
+
     // 4. Existing PaymentDueAt is not overwritten
     [Fact]
     public void Test04_Existing_PaymentDueAt_Is_Not_Overwritten()

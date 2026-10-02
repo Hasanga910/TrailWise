@@ -33,6 +33,7 @@ public interface IFleetReservationService
         Guid bookingId,
         DateOnly startDate,
         DateOnly endDate,
+        Guid? guideId = null,
         CancellationToken ct = default);
 
     Task<int> ReleaseBookingAssignmentsAsync(Guid bookingId, CancellationToken ct = default);

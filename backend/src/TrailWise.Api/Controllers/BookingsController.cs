@@ -36,6 +36,7 @@ public class BookingsController : ControllerBase
     private readonly IFleetCapacityAgent _fleetAgent;
     private readonly IGuideAssignmentService _guideAssignmentService;
     private readonly IGuideAvailabilityService _guideAvailabilityService;
+    private readonly IGuideMatchingAgent? _guideMatchingAgent;
     private readonly IBookingNotificationService? _bookingNotificationService;
     private readonly ILogger<BookingsController> _logger;
     private readonly IPaymentService _paymentService;
@@ -55,7 +56,8 @@ public class BookingsController : ControllerBase
         IPaymentService paymentService,
         IClock? clock = null,
         IBookingLifecycleService? bookingLifecycleService = null,
-        IBookingNotificationService? bookingNotificationService = null)
+        IBookingNotificationService? bookingNotificationService = null,
+        IGuideMatchingAgent? guideMatchingAgent = null)
     {
         _db = db;
         _scopeFactory = scopeFactory;
@@ -65,6 +67,7 @@ public class BookingsController : ControllerBase
         _fleetAgent = fleetAgent;
         _guideAssignmentService = guideAssignmentService;
         _guideAvailabilityService = guideAvailabilityService;
+        _guideMatchingAgent = guideMatchingAgent;
         _logger = logger;
         _paymentService = paymentService;
         _clock = clock ?? new SystemClock();
@@ -546,6 +549,58 @@ public class BookingsController : ControllerBase
                     {
                         _logger.LogWarning("No suitable available vehicle or driver could be assigned to booking {BookingId} upon approval",
                             booking.Id);
+                    }
+                }
+
+                // Auto-assign Guide if not already assigned
+                var alreadyHasGuide = await _db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == booking.Id, ct);
+                if (!alreadyHasGuide)
+                {
+                    Guid guideId = request.GuideId ?? Guid.Empty;
+
+                    if (guideId == Guid.Empty && run is not null)
+                    {
+                        var guideStepLog = await _db.AgentStepLogs
+                            .Where(s => s.WorkflowRunId == run.Id && s.AgentName == "GuideMatchingAgent")
+                            .OrderByDescending(s => s.CreatedAt)
+                            .FirstOrDefaultAsync(ct);
+
+                        if (guideStepLog != null && !string.IsNullOrWhiteSpace(guideStepLog.OutputJson))
+                        {
+                            try
+                            {
+                                using var gDoc = JsonDocument.Parse(guideStepLog.OutputJson);
+                                if (gDoc.RootElement.TryGetProperty("guideId", out var gProp) && gProp.TryGetGuid(out var gGuid))
+                                    guideId = gGuid;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to parse guideStepLog OutputJson for booking {BookingId}", booking.Id);
+                            }
+                        }
+                    }
+
+                    // Check guide availability or re-match if necessary
+                    bool isGuideAvail = guideId != Guid.Empty && await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
+
+                    if (!isGuideAvail && _guideMatchingAgent != null)
+                    {
+                        var rematchGuide = await _guideMatchingAgent.MatchAsync(booking.Id, ct);
+                        if (rematchGuide.GuideId != Guid.Empty)
+                        {
+                            guideId = rematchGuide.GuideId;
+                            isGuideAvail = await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
+                        }
+                    }
+
+                    if (isGuideAvail && guideId != Guid.Empty)
+                    {
+                        await _guideAssignmentService.AssignGuideAsync(booking.Id, guideId, ct);
+                        _logger.LogInformation("Auto-assigned tour guide {GuideId} to approved booking {BookingId}", guideId, booking.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No available tour guide could be auto-assigned to booking {BookingId} upon approval", booking.Id);
                     }
                 }
             }

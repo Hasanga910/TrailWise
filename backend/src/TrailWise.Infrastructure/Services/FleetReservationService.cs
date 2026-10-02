@@ -13,18 +13,21 @@ public class FleetReservationService : IFleetReservationService
     private readonly IServiceScopeFactory? _scopeFactory;
     private readonly ILogger<FleetReservationService> _logger;
     private readonly IBookingLifecycleService _bookingLifecycleService;
+    private readonly IGuideAssignmentService? _guideAssignmentService;
 
     public FleetReservationService(
         TrailWiseDbContext db,
         ILogger<FleetReservationService> logger,
         IBookingLifecycleService? bookingLifecycleService = null,
         IClock? clock = null,
-        IServiceScopeFactory? scopeFactory = null)
+        IServiceScopeFactory? scopeFactory = null,
+        IGuideAssignmentService? guideAssignmentService = null)
     {
         _db = db;
         _logger = logger;
         _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(clock ?? new SystemClock());
         _scopeFactory = scopeFactory;
+        _guideAssignmentService = guideAssignmentService;
     }
 
     public async Task<bool> IsVehicleAvailableAsync(Guid vehicleId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default)
@@ -81,6 +84,7 @@ public class FleetReservationService : IFleetReservationService
         Guid bookingId,
         DateOnly startDate,
         DateOnly endDate,
+        Guid? guideId = null,
         CancellationToken ct = default)
     {
         if (startDate > endDate)
@@ -120,6 +124,7 @@ public class FleetReservationService : IFleetReservationService
             }
 
             var booking = await _db.Bookings
+                .Include(b => b.PackageTier)
                 .FirstOrDefaultAsync(b => b.Id == bookingId, ct);
 
             if (booking is null)
@@ -148,6 +153,73 @@ public class FleetReservationService : IFleetReservationService
                 return ReservationResult.Failure("Driver has a conflicting assignment during the selected dates.");
             }
 
+            // If a guide is provided, check for conflicts and assign
+            if (guideId.HasValue && guideId.Value != Guid.Empty)
+            {
+                var guideExists = await _db.Guides.AnyAsync(g => g.Id == guideId.Value, ct);
+                if (!guideExists)
+                {
+                    if (transaction is not null) await transaction.RollbackAsync(ct);
+                    return ReservationResult.Failure("Tour guide not found.");
+                }
+
+                // Check guide availability overlap
+                var hasGuideConflict = await _db.GuideAvailabilities
+                    .AnyAsync(a => a.GuideId == guideId.Value
+                                   && a.Date >= startDate
+                                   && a.Date <= endDate
+                                   && ((a.AssignedBookingId != null && a.AssignedBookingId != bookingId) || (!a.IsAvailable && a.AssignedBookingId != bookingId)), ct);
+
+                if (hasGuideConflict)
+                {
+                    if (transaction is not null) await transaction.RollbackAsync(ct);
+                    return ReservationResult.Failure("Selected tour guide has a conflicting assignment during the selected dates.");
+                }
+
+                // If guide assignment service is available, assign rows; otherwise directly upsert
+                if (_guideAssignmentService is not null)
+                {
+                    var guideAssigned = await _guideAssignmentService.AssignGuideAsync(bookingId, guideId.Value, ct);
+                    if (!guideAssigned)
+                    {
+                        if (transaction is not null) await transaction.RollbackAsync(ct);
+                        return ReservationResult.Failure("Selected tour guide is no longer available for this booking.");
+                    }
+                }
+                else
+                {
+                    // Fallback upsert for guide availability rows
+                    var existingAvailabilities = await _db.GuideAvailabilities
+                        .Where(a => a.GuideId == guideId.Value && a.Date >= startDate && a.Date <= endDate)
+                        .ToListAsync(ct);
+                    var existingByDate = existingAvailabilities.ToDictionary(a => a.Date);
+                    var daysCount = endDate.DayNumber - startDate.DayNumber;
+
+                    for (var i = 0; i <= daysCount; i++)
+                    {
+                        var date = startDate.AddDays(i);
+                        if (existingByDate.TryGetValue(date, out var existingRow))
+                        {
+                            existingRow.AssignedBookingId = bookingId;
+                            existingRow.IsAvailable = false;
+                            existingRow.UpdatedAt = DateTimeOffset.UtcNow;
+                        }
+                        else
+                        {
+                            _db.GuideAvailabilities.Add(new GuideAvailability
+                            {
+                                GuideId = guideId.Value,
+                                Date = date,
+                                AssignedBookingId = bookingId,
+                                IsAvailable = false,
+                                CreatedAt = DateTimeOffset.UtcNow,
+                                UpdatedAt = DateTimeOffset.UtcNow
+                            });
+                        }
+                    }
+                }
+            }
+
             var assignment = new VehicleAssignment
             {
                 VehicleId = vehicleId,
@@ -159,12 +231,14 @@ public class FleetReservationService : IFleetReservationService
 
             _db.VehicleAssignments.Add(assignment);
 
+            // Check resource allocation completeness:
+            // A booking can transition to Confirmed when vehicle + driver are assigned,
+            // and guide is assigned if provided or already attached to the booking, or if none was explicitly required.
             bool transitionedToConfirmed = false;
-            // If the booking was pending approval, plan proposed, or required manual intervention, manual vehicle allocation resolves it!
             if (booking.Status == BookingStatus.NeedsManualReview || booking.Status == BookingStatus.PendingApproval || booking.Status == BookingStatus.PlanProposed)
             {
                 transitionedToConfirmed = _bookingLifecycleService.TransitionToConfirmed(booking);
-                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator vehicle allocation.", bookingId);
+                _logger.LogInformation("Booking {BookingId} transitioned to Confirmed after coordinator fleet and guide allocation.", bookingId);
             }
 
             await _db.SaveChangesAsync(ct);

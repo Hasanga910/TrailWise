@@ -32,6 +32,7 @@ export interface BookingDto {
   specialRequests?: string | null;
   status: BookingStatus;
   isLargeGroup: boolean;
+  languagePreference?: string | null;
   hasReview?: boolean;
   paymentStatus?: string | null;
   remainingAmount?: number | null;
@@ -114,6 +115,9 @@ export type BookingDecision = 'Approve' | 'Reject';
 export interface DecideBookingInput {
   decision: BookingDecision;
   notes?: string;
+  vehicleId?: string;
+  driverId?: string;
+  guideId?: string;
 }
 
 export async function decideBooking(id: string, input: DecideBookingInput): Promise<BookingDto> {

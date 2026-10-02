@@ -345,6 +345,7 @@ public class VehiclesController : ControllerBase
             request.BookingId,
             request.StartDate,
             request.EndDate,
+            request.GuideId,
             ct);
 
         if (!result.Succeeded)

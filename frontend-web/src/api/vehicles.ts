@@ -50,6 +50,7 @@ export interface ReserveVehicleRequest {
   driverId: string;
   startDate: string;
   endDate: string;
+  guideId?: string;
 }
 
 export interface VehicleAssignmentDto {
