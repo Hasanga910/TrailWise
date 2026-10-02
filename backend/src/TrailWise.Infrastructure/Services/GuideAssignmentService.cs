@@ -55,7 +55,8 @@ public class GuideAssignmentService : IGuideAssignmentService
         // TASK 3: Relational Transaction
         // Use Serializable isolation and guide-level row locking when running against a relational
         // store (PostgreSQL) to prevent concurrent update anomalies and last-write-wins on existing availability rows.
-        await using var transaction = _db.Database.IsRelational()
+        var ownsTransaction = _db.Database.IsRelational() && _db.Database.CurrentTransaction is null;
+        var transaction = ownsTransaction
             ? await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct)
             : null;
 
@@ -155,6 +156,13 @@ public class GuideAssignmentService : IGuideAssignmentService
             }
             _logger.LogError(ex, "Unexpected error assigning Guide {GuideId} to Booking {BookingId}.", guideId, bookingId);
             return false;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
         }
     }
 }

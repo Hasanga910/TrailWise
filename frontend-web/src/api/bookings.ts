@@ -124,6 +124,9 @@ export type BookingDecision = 'Approve' | 'Reject';
 export interface DecideBookingInput {
   decision: BookingDecision;
   notes?: string;
+  vehicleId?: string;
+  driverId?: string;
+  guideId?: string;
 }
 
 export async function decideBooking(id: string, input: DecideBookingInput): Promise<BookingDto> {

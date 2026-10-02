@@ -41,6 +41,38 @@ public class ManualGuideAssignmentEndpointsTests : IClassFixture<TrailWiseWebApp
         var endDate = new DateOnly(2026, 11, 3);
         var booking = await SeedBookingAsync(BookingStatus.NeedsManualReview, startDate, endDate, theme: "Wildlife");
 
+        // Seed vehicle & driver so all 3 resources are present when guide is assigned
+        using (var vScope = _factory.Services.CreateScope())
+        {
+            var vDb = vScope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var v = new Vehicle
+            {
+                Type = VehicleType.Van,
+                RegistrationNumber = $"REG-{Guid.NewGuid():N}"[..10],
+                Capacity = 8,
+                HasAC = true,
+                SeatConfiguration = "2-2-2-2",
+                MaintenanceStatus = VehicleMaintenanceStatus.Available
+            };
+            var d = new Driver
+            {
+                Name = "Kasun Driver",
+                LicenseNumber = $"DL-{Guid.NewGuid():N}"[..10],
+                ContactInfo = "+94770000009"
+            };
+            vDb.Vehicles.Add(v);
+            vDb.Drivers.Add(d);
+            vDb.VehicleAssignments.Add(new VehicleAssignment
+            {
+                Vehicle = v,
+                Driver = d,
+                BookingId = booking.Id,
+                StartDate = startDate,
+                EndDate = endDate
+            });
+            await vDb.SaveChangesAsync();
+        }
+
         var response = await opsManager.PostAsJsonAsync(
             $"/api/bookings/{booking.Id}/assign-guide",
             new AssignGuideRequest(guide.Id));

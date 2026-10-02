@@ -50,6 +50,7 @@ export interface ReserveVehicleRequest {
   driverId: string;
   startDate: string;
   endDate: string;
+  guideId?: string;
 }
 
 export interface VehicleAssignmentDto {
@@ -230,7 +231,15 @@ export async function getMyDriverAssignments(): Promise<VehicleAssignmentDetailD
  */
 export async function getAssignmentByBookingId(bookingId: string): Promise<VehicleAssignmentDetailDto | null> {
   try {
-    const response = await apiClient.get<VehicleAssignmentDetailDto>(`/api/vehicles/assignments/by-booking/${bookingId}`);
+    const response = await apiClient.get<VehicleAssignmentDetailDto>(
+      `/api/vehicles/assignments/by-booking/${bookingId}`,
+      {
+        validateStatus: (status) => status < 400 || status === 404,
+      }
+    );
+    if (response.status === 404) {
+      return null;
+    }
     return response.data;
   } catch (err: any) {
     if (err.response?.status === 404) return null;
