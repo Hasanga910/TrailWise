@@ -16,6 +16,8 @@ class AssignedTour {
   final String? guideNotes;
   final DateTime? tourStartedAt;
   final DateTime? tourEndedAt;
+  final String? paymentStatus;
+  final bool isAdvancePaid;
 
   AssignedTour({
     required this.bookingId,
@@ -35,6 +37,8 @@ class AssignedTour {
     this.guideNotes,
     this.tourStartedAt,
     this.tourEndedAt,
+    this.paymentStatus,
+    this.isAdvancePaid = false,
   });
 
   factory AssignedTour.fromJson(Map<String, dynamic> json) => AssignedTour(
@@ -62,6 +66,8 @@ class AssignedTour {
         tourEndedAt: json['tourEndedAt'] != null
             ? DateTime.tryParse(json['tourEndedAt'] as String)
             : null,
+        paymentStatus: json['paymentStatus'] as String? ?? json['PaymentStatus'] as String?,
+        isAdvancePaid: (json['isAdvancePaid'] ?? json['IsAdvancePaid'] ?? false) as bool,
       );
 
   AssignedTour copyWith({
@@ -83,6 +89,8 @@ class AssignedTour {
     bool clearGuideNotes = false,
     DateTime? tourStartedAt,
     DateTime? tourEndedAt,
+    String? paymentStatus,
+    bool? isAdvancePaid,
   }) {
     return AssignedTour(
       bookingId: bookingId ?? this.bookingId,
@@ -102,6 +110,8 @@ class AssignedTour {
       guideNotes: clearGuideNotes ? null : (guideNotes ?? this.guideNotes),
       tourStartedAt: tourStartedAt ?? this.tourStartedAt,
       tourEndedAt: tourEndedAt ?? this.tourEndedAt,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      isAdvancePaid: isAdvancePaid ?? this.isAdvancePaid,
     );
   }
 }

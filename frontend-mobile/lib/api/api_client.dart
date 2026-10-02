@@ -218,6 +218,25 @@ class ApiClient {
     return [];
   }
 
+  Future<List<ItineraryStep>> setItinerary(
+    String bookingId,
+    List<Map<String, dynamic>> steps,
+  ) async {
+    final response = await _httpClient.post(
+      Uri.parse('$baseUrl/api/bookings/$bookingId/itinerary'),
+      headers: _headers,
+      body: jsonEncode({'steps': steps}),
+    );
+    final decoded = _decode(response);
+    if (decoded is List) {
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(ItineraryStep.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
     final uri = Uri.parse('$baseUrl$path');
     if (query == null || query.isEmpty) {

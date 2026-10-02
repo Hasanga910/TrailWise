@@ -159,6 +159,39 @@ describe('MyBookingsPage', () => {
     await waitFor(() => expect(screen.getByText('Cancelled', { selector: 'span' })).toBeInTheDocument());
   });
 
+  it('hides "Cancel Booking" button if tour has started', async () => {
+    vi.spyOn(bookingsApi, 'getMyBookings').mockResolvedValue({
+      items: [sampleBooking({ startDate: '2099-01-01', status: 'Confirmed', tourStartedAt: '2099-01-01T08:00:00Z' })],
+      totalCount: 1,
+      page: 1,
+      pageSize: 10,
+    });
+
+    renderPage();
+    await screen.findByText(/Cultural Triangle Explorer/);
+    expect(screen.queryByRole('button', { name: /cancel booking/i })).not.toBeInTheDocument();
+  });
+
+  it('hides "Cancel Booking" button if tour has ended', async () => {
+    vi.spyOn(bookingsApi, 'getMyBookings').mockResolvedValue({
+      items: [
+        sampleBooking({
+          startDate: '2099-01-01',
+          status: 'Confirmed',
+          tourStartedAt: '2099-01-01T08:00:00Z',
+          tourEndedAt: '2099-01-05T18:00:00Z',
+        }),
+      ],
+      totalCount: 1,
+      page: 1,
+      pageSize: 10,
+    });
+
+    renderPage();
+    await screen.findByText(/Cultural Triangle Explorer/);
+    expect(screen.queryByRole('button', { name: /cancel booking/i })).not.toBeInTheDocument();
+  });
+
   it('shows the itinerary when View Itinerary is clicked for a confirmed booking', async () => {
     vi.spyOn(bookingsApi, 'getMyBookings').mockResolvedValue({
       items: [sampleBooking({ status: 'Confirmed' })],

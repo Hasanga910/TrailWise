@@ -279,7 +279,7 @@ export function MyBookingsPage() {
                         {expandedBookingId === booking.id ? 'Hide Itinerary' : 'View Itinerary'}
                       </button>
                     )}
-                    {CANCELLABLE_STATUSES.includes(booking.status) && isUpcoming(booking.startDate) && (
+                    {CANCELLABLE_STATUSES.includes(booking.status) && isUpcoming(booking.startDate) && !booking.tourStartedAt && !booking.tourEndedAt && (
                       <button
                         type="button"
                         onClick={() => setCancelPrompt({ bookingId: booking.id, reason: '' })}

@@ -569,9 +569,77 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
         Assert.Equal(HttpStatusCode.BadRequest, startRes.StatusCode);
     }
 
+    [Fact]
+    public async Task Test21_StartTour_WithoutAdvancePayment_ReturnsConflict()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Adv Pay 1");
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Unpaid Tour", new DateOnly(2026, 11, 20), paymentStatus: null);
+
+        var startRes = await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.Conflict, startRes.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var dbBooking = await db.Bookings.FindAsync(booking.Id);
+        Assert.Null(dbBooking!.TourStartedAt);
+    }
+
+    [Fact]
+    public async Task Test22_StartTour_WithPendingAdvancePayment_ReturnsConflict()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Adv Pay 2");
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Pending Tour", new DateOnly(2026, 11, 22), paymentStatus: PaymentStatus.Pending);
+
+        var startRes = await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.Conflict, startRes.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var dbBooking = await db.Bookings.FindAsync(booking.Id);
+        Assert.Null(dbBooking!.TourStartedAt);
+    }
+
+    [Fact]
+    public async Task Test23_StartTour_WithDepositPaid_Succeeds()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Adv Pay 3");
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Deposit Paid Tour", new DateOnly(2026, 11, 24), paymentStatus: PaymentStatus.DepositPaid);
+
+        var startRes = await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.OK, startRes.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var dbBooking = await db.Bookings.FindAsync(booking.Id);
+        Assert.NotNull(dbBooking!.TourStartedAt);
+    }
+
+    [Fact]
+    public async Task Test24_StartTour_WithFullyPaid_Succeeds()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide Adv Pay 4");
+        var booking = await SeedAssignedBookingAsync(guide.Id, "Fully Paid Tour", new DateOnly(2026, 11, 26), paymentStatus: PaymentStatus.FullyPaid);
+
+        var startRes = await guideClient.PostAsync($"/api/bookings/{booking.Id}/start-tour", null);
+        Assert.Equal(HttpStatusCode.OK, startRes.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var dbBooking = await db.Bookings.FindAsync(booking.Id);
+        Assert.NotNull(dbBooking!.TourStartedAt);
+    }
+
     #region Helpers
 
-    private async Task<Booking> SeedAssignedBookingAsync(Guid guideId, string packageName, DateOnly startDate)
+    private async Task<Booking> SeedAssignedBookingAsync(Guid guideId, string packageName, DateOnly startDate, PaymentStatus? paymentStatus = PaymentStatus.DepositPaid)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
@@ -592,6 +660,18 @@ public class TourGuideNotesEndpointsTests : IClassFixture<TrailWiseWebApplicatio
             IsAvailable = false,
             AssignedBookingId = booking.Id
         });
+
+        if (paymentStatus.HasValue)
+        {
+            db.Payments.Add(new Payment
+            {
+                BookingId = booking.Id,
+                Amount = 100m,
+                Method = "BankTransfer",
+                Status = paymentStatus.Value,
+                SubmittedAt = DateTimeOffset.UtcNow
+            });
+        }
 
         await db.SaveChangesAsync();
         return booking;

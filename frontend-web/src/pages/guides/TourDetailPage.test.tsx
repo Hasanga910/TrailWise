@@ -174,7 +174,7 @@ describe('TourDetailPage', () => {
     expect(screen.queryByRole('button', { name: /end tour/i })).not.toBeInTheDocument();
   });
 
-  it('shows the itinerary for a confirmed booking', async () => {
+  it('shows the itinerary for a confirmed booking and never sees Set Itinerary or Edit Itinerary', async () => {
     mockedGetMyAssignedTours.mockResolvedValue([confirmedTour]);
     const steps: ItineraryStepDto[] = [
       { id: 's1', bookingId: 'booking-1', dayNumber: 1, activity: 'City tour', location: 'Kandy', startTime: '09:00:00' },
@@ -189,6 +189,42 @@ describe('TourDetailPage', () => {
       expect(screen.getByText('City tour', { exact: false })).toBeInTheDocument();
     });
     expect(screen.getByText('Day 1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /set itinerary/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit itinerary/i })).not.toBeInTheDocument();
+  });
+
+  it('empty itinerary shows read-only empty message and never shows Set Itinerary or Edit Itinerary', async () => {
+    mockedGetMyAssignedTours.mockResolvedValue([confirmedTour]);
+    mockedGetItinerary.mockResolvedValue([]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('No itinerary has been set for this trip yet.')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /set itinerary/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit itinerary/i })).not.toBeInTheDocument();
+  });
+
+  it('completed itinerary still renders and has no Set Itinerary or Edit Itinerary controls', async () => {
+    mockedGetMyAssignedTours.mockResolvedValue([
+      {
+        ...confirmedTour,
+        completed: true,
+        tourEndedAt: '2026-05-05T18:00:00Z',
+      },
+    ]);
+    const steps: ItineraryStepDto[] = [
+      { id: 's2', bookingId: 'booking-1', dayNumber: 2, activity: 'Temple Visit', location: 'Dambulla', startTime: '10:00:00' },
+    ];
+    mockedGetItinerary.mockResolvedValue(steps);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Temple Visit', { exact: false })).toBeInTheDocument();
+    });
+    expect(screen.getByText('Day 2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /set itinerary/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit itinerary/i })).not.toBeInTheDocument();
   });
 
   it('hides the itinerary form for a non-confirmed booking', async () => {

@@ -289,6 +289,7 @@ public class GuidesController : ControllerBase
             .Where(b => b.GuideAvailabilities.Any(g => g.GuideId == guide.Id))
             .Include(b => b.TourPackage)
                 .ThenInclude(p => p.Locations)
+            .Include(b => b.Payments)
             .OrderBy(b => b.StartDate)
             .ThenBy(b => b.Id)
             .ToListAsync(ct);

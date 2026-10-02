@@ -440,6 +440,256 @@ public class ItineraryEndpointsTests : IClassFixture<TrailWiseWebApplicationFact
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Test17_AssignedTourGuide_CanUpdateItinerary_BeforeCompletion()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide D1 Update");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, BookingStatus.Confirmed);
+
+        var initialRequest = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Initial Hike", Location = "Ella Rock", StartTime = new TimeOnly(8, 0) }
+            }
+        };
+        var res1 = await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", initialRequest);
+        Assert.Equal(HttpStatusCode.OK, res1.StatusCode);
+
+        var updateRequest = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Updated Sunrise Hike", Location = "Little Adam's Peak", StartTime = new TimeOnly(6, 30) }
+            }
+        };
+        var res2 = await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", updateRequest);
+        Assert.Equal(HttpStatusCode.OK, res2.StatusCode);
+        var steps = await res2.Content.ReadFromJsonAsync<List<ItineraryStepDto>>(JsonOptions);
+        Assert.NotNull(steps);
+        Assert.Single(steps);
+        Assert.Equal("Updated Sunrise Hike", steps[0].Activity);
+        Assert.Equal("Little Adam's Peak", steps[0].Location);
+    }
+
+    [Fact]
+    public async Task Test18_AssignedTourGuide_CanDeleteItineraryStep_BeforeCompletion()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide D1 Delete");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, BookingStatus.Confirmed);
+
+        var initialRequest = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Step 1", Location = "Loc 1", StartTime = new TimeOnly(8, 0) },
+                new() { DayNumber = 2, Activity = "Step 2", Location = "Loc 2", StartTime = new TimeOnly(10, 0) }
+            }
+        };
+        var res1 = await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", initialRequest);
+        Assert.Equal(HttpStatusCode.OK, res1.StatusCode);
+
+        // Delete a step by posting with only Step 1
+        var deleteStepRequest = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Step 1", Location = "Loc 1", StartTime = new TimeOnly(8, 0) }
+            }
+        };
+        var res2 = await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", deleteStepRequest);
+        Assert.Equal(HttpStatusCode.OK, res2.StatusCode);
+        var steps = await res2.Content.ReadFromJsonAsync<List<ItineraryStepDto>>(JsonOptions);
+        Assert.NotNull(steps);
+        Assert.Single(steps);
+        Assert.Equal("Step 1", steps[0].Activity);
+    }
+
+    [Fact]
+    public async Task Test19_CompletedTour_RejectsItineraryCreate()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide D1 Completed Create");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, BookingStatus.Confirmed);
+
+        // Mark booking completed
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.FindAsync(booking.Id);
+            b!.Completed = true;
+            b.TourEndedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        var request = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Post Completion Activity", Location = "Loc", StartTime = new TimeOnly(9, 0) }
+            }
+        };
+
+        var response = await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Itinerary cannot be modified after the tour is completed.", body);
+    }
+
+    [Fact]
+    public async Task Test20_CompletedTour_RejectsItineraryUpdate()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide D1 Completed Update");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, BookingStatus.Confirmed);
+
+        // Create itinerary before completion
+        var initialRequest = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Pre Completion Activity", Location = "Loc", StartTime = new TimeOnly(9, 0) }
+            }
+        };
+        var res1 = await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", initialRequest);
+        Assert.Equal(HttpStatusCode.OK, res1.StatusCode);
+
+        // Complete tour
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.FindAsync(booking.Id);
+            b!.Completed = true;
+            b.TourEndedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        // Try to update
+        var updateRequest = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Attempted Update Activity", Location = "New Loc", StartTime = new TimeOnly(10, 0) }
+            }
+        };
+        var res2 = await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", updateRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, res2.StatusCode);
+        var body = await res2.Content.ReadAsStringAsync();
+        Assert.Contains("Itinerary cannot be modified after the tour is completed.", body);
+    }
+
+    [Fact]
+    public async Task Test21_CompletedTour_RejectsItineraryDelete()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide D1 Completed Delete");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, BookingStatus.Confirmed);
+
+        // Create itinerary before completion
+        var initialRequest = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Step to Delete", Location = "Loc", StartTime = new TimeOnly(9, 0) }
+            }
+        };
+        await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", initialRequest);
+
+        // Complete tour
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.FindAsync(booking.Id);
+            b!.Completed = true;
+            b.TourEndedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        // Try to clear/delete all steps
+        var deleteRequest = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>()
+        };
+        var res = await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", deleteRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        var body = await res.Content.ReadAsStringAsync();
+        Assert.Contains("Itinerary cannot be modified after the tour is completed.", body);
+    }
+
+    [Fact]
+    public async Task Test22_ItineraryGet_StillWorks_AfterCompletion()
+    {
+        var admin = await AdminClientAsync();
+        var (guideClient, guideUserId) = await TourGuideClientAsync(admin);
+        var guide = await CreateGuideAsync(admin, guideUserId, "Guide D1 Completed GET");
+
+        var booking = await SeedAssignedBookingAsync(guide.Id, BookingStatus.Confirmed);
+
+        // Set itinerary
+        var request = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Sigiriya Sunset Hike", Location = "Sigiriya", StartTime = new TimeOnly(16, 0) }
+            }
+        };
+        await guideClient.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", request);
+
+        // Complete tour
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.FindAsync(booking.Id);
+            b!.Completed = true;
+            b.TourEndedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        // GET itinerary after completion
+        var getRes = await guideClient.GetAsync($"/api/bookings/{booking.Id}/itinerary");
+        Assert.Equal(HttpStatusCode.OK, getRes.StatusCode);
+        var steps = await getRes.Content.ReadFromJsonAsync<List<ItineraryStepDto>>(JsonOptions);
+        Assert.NotNull(steps);
+        Assert.Single(steps);
+        Assert.Equal("Sigiriya Sunset Hike", steps[0].Activity);
+    }
+
+    [Fact]
+    public async Task Test23_AnotherTourGuide_CannotMutateItinerary()
+    {
+        var admin = await AdminClientAsync();
+        var (guide1Client, guide1UserId) = await TourGuideClientAsync(admin);
+        var (guide2Client, guide2UserId) = await TourGuideClientAsync(admin);
+
+        var guide1 = await CreateGuideAsync(admin, guide1UserId, "Guide Assigned 1");
+        await CreateGuideAsync(admin, guide2UserId, "Guide Unassigned 2");
+
+        var booking = await SeedAssignedBookingAsync(guide1.Id, BookingStatus.Confirmed);
+
+        var request = new SetItineraryRequest
+        {
+            Steps = new List<ItineraryStepRequest>
+            {
+                new() { DayNumber = 1, Activity = "Malicious Hijack", Location = "Unknown", StartTime = new TimeOnly(9, 0) }
+            }
+        };
+
+        var response = await guide2Client.PostAsJsonAsync($"/api/bookings/{booking.Id}/itinerary", request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     #region Helpers
 
     private async Task<Booking> SeedBookingAsync(BookingStatus status, Guid? travelerId = null)

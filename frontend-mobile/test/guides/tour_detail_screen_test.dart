@@ -21,6 +21,8 @@ AssignedTour _sampleTour({
   String? guideNotes,
   DateTime? tourStartedAt,
   DateTime? tourEndedAt,
+  String? paymentStatus = 'DepositPaid',
+  bool isAdvancePaid = true,
 }) =>
     AssignedTour(
       bookingId: bookingId,
@@ -40,6 +42,8 @@ AssignedTour _sampleTour({
       guideNotes: guideNotes,
       tourStartedAt: tourStartedAt,
       tourEndedAt: tourEndedAt,
+      paymentStatus: paymentStatus,
+      isAdvancePaid: isAdvancePaid,
     );
 
 void main() {
@@ -473,6 +477,46 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Tour cannot be started at this time.'), findsAtLeastNWidgets(1));
+    });
+
+    testWidgets('17. Start Tour is disabled and warning is shown when advance payment is not paid', (tester) async {
+      final fake = FakeApiClient();
+      final tour = _sampleTour(bookingId: 'b-unpaid-1', isAdvancePaid: false);
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Waiting for advance payment. Advance payment must be completed before starting this tour.'),
+        findsOneWidget,
+      );
+
+      final startButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Start Tour'),
+      );
+      expect(startButton.onPressed, isNull);
+    });
+
+    testWidgets('18. Start Tour is enabled and warning is hidden when advance payment is paid', (tester) async {
+      final fake = FakeApiClient();
+      final tour = _sampleTour(bookingId: 'b-paid-1', isAdvancePaid: true);
+
+      await tester.pumpWidget(MaterialApp(
+        home: TourDetailScreen(tour: tour, apiClient: fake),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Waiting for advance payment. Advance payment must be completed before starting this tour.'),
+        findsNothing,
+      );
+
+      final startButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Start Tour'),
+      );
+      expect(startButton.onPressed, isNotNull);
     });
   });
 }

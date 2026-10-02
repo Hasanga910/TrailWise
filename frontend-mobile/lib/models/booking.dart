@@ -58,6 +58,8 @@ class Booking {
   final double? remainingAmount;
   final bool isFullyPaid;
   final bool hasPendingPayment;
+  final DateTime? tourStartedAt;
+  final DateTime? tourEndedAt;
   final DateTime? createdAt;
 
   Booking({
@@ -79,6 +81,8 @@ class Booking {
     this.remainingAmount,
     this.isFullyPaid = false,
     this.hasPendingPayment = false,
+    this.tourStartedAt,
+    this.tourEndedAt,
     this.createdAt,
   });
 
@@ -107,6 +111,16 @@ class Booking {
             : (json['RemainingAmount'] != null ? (json['RemainingAmount'] as num).toDouble() : null),
         isFullyPaid: (json['isFullyPaid'] ?? json['IsFullyPaid'] ?? false) as bool,
         hasPendingPayment: (json['hasPendingPayment'] ?? json['HasPendingPayment'] ?? false) as bool,
+        tourStartedAt: json['tourStartedAt'] != null
+            ? DateTime.tryParse(json['tourStartedAt'].toString())
+            : (json['TourStartedAt'] != null
+                ? DateTime.tryParse(json['TourStartedAt'].toString())
+                : null),
+        tourEndedAt: json['tourEndedAt'] != null
+            ? DateTime.tryParse(json['tourEndedAt'].toString())
+            : (json['TourEndedAt'] != null
+                ? DateTime.tryParse(json['TourEndedAt'].toString())
+                : null),
         createdAt: json['createdAt'] != null
             ? DateTime.tryParse(json['createdAt'].toString())
             : (json['CreatedAt'] != null

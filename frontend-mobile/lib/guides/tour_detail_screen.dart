@@ -5,6 +5,8 @@ import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../bookings/booking_status.dart';
 import '../models/assigned_tour.dart';
+import '../models/itinerary_step.dart';
+import 'guide_itinerary_edit_screen.dart';
 
 class TourDetailScreen extends StatefulWidget {
   const TourDetailScreen({
@@ -32,12 +34,17 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   bool _lifecycleLoading = false;
   String? _errorMessage;
 
+  bool _loadingItinerary = true;
+  String? _itineraryErrorMessage;
+  List<ItineraryStep> _itinerarySteps = [];
+
   @override
   void initState() {
     super.initState();
     _tour = widget.tour;
     _attended = widget.tour.attended;
     _notesController = TextEditingController(text: widget.tour.guideNotes ?? '');
+    _loadItinerary();
   }
 
   @override
@@ -202,7 +209,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   Future<void> _startTour() async {
-    if (_saving || _lifecycleLoading) return;
+    if (_saving || _lifecycleLoading || !_tour.isAdvancePaid) return;
 
     setState(() {
       _lifecycleLoading = true;
@@ -291,9 +298,118 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     }
   }
 
+  Future<void> _loadItinerary() async {
+    setState(() {
+      _loadingItinerary = true;
+      _itineraryErrorMessage = null;
+    });
+
+    try {
+      final steps = await _apiClient.getItinerary(_tour.bookingId);
+      if (!mounted) return;
+      setState(() {
+        _itinerarySteps = steps;
+        _loadingItinerary = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingItinerary = false;
+        _itineraryErrorMessage = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingItinerary = false;
+        _itineraryErrorMessage = 'Failed to load itinerary. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _openItineraryEditor() async {
+    final result = await Navigator.of(context).push<List<ItineraryStep>>(
+      MaterialPageRoute(
+        builder: (context) => GuideItineraryEditScreen(
+          bookingId: _tour.bookingId,
+          initialSteps: _itinerarySteps,
+          apiClient: _apiClient,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _itinerarySteps = result;
+      });
+    } else if (mounted) {
+      await _loadItinerary();
+    }
+  }
+
+  Widget _buildItineraryList(List<ItineraryStep> steps) {
+    final grouped = <int, List<ItineraryStep>>{};
+    for (final step in steps) {
+      grouped.putIfAbsent(step.dayNumber, () => []).add(step);
+    }
+    final days = grouped.keys.toList()..sort();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final day in days) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: Text(
+              'Day $day',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          for (final step in (grouped[day]!..sort((a, b) => a.startTime.compareTo(b.startTime)))) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 55,
+                    child: Text(
+                      step.formattedStartTime,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${step.activity} — ${step.location}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final statusColor = BookingStatus.color(_tour.status);
+    final isCompleted = _tour.completed || _tour.tourEndedAt != null;
 
     return PopScope<AssignedTour>(
       canPop: false,
@@ -699,11 +815,38 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           ),
                         ),
                       ] else ...[
+                        if (!_tour.isAdvancePaid) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade300),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.amber.shade900, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Waiting for advance payment. Advance payment must be completed before starting this tour.',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.amber.shade900,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         SizedBox(
                           width: double.infinity,
                           height: 48,
                           child: FilledButton(
-                            onPressed: (_lifecycleLoading || _saving) ? null : _startTour,
+                            onPressed: (_lifecycleLoading || _saving || !_tour.isAdvancePaid) ? null : _startTour,
                             style: FilledButton.styleFrom(backgroundColor: Colors.teal),
                             child: _lifecycleLoading
                                 ? const SizedBox(
@@ -717,6 +860,95 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                   ),
                           ),
                         ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Itinerary Card
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Itinerary',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (!isCompleted && !_loadingItinerary && _itineraryErrorMessage == null)
+                            FilledButton.tonal(
+                              key: const ValueKey('itineraryActionButton'),
+                              onPressed: _openItineraryEditor,
+                              child: Text(
+                                _itinerarySteps.isEmpty ? 'Set Itinerary' : 'Edit Itinerary',
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (isCompleted) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.lock_outline, size: 16, color: Colors.grey.shade700),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Tour completed — itinerary is read-only.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade800,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      if (_loadingItinerary) ...[
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                      ] else if (_itineraryErrorMessage != null) ...[
+                        Text(
+                          _itineraryErrorMessage!,
+                          style: TextStyle(color: Colors.red.shade700),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: _loadItinerary,
+                          child: const Text('Retry'),
+                        ),
+                      ] else if (_itinerarySteps.isEmpty) ...[
+                        const Text(
+                          'No itinerary has been set for this trip yet.',
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
+                      ] else ...[
+                        _buildItineraryList(_itinerarySteps),
                       ],
                     ],
                   ),
