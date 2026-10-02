@@ -48,6 +48,7 @@ export function FleetGuideAssignmentsPage() {
   }
 
   function handleOpenAssignModal(booking: BookingSummaryDto) {
+    if (booking.assignedGuide) return;
     setSelectedBooking(booking);
     setSelectedGuideId(null);
     setIsConfirming(false);
@@ -64,14 +65,39 @@ export function FleetGuideAssignmentsPage() {
   }
 
   async function handleConfirmAssignment() {
-    if (!selectedBooking || !selectedGuideId) return;
+    if (!selectedBooking || !selectedGuideId || isAssigning) return;
 
     setIsAssigning(true);
     setAssignError(null);
 
     try {
-      await assignGuide(selectedBooking.id, selectedGuideId);
-      setAssignSuccess(`Tour Guide successfully assigned to booking ${selectedBooking.id.slice(0, 8)}! Booking is now Confirmed.`);
+      const res = await assignGuide(selectedBooking.id, selectedGuideId);
+
+      // Update local state immediately so row/button disappears without waiting for network
+      setBookings((prev) =>
+        prev
+          ? prev.map((b) =>
+              b.id === selectedBooking.id
+                ? {
+                    ...b,
+                    status: res.status ?? b.status,
+                    assignedGuide: {
+                      id: selectedGuideId,
+                      name: availableGuides?.find((g) => g.guideId === selectedGuideId)?.name ?? 'Assigned Guide',
+                      languages: availableGuides?.find((g) => g.guideId === selectedGuideId)?.languages ?? [],
+                      specializations: availableGuides?.find((g) => g.guideId === selectedGuideId)?.specializations ?? [],
+                    },
+                  }
+                : b,
+            )
+          : prev,
+      );
+
+      setAssignSuccess(
+        `Tour Guide successfully assigned to booking ${selectedBooking.id.slice(0, 8)}! ${
+          res.status === 'Confirmed' ? 'Booking is now Confirmed.' : 'Guide allocation saved.'
+        }`,
+      );
       handleCloseModal();
       loadBookings();
     } catch (err) {
@@ -84,8 +110,8 @@ export function FleetGuideAssignmentsPage() {
     }
   }
 
-  // Filter only bookings in NeedsManualReview status
-  const pendingBookings = bookings?.filter((b) => b.status === 'NeedsManualReview') ?? [];
+  // Filter only bookings in NeedsManualReview status that genuinely still require a guide
+  const pendingBookings = bookings?.filter((b) => b.status === 'NeedsManualReview' && !b.assignedGuide) ?? [];
 
   const filteredBookings = pendingBookings.filter((b) => {
     if (!searchQuery.trim()) return true;
@@ -237,14 +263,20 @@ export function FleetGuideAssignmentsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenAssignModal(b)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 transition focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        <UsersIcon className="h-3.5 w-3.5" />
-                        Assign Tour Guide
-                      </button>
+                      {b.status === 'NeedsManualReview' && !b.assignedGuide ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAssignModal(b)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 transition focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        >
+                          <UsersIcon className="h-3.5 w-3.5" />
+                          Assign Tour Guide
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                          Guide Assigned
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
