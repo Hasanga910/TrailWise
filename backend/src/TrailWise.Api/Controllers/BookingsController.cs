@@ -1246,6 +1246,15 @@ public class BookingsController : ControllerBase
             });
         }
 
+        if (booking.Completed || booking.TourEndedAt.HasValue)
+        {
+            return BadRequest(new
+            {
+                message = "Itinerary cannot be modified after the tour is completed.",
+                errors = new[] { new FieldValidationError("booking", "Itinerary cannot be modified after the tour is completed.") }
+            });
+        }
+
         var isManager = User.IsInRole("OperationsManager") || User.IsInRole("Admin");
         if (!isManager)
         {
