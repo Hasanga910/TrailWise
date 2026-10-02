@@ -195,5 +195,91 @@ public static class DbSeeder
                 });
             await db.SaveChangesAsync(ct);
         }
+
+        if (!await db.Vehicles.AnyAsync(ct))
+        {
+            db.Vehicles.AddRange(
+                new Vehicle
+                {
+                    Type = VehicleType.SUV,
+                    RegistrationNumber = "WP-CAB-1234",
+                    Capacity = 4,
+                    HasAC = true,
+                    SeatConfiguration = "4 Passenger Seats",
+                    MaintenanceStatus = VehicleMaintenanceStatus.Available
+                },
+                new Vehicle
+                {
+                    Type = VehicleType.Van,
+                    RegistrationNumber = "WP-ND-5678",
+                    Capacity = 10,
+                    HasAC = true,
+                    SeatConfiguration = "10 Passenger Seats",
+                    MaintenanceStatus = VehicleMaintenanceStatus.Available
+                },
+                new Vehicle
+                {
+                    Type = VehicleType.Coach,
+                    RegistrationNumber = "WP-NB-9012",
+                    Capacity = 30,
+                    HasAC = true,
+                    SeatConfiguration = "30 Passenger Seats",
+                    MaintenanceStatus = VehicleMaintenanceStatus.Available
+                });
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (!await db.Drivers.AnyAsync(ct))
+        {
+            var driverUser = await db.Users.FirstOrDefaultAsync(u => u.Email == driverEmail, ct);
+            db.Drivers.AddRange(
+                new Driver
+                {
+                    UserId = driverUser?.Id,
+                    Name = "Sunil Jayawardena",
+                    LicenseNumber = "B-8472910",
+                    ContactInfo = "+94711122334"
+                },
+                new Driver
+                {
+                    Name = "Kamal Perera",
+                    LicenseNumber = "B-9182734",
+                    ContactInfo = "+94772233445"
+                },
+                new Driver
+                {
+                    Name = "Nimal Silva",
+                    LicenseNumber = "B-6352419",
+                    ContactInfo = "+94783344556"
+                });
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (!await db.Guides.AnyAsync(ct))
+        {
+            db.Guides.AddRange(
+                new Guide
+                {
+                    Name = "Rohan Fernando",
+                    ContactInfo = "+94771234567",
+                    Languages = new[] { "English", "Sinhala" },
+                    Specializations = new[] { "Cultural", "Heritage" }
+                },
+                new Guide
+                {
+                    Name = "Anura Wickramasinghe",
+                    ContactInfo = "+94772345678",
+                    Languages = new[] { "English", "German", "Sinhala" },
+                    Specializations = new[] { "Adventure", "Hiking" }
+                },
+                new Guide
+                {
+                    Name = "Dilshan Mendis",
+                    ContactInfo = "+94773456789",
+                    Languages = new[] { "English", "Sinhala", "French" },
+                    Specializations = new[] { "Beach", "Coastal" }
+                });
+            await db.SaveChangesAsync(ct);
+        }
     }
 }

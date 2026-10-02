@@ -38,6 +38,8 @@ services:
       Cors__AllowedOrigins__1: ${CORS_ALLOWED_ORIGIN_FLUTTER:-http://localhost:5000}
       Llm__Enabled: ${LLM_ENABLED:-false}
       Llm__ApiKey: ${GROQ_API_KEY}
+      Llm__ExtractionModel: ${LLM_EXTRACTION_MODEL:-openai/gpt-oss-120b}
+      Llm__SummaryModel: ${LLM_SUMMARY_MODEL:-openai/gpt-oss-120b}
       NOTIFY_LK_USER_ID: ${NOTIFY_LK_USER_ID}
       NOTIFY_LK_API_KEY: ${NOTIFY_LK_API_KEY}
       NOTIFY_LK_SENDER_ID: ${NOTIFY_LK_SENDER_ID:-NotifyDEMO}

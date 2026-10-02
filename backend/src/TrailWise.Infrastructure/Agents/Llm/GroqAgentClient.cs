@@ -47,12 +47,16 @@ public class GroqAgentClient : ILlmClient
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-
             try
             {
                 var request = new GroqChatRequest(model, messages, new GroqResponseFormat("json_object"), maxOutputTokens);
                 using var response = await _httpClient.PostAsJsonAsync("chat/completions", request, RequestJsonOptions, cts.Token);
-                response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(cts.Token);
+                    _logger.LogWarning("Groq API returned HTTP {StatusCode}: {ErrorBody}", (int)response.StatusCode, errorBody);
+                    response.EnsureSuccessStatusCode();
+                }
 
                 var envelope = await response.Content.ReadFromJsonAsync<GroqChatResponse>(RequestJsonOptions, cts.Token);
                 var content = envelope?.Choices?.FirstOrDefault()?.Message?.Content;
