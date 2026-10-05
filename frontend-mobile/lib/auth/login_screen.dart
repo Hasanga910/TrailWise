@@ -35,76 +35,58 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.watch<AuthProvider>();
     final isLoading = auth.status == AuthStatus.authenticating;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('TrailWise Login')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: AppSpacing.page,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: AppCard(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Center(child: Logo(height: 36)),
-                    const SizedBox(height: AppSpacing.xl),
-                    Text(
-                      'Welcome back',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                      validator: (value) =>
-                          (value == null || !value.contains('@')) ? 'Enter a valid email' : null,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(labelText: 'Password'),
-                      validator: (value) =>
-                          (value == null || value.isEmpty) ? 'Password is required' : null,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    if (auth.errorMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: Text(
-                          auth.errorMessage!,
-                          style: TextStyle(color: AppColors.of(context).danger),
-                        ),
-                      ),
-                    AppButton(
-                      label: 'Log in',
-                      expand: true,
-                      loading: isLoading,
-                      onPressed: isLoading ? null : () => _submit(auth),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextButton(
-                      onPressed: isLoading
-                          ? null
-                          : () => Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                              ),
-                      child: const Text(
-                        "Don't have an account? Register as a Traveler",
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
+    return AuthScaffold(
+      appBarTitle: 'TrailWise Login',
+      tagline: 'Your next Sri Lankan adventure starts here.',
+      heading: 'Welcome back',
+      subtitle: 'Log in to your TrailWise account.',
+      footer: TextButton(
+        onPressed: isLoading
+            ? null
+            : () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                ),
+        child: const Text(
+          "Don't have an account? Register as a Traveler",
+          textAlign: TextAlign.center,
+        ),
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email'),
+              validator: (value) =>
+                  (value == null || !value.contains('@')) ? 'Enter a valid email' : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Password'),
+              validator: (value) =>
+                  (value == null || value.isEmpty) ? 'Password is required' : null,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            if (auth.errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Text(
+                  auth.errorMessage!,
+                  style: TextStyle(color: AppColors.of(context).danger),
                 ),
               ),
+            AppButton(
+              label: 'Log in',
+              expand: true,
+              loading: isLoading,
+              onPressed: isLoading ? null : () => _submit(auth),
             ),
-          ),
+          ],
         ),
       ),
     );

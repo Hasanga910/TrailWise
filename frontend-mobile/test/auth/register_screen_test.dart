@@ -29,6 +29,7 @@ void main() {
 
   testWidgets('RegisterScreen shows validation errors on an empty submit', (tester) async {
     await tester.pumpWidget(_app(const RegisterScreen()));
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Register'));
     await tester.tap(find.widgetWithText(FilledButton, 'Register'));
     await tester.pump();
     expect(find.text('Name is required'), findsOneWidget);
