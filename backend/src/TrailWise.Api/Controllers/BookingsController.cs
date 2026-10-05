@@ -613,6 +613,22 @@ public class BookingsController : ControllerBase
                 title: "This booking has already started or finished and cannot be self-cancelled.");
         }
 
+        // A traveler cancelling inside the refund window with an approved payment needs the
+        // Operations Manager's approval (refund exception); staff cancel directly.
+        if (!isManager && callerId.HasValue)
+        {
+            var approval = await _approvalService.TryRequestRefundExceptionAsync(booking.Id, request.Reason, callerId.Value, ct);
+            if (approval is not null)
+            {
+                return approval.Outcome switch
+                {
+                    ApprovalOutcome.Success => Ok(BookingDto.FromEntity(booking) with { ApprovalPending = true }),
+                    ApprovalOutcome.NotFound => NotFound(),
+                    _ => Problem(statusCode: StatusCodes.Status409Conflict, title: approval.Error, detail: approval.Error)
+                };
+            }
+        }
+
         booking.Status = BookingStatus.Cancelled;
         booking.CancellationReason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
 
@@ -623,6 +639,15 @@ public class BookingsController : ControllerBase
         try
         {
             var releasedGuideDays = await _guideAssignmentService.ReleaseGuideAsync(booking.Id, ct);
+
+            // A cancelled booking must not stay in the approvals queue.
+            var openApprovals = await _db.ApprovalRequests
+                .Where(a => a.BookingId == booking.Id && a.Status == ApprovalStatus.Pending)
+                .ToListAsync(ct);
+            foreach (var open in openApprovals)
+            {
+                open.Status = ApprovalStatus.Superseded;
+            }
 
             var assignments = await _db.VehicleAssignments
                 .Where(a => a.BookingId == booking.Id)

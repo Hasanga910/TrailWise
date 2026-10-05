@@ -557,7 +557,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     public async Task CancelBooking_ReleasesVehicleAssignment_RestoresVehicleAvailability()
     {
         var adminClient = await AdminClientAsync();
-        var travelerClient = await TravelerClientAsync();
+        var (travelerClient, travelerEmail) = await TravelerClientWithEmailAsync();
 
         // 1. Create a vehicle
         var regNum = NewRegistrationNumber();
@@ -591,16 +591,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(40));
         var endDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(45));
 
-        var bookingRes = await travelerClient.PostAsJsonAsync("/api/bookings", new
-        {
-            PackageTierId = tier.Id,
-            GroupSize = 4,
-            StartDate = startDate,
-            EndDate = endDate,
-            BudgetPerPerson = 500m
-        });
-        var booking = await bookingRes.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
-        Assert.NotNull(booking);
+        var booking = await SeedBookingAsync(travelerEmail, tier.Id, groupSize: 4, startDate, endDate, budgetPerPerson: 500m);
 
         // 4. Reserve vehicle for the booking
         var reserveRes = await adminClient.PostAsJsonAsync($"/api/vehicles/{vehicle.Id}/reservations", new ReserveVehicleRequest

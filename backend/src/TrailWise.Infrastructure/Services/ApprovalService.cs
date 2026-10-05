@@ -2,9 +2,11 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Agents;
+using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
 
 namespace TrailWise.Infrastructure.Services;
@@ -21,6 +23,8 @@ public class ApprovalService : IApprovalService
     private readonly IGuideMatchingAgent _guideMatchingAgent;
     private readonly IBookingLifecycleService _bookingLifecycleService;
     private readonly ILogger<ApprovalService> _logger;
+    private readonly CancellationOptions _cancellation;
+    private readonly IClock _clock;
 
     public ApprovalService(
         TrailWiseDbContext db,
@@ -32,7 +36,9 @@ public class ApprovalService : IApprovalService
         IGuideAvailabilityService guideAvailabilityService,
         IGuideMatchingAgent guideMatchingAgent,
         IBookingLifecycleService bookingLifecycleService,
-        ILogger<ApprovalService> logger)
+        ILogger<ApprovalService> logger,
+        IOptions<CancellationOptions> cancellation,
+        IClock clock)
     {
         _db = db;
         _scopeFactory = scopeFactory;
@@ -44,6 +50,8 @@ public class ApprovalService : IApprovalService
         _guideMatchingAgent = guideMatchingAgent;
         _bookingLifecycleService = bookingLifecycleService;
         _logger = logger;
+        _cancellation = cancellation.Value;
+        _clock = clock;
     }
 
     public async Task<ApprovalDecisionResult> DecideApprovalAsync(
@@ -75,11 +83,212 @@ public class ApprovalService : IApprovalService
 
         if (request.Type == ApprovalType.RefundException)
         {
-            // Refund requests are only created by the cancellation flow; their decisions are added with it.
-            return ApprovalDecisionResult.Conflict("Refund exception approvals cannot be decided yet.");
+            return await DecideRefundExceptionAsync(request, decision, trimmedNote, performedBy, ct);
         }
 
         return await DecideBookingCoreAsync(request.BookingId, decision, trimmedNote, null, performedBy, request, ct);
+    }
+
+    private static bool IsApprovedPayment(Payment p) => p.Status is PaymentStatus.DepositPaid or PaymentStatus.FullyPaid;
+
+    public async Task<ApprovalDecisionResult?> TryRequestRefundExceptionAsync(
+        Guid bookingId,
+        string? travelerReason,
+        Guid requestedBy,
+        CancellationToken ct = default)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
+            .Include(b => b.Payments)
+            .FirstOrDefaultAsync(b => b.Id == bookingId, ct);
+        if (booking is null)
+        {
+            return ApprovalDecisionResult.NotFound();
+        }
+
+        var today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
+        var approvedPayments = booking.Payments.Where(IsApprovedPayment).ToList();
+        if (!CancellationPolicy.RequiresApproval(today, booking.StartDate, _cancellation.RefundWindowDays, approvedPayments.Count > 0))
+        {
+            return null;
+        }
+
+        if (await _db.ApprovalRequests.AnyAsync(a => a.BookingId == bookingId && a.Status == ApprovalStatus.Pending, ct))
+        {
+            return ApprovalDecisionResult.Conflict("A decision on this booking is already pending with the Operations Manager.");
+        }
+
+        var daysUntilStart = CancellationPolicy.DaysUntilStart(today, booking.StartDate);
+        var paidAmount = approvedPayments.Sum(p => p.Amount);
+        var reasons = new List<string>
+        {
+            $"Cancellation requested {daysUntilStart} day(s) before the start date, inside the {_cancellation.RefundWindowDays}-day window.",
+            $"Approved payments on record: {paidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}."
+        };
+        var reason = string.IsNullOrWhiteSpace(travelerReason) ? null : travelerReason.Trim();
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+        try
+        {
+            var request = new ApprovalRequest
+            {
+                BookingId = booking.Id,
+                Type = ApprovalType.RefundException,
+                Status = ApprovalStatus.Pending,
+                PreviousBookingStatus = booking.Status,
+                ReasonsJson = JsonSerializer.Serialize(reasons, AgentJsonOptions.Default),
+                RequesterNote = reason,
+                RequestedAt = _clock.UtcNow,
+            };
+            _db.ApprovalRequests.Add(request);
+            booking.Status = BookingStatus.PendingApproval;
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: "RefundExceptionRequested",
+                performedBy: requestedBy,
+                details: new
+                {
+                    approvalId = request.Id,
+                    reason,
+                    daysUntilStart,
+                    windowDays = _cancellation.RefundWindowDays,
+                    approvedPaymentTotal = paidAmount,
+                },
+                ct: ct);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        return new ApprovalDecisionResult(ApprovalOutcome.Success, booking);
+    }
+
+    /// <summary>
+    /// Approve: the booking is cancelled and its approved payments are marked Refunded (a status
+    /// change only; the money is returned by staff outside the system, there is no payment gateway).
+    /// Reject: the booking is cancelled with no refund. Request revision: the booking goes back to
+    /// the status it had, with the note visible to the traveler. Guide and vehicle are released
+    /// when the booking is cancelled. All in one transaction with the audit log entry.
+    /// </summary>
+    private async Task<ApprovalDecisionResult> DecideRefundExceptionAsync(
+        ApprovalRequest approval,
+        ApprovalDecision decision,
+        string? note,
+        Guid performedBy,
+        CancellationToken ct)
+    {
+        var booking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
+            .Include(b => b.Payments)
+            .FirstOrDefaultAsync(b => b.Id == approval.BookingId, ct);
+        if (booking is null)
+        {
+            return ApprovalDecisionResult.NotFound();
+        }
+
+        if (booking.Status != BookingStatus.PendingApproval)
+        {
+            return ApprovalDecisionResult.Conflict(
+                $"This booking is {booking.Status}, so its cancellation request can no longer be decided.");
+        }
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+        try
+        {
+            var refunded = new List<Payment>();
+            switch (decision)
+            {
+                case ApprovalDecision.Approve:
+                    foreach (var payment in booking.Payments.Where(IsApprovedPayment))
+                    {
+                        payment.Status = PaymentStatus.Refunded;
+                        refunded.Add(payment);
+                    }
+                    booking.Status = BookingStatus.Cancelled;
+                    booking.CancellationReason = approval.RequesterNote ?? note;
+                    await ReleaseResourcesAsync(booking.Id, ct);
+                    break;
+                case ApprovalDecision.Reject:
+                    booking.Status = BookingStatus.Cancelled;
+                    booking.CancellationReason = approval.RequesterNote ?? note;
+                    await ReleaseResourcesAsync(booking.Id, ct);
+                    break;
+                default:
+                    booking.Status = approval.PreviousBookingStatus ?? BookingStatus.Confirmed;
+                    booking.RevisionNote = note;
+                    break;
+            }
+
+            approval.Status = decision switch
+            {
+                ApprovalDecision.Approve => ApprovalStatus.Approved,
+                ApprovalDecision.Reject => ApprovalStatus.Rejected,
+                _ => ApprovalStatus.RevisionRequested
+            };
+            approval.DecidedBy = performedBy;
+            approval.DecidedAt = _clock.UtcNow;
+            approval.DecisionNote = note;
+
+            await _db.SaveChangesAsync(ct);
+
+            await _auditLogService.LogAsync(
+                entityType: "Booking",
+                entityId: booking.Id,
+                action: decision switch
+                {
+                    ApprovalDecision.Approve => "RefundExceptionApproved",
+                    ApprovalDecision.Reject => "RefundExceptionRejected",
+                    _ => "RefundExceptionRevisionRequested"
+                },
+                performedBy: performedBy,
+                details: new
+                {
+                    decision = decision.ToString(),
+                    notes = note,
+                    approvalId = approval.Id,
+                    refundedPaymentIds = refunded.Select(p => p.Id).ToList(),
+                    refundedAmount = refunded.Sum(p => p.Amount),
+                },
+                ct: ct);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+
+        return new ApprovalDecisionResult(ApprovalOutcome.Success, booking);
     }
 
     public async Task<ApprovalDecisionResult> DecideBookingAsync(

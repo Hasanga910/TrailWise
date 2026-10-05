@@ -13,6 +13,7 @@ public class ApprovalRequestConfiguration : IEntityTypeConfiguration<ApprovalReq
         builder.Property(a => a.PreviousBookingStatus).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.ReasonsJson).HasColumnType("jsonb");
         builder.Property(a => a.DecisionNote).HasMaxLength(500);
+        builder.Property(a => a.RequesterNote).HasMaxLength(500);
 
         builder.HasOne(a => a.Booking)
             .WithMany()

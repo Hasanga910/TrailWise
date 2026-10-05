@@ -17,7 +17,8 @@ public record ApprovalItemDto(
     List<string> Reasons,
     ApprovalBookingDto Booking,
     ApprovalEvidenceDto Evidence,
-    Guid? WorkflowRunId);
+    Guid? WorkflowRunId,
+    RefundEvidenceDto? Refund = null);
 
 public record ApprovalBookingDto(
     string TravelerName,
@@ -40,6 +41,17 @@ public record ApprovalEvidenceDto(
     ValidationEvidenceDto? Validation,
     string? SummaryText,
     List<string> AdvisoryFlags);
+
+/// <summary>Extra evidence for a cancellation / refund exception.</summary>
+public record RefundEvidenceDto(
+    int DaysUntilStart,
+    int WindowDays,
+    string? TravelerReason,
+    BookingStatus? PreviousBookingStatus,
+    decimal ApprovedPaymentTotal,
+    List<RefundPaymentDto> Payments);
+
+public record RefundPaymentDto(Guid Id, decimal Amount, string Method, PaymentStatus Status, DateTimeOffset? PaidAt, DateTimeOffset SubmittedAt);
 
 public record GuideEvidenceDto(Guid? GuideId, string? Name, double MatchScore, string Reasoning);
 

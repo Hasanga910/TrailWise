@@ -25,6 +25,19 @@ public record ApprovalDecisionResult(ApprovalOutcome Outcome, Booking? Booking =
 /// </summary>
 public interface IApprovalService
 {
+    /// <summary>
+    /// A traveler's cancellation (design doc 8.3 "Cancellation / Refund Exception"): when it falls
+    /// inside the cancellation window and the booking has an approved payment, the booking is paused
+    /// in PendingApproval and an approval request is created instead of cancelling. Returns null when
+    /// no approval is required (the caller cancels normally). Guide and vehicle stay reserved until
+    /// the Operations Manager decides.
+    /// </summary>
+    Task<ApprovalDecisionResult?> TryRequestRefundExceptionAsync(
+        Guid bookingId,
+        string? travelerReason,
+        Guid requestedBy,
+        CancellationToken ct = default);
+
     /// <summary>Decides by approval id (the /api/approvals/{id}/decide path).</summary>
     Task<ApprovalDecisionResult> DecideApprovalAsync(
         Guid approvalId,

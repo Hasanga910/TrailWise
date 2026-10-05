@@ -21,6 +21,9 @@ public class ApprovalRequest : BaseEntity
     /// <summary>Why the deterministic rules required approval (JSON array of strings).</summary>
     public string? ReasonsJson { get; set; }
 
+    /// <summary>What the requester wrote (the traveler's cancellation reason for a refund exception).</summary>
+    public string? RequesterNote { get; set; }
+
     public DateTimeOffset RequestedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Guid? DecidedBy { get; set; }

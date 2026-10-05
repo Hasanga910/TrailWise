@@ -1,10 +1,13 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TrailWise.Api.Contracts.Approvals;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Agents;
+using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Services;
 
@@ -16,11 +19,14 @@ public class ApprovalQueueService
 {
     private readonly TrailWiseDbContext _db;
     private readonly ILogger<ApprovalQueueService> _logger;
+    private readonly CancellationOptions _cancellation;
 
-    public ApprovalQueueService(TrailWiseDbContext db, ILogger<ApprovalQueueService> logger)
+    public ApprovalQueueService(
+        TrailWiseDbContext db, ILogger<ApprovalQueueService> logger, IOptions<CancellationOptions> cancellation)
     {
         _db = db;
         _logger = logger;
+        _cancellation = cancellation.Value;
     }
 
     public async Task<PendingApprovalsDto> GetPendingAsync(ApprovalType? type, CancellationToken ct)
@@ -42,6 +48,7 @@ public class ApprovalQueueService
             .Include(a => a.Booking).ThenInclude(b => b.Traveler)
             .Include(a => a.Booking).ThenInclude(b => b.TourPackage)
             .Include(a => a.Booking).ThenInclude(b => b.PackageTier)
+            .Include(a => a.Booking).ThenInclude(b => b.Payments)
             .AsQueryable();
         if (type is not null)
         {
@@ -131,6 +138,25 @@ public class ApprovalQueueService
             ? null
             : new ValidationEvidenceDto(validation.Decision ?? "Unknown", validation.Reasons ?? new List<string>());
 
+        RefundEvidenceDto? refund = null;
+        if (request.Type == ApprovalType.RefundException)
+        {
+            var requestedOn = DateOnly.FromDateTime(request.RequestedAt.UtcDateTime);
+            var approved = booking.Payments
+                .Where(p => p.Status is PaymentStatus.DepositPaid or PaymentStatus.FullyPaid)
+                .ToList();
+            refund = new RefundEvidenceDto(
+                CancellationPolicy.DaysUntilStart(requestedOn, booking.StartDate),
+                _cancellation.RefundWindowDays,
+                request.RequesterNote,
+                request.PreviousBookingStatus,
+                approved.Sum(p => p.Amount),
+                booking.Payments
+                    .OrderBy(p => p.SubmittedAt)
+                    .Select(p => new RefundPaymentDto(p.Id, p.Amount, p.Method, p.Status, p.PaidAt, p.SubmittedAt))
+                    .ToList());
+        }
+
         return new ApprovalItemDto(
             request.Id,
             request.Type,
@@ -157,7 +183,8 @@ public class ApprovalQueueService
                 validationEvidence,
                 run?.SummaryText,
                 summary?.AdvisoryFlags ?? new List<string>()),
-            run?.Id);
+            run?.Id,
+            refund);
     }
 
     private T? ReadLog<T>(AgentStepLog? log) where T : class

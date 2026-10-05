@@ -27,7 +27,8 @@ public record BookingDto(
     DateTimeOffset? CreatedAt = null,
     DateTimeOffset? TourStartedAt = null,
     DateTimeOffset? TourEndedAt = null,
-    string? RevisionNote = null)
+    string? RevisionNote = null,
+    bool ApprovalPending = false)
 {
     // Duplicated by value in TrailWise.Infrastructure.Agents.BookingApprovalEvaluator.LargeGroupThreshold
     // since Infrastructure cannot reference this (Api) project. Keep both in sync if this ever changes.
