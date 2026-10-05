@@ -3,12 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { extractErrorMessage, extractFieldErrors } from '../../api/apiClient';
 import { createBooking } from '../../api/bookings';
 import { getPackages, type TourPackage } from '../../api/packages';
+import { Button, Card, Input, PageHeader, Select, Textarea } from '../../components/ui';
 import { notify } from '../../components/ui/notify';
-
-const inputClass =
-  'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'text-xs font-semibold text-fg-muted';
-const fieldErrorClass = 'mt-1 text-xs font-medium text-danger-fg';
 
 interface TierOption {
   tierId: string;
@@ -98,29 +94,25 @@ export function BookingRequestPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-fg">Request a Booking</h2>
-        <p className="mt-1 text-sm text-fg-muted">
-          Choose a package tier, your dates, group size, and budget per person.
-        </p>
-      </div>
+      <PageHeader
+        title="Request a Booking"
+        description="Choose a package tier, your dates, group size, and budget per person."
+      />
 
       {loadError && (
-        <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+        <p role="alert" className="mb-4 rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
           {loadError}
         </p>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-surface-raised p-6">
-        <div>
-          <label htmlFor="packageTierId" className={labelClass}>
-            Package tier
-          </label>
-          <select
+      <Card className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Select
             id="packageTierId"
+            label="Package tier"
             required
-            className={inputClass}
             value={packageTierId}
+            error={fieldErrors.packageTierId}
             onChange={(e) => setPackageTierId(e.target.value)}
           >
             <option value="" disabled>
@@ -131,99 +123,66 @@ export function BookingRequestPage() {
                 {option.packageName} — {option.classType} (${option.basePricePerPerson.toFixed(2)}/person)
               </option>
             ))}
-          </select>
-          {fieldErrors.packageTierId && <p className={fieldErrorClass}>{fieldErrors.packageTierId}</p>}
-        </div>
+          </Select>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="startDate" className={labelClass}>
-              Start date
-            </label>
-            <input
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
               id="startDate"
+              label="Start date"
               required
               type="date"
-              className={inputClass}
               value={startDate}
+              error={fieldErrors.startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
-            {fieldErrors.startDate && <p className={fieldErrorClass}>{fieldErrors.startDate}</p>}
-          </div>
-          <div>
-            <label htmlFor="endDate" className={labelClass}>
-              End date
-            </label>
-            <input
+            <Input
               id="endDate"
+              label="End date"
               required
               type="date"
-              className={inputClass}
               value={endDate}
+              error={fieldErrors.endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
-            {fieldErrors.endDate && <p className={fieldErrorClass}>{fieldErrors.endDate}</p>}
-          </div>
-          <div>
-            <label htmlFor="groupSize" className={labelClass}>
-              Group size
-            </label>
-            <input
+            <Input
               id="groupSize"
+              label="Group size"
               required
               type="number"
               min={1}
-              className={inputClass}
               value={groupSize}
+              error={fieldErrors.groupSize}
               onChange={(e) => setGroupSize(Number(e.target.value))}
             />
-            {fieldErrors.groupSize && <p className={fieldErrorClass}>{fieldErrors.groupSize}</p>}
-          </div>
-          <div>
-            <label htmlFor="budgetPerPerson" className={labelClass}>
-              Budget per person
-            </label>
-            <input
+            <Input
               id="budgetPerPerson"
+              label="Budget per person"
               required
               type="number"
               min={0.01}
               step="0.01"
-              className={inputClass}
               value={budgetPerPerson}
+              error={fieldErrors.budgetPerPerson}
               onChange={(e) => setBudgetPerPerson(Number(e.target.value))}
             />
-            {fieldErrors.budgetPerPerson && <p className={fieldErrorClass}>{fieldErrors.budgetPerPerson}</p>}
           </div>
-        </div>
 
-        <div>
-          <label htmlFor="specialRequests" className={labelClass}>
-            Special requests (optional)
-          </label>
-          <textarea
+          <Textarea
             id="specialRequests"
+            label="Special requests (optional)"
             rows={3}
             maxLength={1000}
-            className={inputClass}
             value={specialRequests}
+            hint="This note is processed by an AI service to help plan your trip. Avoid including sensitive personal or payment details."
+            error={fieldErrors.specialRequests}
             onChange={(e) => setSpecialRequests(e.target.value)}
           />
-          <p className="mt-1 text-xs text-fg-muted">
-            This note is processed by an AI service to help plan your trip. Avoid including sensitive personal
-            or payment details.
-          </p>
-          {fieldErrors.specialRequests && <p className={fieldErrorClass}>{fieldErrors.specialRequests}</p>}
-        </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
-        >
-          {submitting ? 'Submitting...' : 'Submit request'}
-        </button>
-      </form>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? 'Submitting...' : 'Submit request'}
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }
