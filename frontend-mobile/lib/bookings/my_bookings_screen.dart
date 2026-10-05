@@ -11,6 +11,8 @@ import 'itinerary_screen.dart';
 import 'payment_status_screen.dart';
 import 'review_screen.dart';
 import '../support/create_support_ticket_screen.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key, this.apiClient, this.currentUser});
@@ -23,7 +25,8 @@ class MyBookingsScreen extends StatefulWidget {
 }
 
 class _MyBookingsScreenState extends State<MyBookingsScreen> {
-  late final ApiClient _apiClient = widget.apiClient ?? context.read<AuthProvider>().apiClient;
+  late final ApiClient _apiClient =
+      widget.apiClient ?? context.read<AuthProvider>().apiClient;
 
   CurrentUser? _getUser() {
     if (widget.currentUser != null) return widget.currentUser;
@@ -91,18 +94,24 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     }
     try {
       final sortParams = _getSortParams();
-      final json = await _apiClient.get('/api/bookings/mine', query: {
-        'status': _statusFilter,
-        'from': _from == null ? null : _formatDate(_from!),
-        'to': _to == null ? null : _formatDate(_to!),
-        'sortBy': sortParams.$1,
-        'sortDirection': sortParams.$2,
-        'page': _page,
-        'pageSize': _pageSize,
-      });
+      final json = await _apiClient.get(
+        '/api/bookings/mine',
+        query: {
+          'status': _statusFilter,
+          'from': _from == null ? null : _formatDate(_from!),
+          'to': _to == null ? null : _formatDate(_to!),
+          'sortBy': sortParams.$1,
+          'sortDirection': sortParams.$2,
+          'page': _page,
+          'pageSize': _pageSize,
+        },
+      );
       if (!mounted) return;
       setState(() {
-        _result = PagedResult<Booking>.fromJson(json as Map<String, dynamic>, Booking.fromJson);
+        _result = PagedResult<Booking>.fromJson(
+          json as Map<String, dynamic>,
+          Booking.fromJson,
+        );
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -175,10 +184,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   void _openBooking(Booking booking) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ItineraryScreen(
-          booking: booking,
-          apiClient: _apiClient,
-        ),
+        builder: (_) =>
+            ItineraryScreen(booking: booking, apiClient: _apiClient),
       ),
     );
   }
@@ -186,10 +193,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   Future<void> _openPayment(Booking booking) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PaymentStatusScreen(
-          booking: booking,
-          apiClient: _apiClient,
-        ),
+        builder: (_) =>
+            PaymentStatusScreen(booking: booking, apiClient: _apiClient),
       ),
     );
 
@@ -201,10 +206,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   Future<void> _openReview(Booking booking) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReviewScreen(
-          booking: booking,
-          apiClient: _apiClient,
-        ),
+        builder: (_) => ReviewScreen(booking: booking, apiClient: _apiClient),
       ),
     );
     if (mounted) {
@@ -244,7 +246,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Are you sure you want to cancel this booking?'),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             TextField(
               controller: reasonController,
               decoration: const InputDecoration(labelText: 'Reason (optional)'),
@@ -270,16 +272,21 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
     try {
       await _apiClient.patch('/api/bookings/${booking.id}/cancel', {
-        'reason': reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+        'reason': reasonController.text.trim().isEmpty
+            ? null
+            : reasonController.text.trim(),
       });
       _load();
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not reach the server. Please try again.')),
+        const SnackBar(
+          content: Text('Could not reach the server. Please try again.'),
+        ),
       );
     }
   }
@@ -298,32 +305,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     if (user != null && user.role == 'TourGuide') {
       return Scaffold(
         appBar: AppBar(title: const Text('My Bookings')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.lock_outline, size: 56, color: Colors.grey),
-                const SizedBox(height: 16),
-                const Text(
-                  'Access Restricted',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Personal bookings are only available to Travelers. Please use Assigned Tours to view your tours.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Go Back'),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-              ],
-            ),
+        body: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Access Restricted',
+          message: 'Personal bookings are only available to Travelers. Please use Assigned Tours to view your tours.',
+          action: FilledButton.icon(
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Go Back'),
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
       );
@@ -353,7 +342,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   Widget _buildFilters() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -366,13 +358,21 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   initialValue: _statusFilter,
                   decoration: const InputDecoration(
                     labelText: 'Status',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     isDense: true,
                   ),
                   items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('All')),
-                    ...BookingStatus.filterOptions
-                        .map((s) => DropdownMenuItem<String?>(value: s, child: Text(s))),
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All'),
+                    ),
+                    ...BookingStatus.filterOptions.map(
+                      (s) =>
+                          DropdownMenuItem<String?>(value: s, child: Text(s)),
+                    ),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -391,14 +391,19 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   initialValue: _sortOption,
                   decoration: const InputDecoration(
                     labelText: 'Sort',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     isDense: true,
                   ),
                   items: sortOptions
-                      .map((opt) => DropdownMenuItem(
-                            value: opt,
-                            child: Text(opt, overflow: TextOverflow.ellipsis),
-                          ))
+                      .map(
+                        (opt) => DropdownMenuItem(
+                          value: opt,
+                          child: Text(opt, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
                       .toList(),
                   onChanged: (value) {
                     if (value != null && value != _sortOption) {
@@ -414,31 +419,43 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
             children: [
-              IconButton(
-                icon: const Icon(Icons.date_range, size: 20),
-                tooltip: _from == null ? 'From date' : _formatDate(_from!),
-                visualDensity: VisualDensity.compact,
-                onPressed: _pickFrom,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.date_range, size: 20),
+                    tooltip: _from == null ? 'From date' : _formatDate(_from!),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _pickFrom,
+                  ),
+                  Text(
+                    _from == null
+                        ? 'From: Any'
+                        : 'From: ${_formatDate(_from!)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
-              Text(
-                _from == null ? 'From: Any' : 'From: ${_formatDate(_from!)}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.date_range_outlined, size: 20),
+                    tooltip: _to == null ? 'To date' : _formatDate(_to!),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _pickTo,
+                  ),
+                  Text(
+                    _to == null ? 'To: Any' : 'To: ${_formatDate(_to!)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.date_range_outlined, size: 20),
-                tooltip: _to == null ? 'To date' : _formatDate(_to!),
-                visualDensity: VisualDensity.compact,
-                onPressed: _pickTo,
-              ),
-              Text(
-                _to == null ? 'To: Any' : 'To: ${_formatDate(_to!)}',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-              ),
-              if (_from != null || _to != null) ...[
-                const Spacer(),
+              if (_from != null || _to != null)
                 IconButton(
                   icon: const Icon(Icons.clear, size: 18),
                   tooltip: 'Clear dates',
@@ -452,7 +469,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     _load();
                   },
                 ),
-              ],
             ],
           ),
         ],
@@ -462,34 +478,26 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SkeletonList(count: 3, height: 140);
     }
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: _load, child: const Text('Retry')),
-          ],
-        ),
-      );
+      return ErrorState(message: _error!, onRetry: _load);
     }
     final result = _result!;
     if (result.items.isEmpty) {
       return RefreshIndicator(
         onRefresh: _load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 100),
-            Center(child: Text('No bookings match your filters.')),
-          ],
+        child: const EmptyState(
+          icon: Icons.event_note_outlined,
+          title: 'No bookings match your filters.',
+          message: 'Try changing the filters or request a new booking from Packages.',
         ),
       );
     }
-    final totalPages = (result.totalCount / result.pageSize).ceil().clamp(1, 1 << 30);
+    final totalPages = (result.totalCount / result.pageSize).ceil().clamp(
+      1,
+      1 << 30,
+    );
     final isFirstPage = _page <= 1;
     final isLastPage = _page * result.pageSize >= result.totalCount;
     final items = result.items;
@@ -501,22 +509,26 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             onRefresh: _load,
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
+              padding: AppSpacing.page,
               itemCount: items.length,
               itemBuilder: (_, i) => _BookingCard(
                 booking: items[i],
                 onTap: () => _openBooking(items[i]),
                 onPaymentTap: () => _openPayment(items[i]),
                 onReviewTap: () => _openReview(items[i]),
-                onCancelTap:
-                    _isCancellable(items[i]) ? () => _cancelBooking(items[i]) : null,
+                onCancelTap: _isCancellable(items[i])
+                    ? () => _cancelBooking(items[i])
+                    : null,
                 onSupportTap: () => _openSupport(items[i]),
               ),
             ),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -571,15 +583,17 @@ class _BookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = BookingStatus.color(booking.status);
+    final colors = AppColors.of(context);
     final isConfirmed = booking.status == BookingStatus.confirmed;
     final isCompleted = booking.status == BookingStatus.completed;
 
-    final shouldShowPayment = isConfirmed ||
+    final shouldShowPayment =
+        isConfirmed ||
         (isCompleted &&
             (!booking.isFullyPaid ||
                 booking.hasPendingPayment ||
-                (booking.remainingAmount != null && booking.remainingAmount! > 0)));
+                (booking.remainingAmount != null &&
+                    booking.remainingAmount! > 0)));
 
     final paymentLabel = booking.hasPendingPayment
         ? 'Payment Status'
@@ -588,33 +602,38 @@ class _BookingCard extends StatelessWidget {
     final shouldShowReview = isCompleted && booking.isFullyPaid;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
           children: [
             ListTile(
               onTap: onTap,
-              title: Text('${booking.tourPackageName} — ${booking.packageTier.classType}'),
-              subtitle: Text(
-                '${booking.startDate} to ${booking.endDate} · ${booking.groupSize} '
-                '${booking.groupSize == 1 ? 'traveler' : 'travelers'} · '
-                '\$${booking.budgetPerPerson.toStringAsFixed(2)}/person',
+              title: Text(
+                '${booking.tourPackageName} — ${booking.packageTier.classType}',
               ),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Chip(
-                    label: Text(booking.status, style: TextStyle(color: color, fontSize: 12)),
-                    backgroundColor: color.withValues(alpha: 0.15),
-                    visualDensity: VisualDensity.compact,
+                  Text(
+                    '${booking.startDate} to ${booking.endDate} · ${booking.groupSize} '
+                    '${booking.groupSize == 1 ? 'traveler' : 'travelers'} · '
+                    '\$${booking.budgetPerPerson.toStringAsFixed(2)}/person',
                   ),
-                  if (booking.isLargeGroup)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Text('Large group', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      StatusBadge(status: booking.status),
+                      if (booking.isLargeGroup)
+                        Text(
+                          'Large group',
+                          style: TextStyle(fontSize: 11, color: colors.fgMuted),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -629,8 +648,8 @@ class _BookingCard extends StatelessWidget {
                           : Icons.person_search,
                       size: 16,
                       color: booking.assignedGuide != null
-                          ? Colors.teal
-                          : Colors.amber.shade800,
+                          ? colors.brandText
+                          : colors.warning,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -641,8 +660,8 @@ class _BookingCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           color: booking.assignedGuide != null
-                              ? Colors.teal.shade800
-                              : Colors.amber.shade900,
+                              ? colors.brandText
+                              : colors.warning,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -675,13 +694,19 @@ class _BookingCard extends StatelessWidget {
                     if (shouldShowReview) ...[
                       if (booking.hasReview)
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.check_circle_outline, size: 16),
+                          icon: const Icon(
+                            Icons.check_circle_outline,
+                            size: 16,
+                          ),
                           label: const Text('Reviewed'),
                           onPressed: null,
                         )
                       else if (onReviewTap != null)
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.rate_review_outlined, size: 16),
+                          icon: const Icon(
+                            Icons.rate_review_outlined,
+                            size: 16,
+                          ),
                           label: const Text('Review'),
                           onPressed: onReviewTap,
                         ),

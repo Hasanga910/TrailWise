@@ -7,6 +7,8 @@ import '../auth/current_user.dart';
 import '../models/active_discount.dart';
 import '../models/package_tier.dart';
 import '../models/tour_package.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class BookingRequestScreen extends StatefulWidget {
   const BookingRequestScreen({
@@ -190,32 +192,14 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
     if (user != null && user.role == 'TourGuide') {
       return Scaffold(
         appBar: AppBar(title: const Text('Request a Booking')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.lock_outline, size: 56, color: Colors.grey),
-                const SizedBox(height: 16),
-                const Text(
-                  'Access Restricted',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Only travelers can request tour bookings.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Go Back'),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-              ],
-            ),
+        body: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Access Restricted',
+          message: 'Only travelers can request tour bookings.',
+          action: FilledButton.icon(
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Go Back'),
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
       );
@@ -227,19 +211,19 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: AppSpacing.page,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   widget.package.name,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
                 Text(
                   '${widget.tier.classType} · \$${widget.tier.basePricePerPerson.toStringAsFixed(2)}/person',
-                  style: const TextStyle(color: Colors.grey),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xl),
                 InkWell(
                   onTap: _pickStartDate,
                   child: InputDecorator(
@@ -250,7 +234,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     child: Text(_startDate == null ? 'Select date' : _formatDate(_startDate!)),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 InkWell(
                   onTap: _pickEndDate,
                   child: InputDecorator(
@@ -261,7 +245,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     child: Text(_endDate == null ? 'Select date' : _formatDate(_endDate!)),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _groupSizeController,
                   keyboardType: TextInputType.number,
@@ -272,7 +256,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                 ),
                 const SizedBox(height: 8),
                 _buildAvailableDiscountsSection(),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _budgetController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -281,7 +265,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     errorText: _fieldErrors['budgetPerPerson'],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _specialRequestsController,
                   maxLines: 3,
@@ -296,18 +280,14 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                 const SizedBox(height: 16),
                 if (_submitError != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_submitError!, style: const TextStyle(color: Colors.red)),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: Text(_submitError!, style: TextStyle(color: AppColors.of(context).danger)),
                   ),
-                FilledButton(
+                AppButton(
+                  label: 'Submit request',
+                  expand: true,
+                  loading: _submitting,
                   onPressed: _submitting ? null : _submit,
-                  child: _submitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Submit request'),
                 ),
               ],
             ),
@@ -318,6 +298,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
   }
 
   Widget _buildAvailableDiscountsSection() {
+    final colors = AppColors.of(context);
     if (_loadingDiscounts) {
       return const SizedBox(
         height: 24,
@@ -332,16 +313,16 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.teal.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.teal.shade200),
+        color: colors.brandSoft,
+        borderRadius: BorderRadius.circular(AppRadius.input),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.local_offer, size: 16, color: Colors.teal.shade700),
+              Icon(Icons.local_offer, size: 16, color: colors.brandText),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -349,7 +330,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: Colors.teal.shade900,
+                    color: colors.brandFg,
                   ),
                 ),
               ),
@@ -364,7 +345,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.teal.shade100,
+                    color: colors.surfaceRaised,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -372,7 +353,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      color: Colors.teal.shade900,
+                      color: colors.brandFg,
                     ),
                   ),
                 ),
@@ -383,11 +364,11 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     children: [
                       Text(
                         'Groups of ${discount.minGroupSize} or more',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: colors.brandFg),
                       ),
                       Text(
                         discount.formattedValidity,
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                        style: TextStyle(color: colors.fgMuted, fontSize: 11),
                       ),
                     ],
                   ),
@@ -401,7 +382,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
             style: TextStyle(
               fontSize: 11,
               fontStyle: FontStyle.italic,
-              color: Colors.grey.shade700,
+              color: colors.fgMuted,
             ),
           ),
         ],
