@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { extractErrorMessage } from '../../api/apiClient';
+import { Button, Input } from '../ui';
 import { setItinerary, type ItineraryStepDto, type ItineraryStepInput } from '../../api/itineraries';
 
 interface EditableStep {
@@ -71,89 +72,57 @@ export function ItineraryEditor({
 
   return (
     <div className="space-y-3">
-      {error && <p className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger-fg">{error}</p>}
+      {error && <p className="rounded-input border border-danger/30 bg-danger-soft px-3 py-2 text-body text-danger-fg">{error}</p>}
 
       {rows.map((row, index) => (
         <div
           key={index}
-          className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 sm:grid-cols-[80px_1fr_1fr_110px_auto] sm:items-end"
+          className="grid grid-cols-2 gap-2 rounded-input border border-border p-3 sm:grid-cols-[80px_1fr_1fr_110px_auto] sm:items-end"
         >
-          <div>
-            <label className="text-xs font-semibold text-fg-muted">Day</label>
-            <input
-              type="number"
-              min={1}
-              value={row.dayNumber}
-              onChange={(e) => updateRow(index, { dayNumber: Number(e.target.value) })}
-              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-fg-muted">Activity</label>
-            <input
-              type="text"
-              value={row.activity}
-              maxLength={300}
-              onChange={(e) => updateRow(index, { activity: e.target.value })}
-              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-fg-muted">Location</label>
-            <input
-              type="text"
-              value={row.location}
-              maxLength={300}
-              onChange={(e) => updateRow(index, { location: e.target.value })}
-              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-fg-muted">Start time</label>
-            <input
-              type="time"
-              value={row.startTime}
-              onChange={(e) => updateRow(index, { startTime: e.target.value })}
-              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
-            />
-          </div>
-          <div>
-            <button
-              type="button"
-              onClick={() => removeRow(index)}
-              disabled={rows.length === 1}
-              className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-fg-muted hover:bg-surface-sunken disabled:opacity-40"
-            >
-              Remove
-            </button>
-          </div>
+          <Input
+            label="Day"
+            type="number"
+            min={1}
+            value={row.dayNumber}
+            onChange={(e) => updateRow(index, { dayNumber: Number(e.target.value) })}
+          />
+          <Input
+            label="Activity"
+            type="text"
+            value={row.activity}
+            maxLength={300}
+            onChange={(e) => updateRow(index, { activity: e.target.value })}
+          />
+          <Input
+            label="Location"
+            type="text"
+            value={row.location}
+            maxLength={300}
+            onChange={(e) => updateRow(index, { location: e.target.value })}
+          />
+          <Input
+            label="Start time"
+            type="time"
+            value={row.startTime}
+            onChange={(e) => updateRow(index, { startTime: e.target.value })}
+          />
+          <Button variant="secondary" size="sm" onClick={() => removeRow(index)} disabled={rows.length === 1}>
+            Remove
+          </Button>
         </div>
       ))}
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={addRow}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg hover:bg-surface-sunken"
-        >
+        <Button variant="secondary" size="sm" onClick={addRow}>
           Add Day
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
-        >
+        </Button>
+        <Button size="sm" onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save Itinerary'}
-        </button>
+        </Button>
         {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-fg-muted hover:text-fg"
-          >
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </div>
