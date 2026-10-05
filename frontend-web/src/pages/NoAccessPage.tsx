@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getHomeRouteForRole } from '../auth/roleHome';
+import { Button } from '../components/ui/Button';
 import { buttonClasses } from '../components/ui/buttonStyles';
 import { StatusPage } from './StatusPage';
 
@@ -17,9 +18,9 @@ export function NoAccessPage() {
             {user ? 'Go to my dashboard' : 'Sign in'}
           </Link>
           {user && (
-            <button type="button" onClick={logout} className={buttonClasses('secondary')}>
+            <Button variant="secondary" onClick={logout}>
               Switch account
-            </button>
+            </Button>
           )}
         </>
       }

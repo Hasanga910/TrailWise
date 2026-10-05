@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getHomeRouteForRole } from '../auth/roleHome';
+import { Button } from '../components/ui/Button';
 import { buttonClasses } from '../components/ui/buttonStyles';
 import { StatusPage } from './StatusPage';
 
@@ -18,9 +19,9 @@ export function NotFoundPage() {
           <Link to={home} className={buttonClasses('primary')}>
             {user ? 'Back to my dashboard' : 'Back to home'}
           </Link>
-          <button type="button" onClick={() => navigate(-1)} className={buttonClasses('secondary')}>
+          <Button variant="secondary" onClick={() => navigate(-1)}>
             Go back
-          </button>
+          </Button>
         </>
       }
     />

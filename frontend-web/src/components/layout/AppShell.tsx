@@ -6,6 +6,7 @@ import logoIcon from '../../assets/logo-icon.png';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { useTheme } from '../../theme/useTheme';
 import { Avatar } from '../ui/Avatar';
+import { Button } from '../ui/Button';
 import { Breadcrumbs } from '../ui/PageHeader';
 import { cn } from '../ui/cn';
 import { PageSkeleton } from '../ui/Skeleton';
@@ -207,18 +208,18 @@ export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShe
         </nav>
 
         <div className="border-t border-border p-3">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={logout}
             title="Log out"
+            leftIcon={<LogOut className="h-5 w-5 shrink-0" aria-hidden />}
             className={cn(
-              'flex items-center gap-3 rounded-input px-3 py-2 text-body font-semibold text-danger transition hover:bg-danger-soft',
-              isCollapsed ? 'w-auto justify-center' : 'w-full',
+              'gap-3 font-semibold text-danger hover:bg-danger-soft hover:text-danger',
+              isCollapsed ? 'w-auto justify-center px-3' : 'w-full justify-start',
             )}
           >
-            <LogOut className="h-5 w-5 shrink-0" aria-hidden />
             {isCollapsed ? <span className="sr-only">Log out</span> : 'Log out'}
-          </button>
+          </Button>
         </div>
       </>
     );
