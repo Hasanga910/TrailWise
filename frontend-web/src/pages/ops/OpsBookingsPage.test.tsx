@@ -93,7 +93,7 @@ describe('OpsBookingsPage', () => {
 
     renderPage();
 
-    await screen.findByText('PendingApproval');
+    await screen.findByText('Pending Approval');
     expect(screen.getAllByRole('button', { name: /^approve$/i })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: /^reject$/i })).toHaveLength(1);
     expect(screen.getByRole('button', { name: /mark completed/i })).toBeInTheDocument();
@@ -106,7 +106,7 @@ describe('OpsBookingsPage', () => {
 
     renderPage();
 
-    await screen.findByText('NeedsManualReview');
+    await screen.findByText('Needs Manual Review');
     expect(screen.queryByRole('button', { name: /^approve$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^reject$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^cancel$/i })).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe('OpsBookingsPage', () => {
       .mockResolvedValue(sampleBookingDto({ status: 'Confirmed' }));
 
     renderPage();
-    await screen.findByText('PendingApproval');
+    await screen.findByText('Pending Approval');
 
     await userEvent.click(screen.getByRole('button', { name: /^approve$/i }));
 
@@ -140,7 +140,7 @@ describe('OpsBookingsPage', () => {
       .mockResolvedValue(sampleBookingDto({ status: 'Cancelled' }));
 
     renderPage();
-    await screen.findByText('NeedsManualReview');
+    await screen.findByText('Needs Manual Review');
 
     await userEvent.click(screen.getByRole('button', { name: /^reject$/i }));
     await userEvent.type(screen.getByLabelText(/notes/i), 'Budget too low');
@@ -181,7 +181,7 @@ describe('OpsBookingsPage', () => {
     vi.spyOn(bookingsApi, 'getAllBookings').mockResolvedValue([sampleBooking({ status: 'PendingApproval' })]);
 
     renderPage();
-    await screen.findByText('PendingApproval');
+    await screen.findByText('Pending Approval');
 
     expect(screen.queryByRole('button', { name: /^itinerary$/i })).not.toBeInTheDocument();
   });
@@ -222,7 +222,7 @@ describe('OpsBookingsPage', () => {
     ]);
 
     renderPage();
-    await screen.findByText('NeedsManualReview');
+    await screen.findByText('Needs Manual Review');
 
     expect(screen.queryByRole('button', { name: /assign tour guide/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /assign tour guide/i })).not.toBeInTheDocument();

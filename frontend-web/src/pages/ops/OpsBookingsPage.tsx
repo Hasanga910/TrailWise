@@ -188,7 +188,7 @@ export function OpsBookingsPage() {
                       <td className="px-4 py-3 font-medium text-fg">{booking.travelerName}</td>
                       <td className="px-4 py-3 text-fg-muted">{booking.packageName}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={booking.status} label={booking.status} className="whitespace-nowrap" />
+                        <StatusBadge status={booking.status} className="whitespace-nowrap" />
                       </td>
                       <td className="px-4 py-3 text-fg-muted">{booking.createdAt}</td>
                       <td className="px-4 py-3 text-fg-muted">{booking.startDate}</td>
