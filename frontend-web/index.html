@@ -7,12 +7,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="TrailWise — tour operations, booking, and travel management console." />
     <script>
+      // Runs before first paint. Light by default; only an explicit saved "dark" turns dark on. The OS setting is ignored.
       (function () {
+        var dark = false;
         try {
-          var t = localStorage.getItem('trailwise_theme');
-          var dark = t === 'dark' || ((t === null || t === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+          dark = localStorage.getItem('trailwise_theme') === 'dark';
         } catch (e) {}
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       })();
     </script>
     <script>

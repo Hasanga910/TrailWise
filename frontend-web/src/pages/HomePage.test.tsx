@@ -6,6 +6,7 @@ import { getPackages, type TourPackage } from '../api/packages';
 import { getFeaturedReviews, type FeaturedReview } from '../api/reviews';
 import { AuthContext, type AuthContextValue } from '../auth/AuthContext';
 import { PublicLayout } from '../components/public/PublicLayout';
+import { ThemeProvider } from '../theme/ThemeProvider';
 import { CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, contactLinks } from '../config/contact';
 import { HomePage } from './HomePage';
 
@@ -56,14 +57,16 @@ function ExplorerProbe() {
 function renderHome(authenticated = false) {
   return render(
     <MemoryRouter initialEntries={['/']}>
-      <AuthContext.Provider value={auth(authenticated)}>
-        <Routes>
-          <Route element={<PublicLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/explore" element={<ExplorerProbe />} />
-          </Route>
-        </Routes>
-      </AuthContext.Provider>
+      <ThemeProvider>
+        <AuthContext.Provider value={auth(authenticated)}>
+          <Routes>
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/explore" element={<ExplorerProbe />} />
+            </Route>
+          </Routes>
+        </AuthContext.Provider>
+      </ThemeProvider>
     </MemoryRouter>,
   );
 }
@@ -83,6 +86,11 @@ describe('HomePage', () => {
     expect(screen.getByRole('heading', { name: 'How TrailWise plans your trip' })).toBeInTheDocument();
     expect(await screen.findByText(/unforgettable week/i)).toBeInTheDocument();
     expect(mockedGetPackages).toHaveBeenCalledWith({ sort: 'rating', dir: 'desc' }, expect.any(AbortSignal));
+  });
+
+  it('has a light/dark toggle in the header', async () => {
+    renderHome();
+    expect(await screen.findByRole('button', { name: /switch to dark mode/i })).toBeInTheDocument();
   });
 
   describe('carousel arrows', () => {

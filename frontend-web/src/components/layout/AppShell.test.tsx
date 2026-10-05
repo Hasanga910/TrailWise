@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '../../auth/AuthContext';
 import { ThemeProvider } from '../../theme/ThemeProvider';
 import { DashboardIcon, ProfileIcon } from '../admin/icons';
@@ -47,6 +47,11 @@ function renderShell(path = '/x/profile', badge?: number | null) {
 }
 
 describe('AppShell', () => {
+  beforeEach(() => {
+    localStorage.removeItem('trailwise_theme');
+    document.documentElement.removeAttribute('data-theme');
+  });
+
   it('renders title, breadcrumbs, primary nav and outlet', async () => {
     renderShell();
     expect(screen.getByRole('heading', { level: 1, name: 'Profile Settings' })).toBeInTheDocument();
@@ -63,6 +68,14 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Account menu' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'Dark' }));
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+  });
+
+  it('switches theme from the header toggle', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.click(screen.getByRole('button', { name: /switch to dark mode/i }));
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(screen.getByRole('button', { name: /switch to light mode/i })).toBeInTheDocument();
   });
 
   it('opens the mobile drawer', async () => {

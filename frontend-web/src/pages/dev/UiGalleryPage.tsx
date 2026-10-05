@@ -95,7 +95,7 @@ export function UiGalleryPage() {
             description="Every design-system component in the active theme. Development only."
             actions={
               <div className="flex gap-1 rounded-input border border-border bg-surface-raised p-1" role="group" aria-label="Theme">
-                {(['system', 'light', 'dark'] as const).map((p) => (
+                {(['light', 'dark'] as const).map((p) => (
                   <Button key={p} size="sm" variant={preference === p ? 'primary' : 'ghost'} onClick={() => setPreference(p)}>
                     {p[0].toUpperCase() + p.slice(1)}
                   </Button>

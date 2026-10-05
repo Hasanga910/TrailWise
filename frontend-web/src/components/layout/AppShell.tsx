@@ -1,8 +1,9 @@
 import { Suspense, useState, type ComponentType, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { ChevronLeft, LogOut, Menu, Monitor, Moon, Sun } from 'lucide-react';
+import { ChevronLeft, LogOut, Menu, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import logoIcon from '../../assets/logo-icon.png';
+import { ThemeToggle } from '../../theme/ThemeToggle';
 import { useTheme } from '../../theme/useTheme';
 import { Avatar } from '../ui/Avatar';
 import { Breadcrumbs } from '../ui/PageHeader';
@@ -226,7 +227,6 @@ export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShe
   const themeEntries: MenuEntry[] = [
     { heading: 'Appearance' },
     ...([
-      ['system', 'System', Monitor],
       ['light', 'Light', Sun],
       ['dark', 'Dark', Moon],
     ] as const).map(([value, label, Icon]) => ({
@@ -266,7 +266,8 @@ export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShe
               <h1 className="truncate font-heading text-h3 text-fg">{title}</h1>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle />
             <div className="hidden text-right sm:block">
               <p className="text-body font-semibold text-fg">{user?.name}</p>
               <p className="text-caption text-fg-muted">{roleLabel}</p>

@@ -1,10 +1,11 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { getHomeRouteForRole } from '../../auth/roleHome';
+import { ThemeToggle } from '../../theme/ThemeToggle';
 import { Logo } from '../Logo';
 
 const ctaClass =
-  'rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-brand-950 transition hover:bg-accent-400';
+  'whitespace-nowrap rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-brand-950 transition hover:bg-accent-400 sm:px-4';
 
 export function HomeNav() {
   const { status, user } = useAuth();
@@ -29,8 +30,9 @@ export function HomeNav() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link to="/explore" className="text-sm font-semibold text-white/85 transition hover:text-white sm:hidden">
+        <div className="flex items-center gap-1.5 sm:gap-3">
+          <ThemeToggle onDark size="sm" />
+          <Link to="/explore" className="whitespace-nowrap text-sm font-semibold text-white/85 transition hover:text-white sm:hidden">
             Explore
           </Link>
           {isAuthenticated && user ? (
@@ -39,7 +41,7 @@ export function HomeNav() {
             </Link>
           ) : (
             <>
-              <Link to="/login" className="text-sm font-semibold text-white/85 transition hover:text-white">
+              <Link to="/login" className="whitespace-nowrap text-sm font-semibold text-white/85 transition hover:text-white">
                 Log in
               </Link>
               <Link to="/register" className={ctaClass}>

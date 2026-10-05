@@ -1,7 +1,8 @@
 import { createContext } from 'react';
 
-export type ThemePreference = 'system' | 'light' | 'dark';
-export type ResolvedTheme = 'light' | 'dark';
+/** Light is the default; the OS colour scheme is deliberately ignored. */
+export type ThemePreference = 'light' | 'dark';
+export type ResolvedTheme = ThemePreference;
 
 export interface ThemeContextValue {
   preference: ThemePreference;
