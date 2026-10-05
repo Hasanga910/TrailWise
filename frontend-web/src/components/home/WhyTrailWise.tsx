@@ -26,7 +26,7 @@ const REASONS = [
 export function WhyTrailWise() {
   return (
     <section aria-labelledby="why-heading" className="bg-surface-sunken py-16">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <h2 id="why-heading" className="max-w-xl font-heading text-h1 text-fg">
           Why travelers choose TrailWise
         </h2>

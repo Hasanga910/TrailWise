@@ -10,13 +10,13 @@ import { StarRating } from './StarRating';
 
 /** Grid card for the public explorer and the home carousel. The whole card is one link. */
 export function PackageCard({ pkg, linkSearch = '' }: { pkg: TourPackage; linkSearch?: string }) {
-  const { shown, more } = locationSummary(pkg);
+  const { shown, more, full } = locationSummary(pkg);
   return (
     <Card interactive padded={false} className="group relative flex h-full flex-col overflow-hidden">
       <div className="relative aspect-[4/3] overflow-hidden">
         <PackagePhoto pkg={pkg} className="h-full w-full transition duration-300 group-hover:scale-105" />
-        <Badge tone="brand" className="absolute left-3 top-3 shadow-soft">
-          {pkg.theme}
+        <Badge tone="brand" className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] shadow-soft" title={pkg.theme}>
+          <span className="min-w-0 truncate">{pkg.theme}</span>
         </Badge>
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
@@ -33,7 +33,7 @@ export function PackageCard({ pkg, linkSearch = '' }: { pkg: TourPackage; linkSe
         </div>
 
         {shown.length > 0 && (
-          <p className="flex items-start gap-1.5 text-caption text-fg-muted">
+          <p className="flex items-start gap-1.5 text-caption text-fg-muted" title={full}>
             <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             <span>
               {shown.join(' · ')}

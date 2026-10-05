@@ -7,6 +7,7 @@ import beach800 from '../../assets/hero/tropical-beach-palm-800.webp';
 // The first slide lives in /public so index.html can preload it by a stable URL.
 const MOUNTAIN_800 = '/hero/mountain-ridge-hikers-800.webp';
 const MOUNTAIN_1600 = '/hero/mountain-ridge-hikers-1600.webp';
+const MOUNTAIN_1920 = '/hero/mountain-ridge-hikers-1920.webp';
 
 // Photos are Sri Lankan only. TODO: add one more Sri Lankan photo (see the Session 2 follow-ups).
 // Each is exported at two widths so phones don't download the desktop image.
@@ -22,10 +23,10 @@ interface Slide {
 
 const slides: Slide[] = [
   {
-    src: MOUNTAIN_1600,
-    srcSet: `${MOUNTAIN_800} 800w, ${MOUNTAIN_1600} 1600w`,
-    width: 1600,
-    height: 899,
+    src: MOUNTAIN_1920,
+    srcSet: `${MOUNTAIN_800} 800w, ${MOUNTAIN_1600} 1600w, ${MOUNTAIN_1920} 1920w`,
+    width: 1920,
+    height: 1079,
     alt: 'Two hikers silhouetted on a mountain ridge at golden hour',
     caption: 'Mountain trekking',
     objectPosition: 'center 65%',
@@ -108,7 +109,7 @@ export function HeroSlideshow() {
         </div>
       ))}
 
-      <div className="absolute inset-x-0 bottom-20 z-10 px-6 text-center sm:bottom-24">
+      <div className="absolute bottom-14 left-4 z-10 sm:bottom-6 sm:left-6">
         <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur">
           {slides[activeIndex].caption}
         </span>

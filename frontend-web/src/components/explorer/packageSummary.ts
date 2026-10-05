@@ -17,9 +17,15 @@ export function tierClasses(pkg: TourPackage): ClassType[] {
   return CLASS_ORDER.filter((c) => present.has(c));
 }
 
-export function locationSummary(pkg: TourPackage, max = 3): { shown: string[]; more: number } {
+/** Just the place name: the text before the first comma ("Kandy, Central Province" becomes "Kandy"). */
+export function shortLocationName(name: string): string {
+  const short = name.split(',')[0].trim();
+  return short || name.trim();
+}
+
+export function locationSummary(pkg: TourPackage, max = 3): { shown: string[]; more: number; full: string } {
   const names = pkg.locations.map((l) => l.name);
-  return { shown: names.slice(0, max), more: Math.max(0, names.length - max) };
+  return { shown: names.slice(0, max).map(shortLocationName), more: Math.max(0, names.length - max), full: names.join(' · ') };
 }
 
 export interface MapPoint {

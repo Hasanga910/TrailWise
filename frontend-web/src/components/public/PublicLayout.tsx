@@ -19,7 +19,7 @@ export function PublicLayout() {
         <Suspense
           fallback={
             // Tall enough to keep the footer below the fold, so it doesn't jump when the page chunk arrives.
-            <div className="mx-auto min-h-svh max-w-6xl px-4 py-10">
+            <div className="mx-auto min-h-svh max-w-7xl px-4 py-10">
               <PageSkeleton />
             </div>
           }

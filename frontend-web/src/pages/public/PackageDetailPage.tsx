@@ -111,7 +111,7 @@ export function PackageDetailPage() {
       <header className="relative isolate overflow-hidden bg-brand-950">
         <PackagePhoto pkg={pkg} priority className="absolute inset-0 -z-10 h-full w-full opacity-60" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-950 via-brand-950/50 to-brand-950/20" />
-        <div className="mx-auto flex min-h-[22rem] max-w-6xl flex-col justify-end px-4 pb-10 pt-8 text-white sm:px-6 sm:min-h-[26rem]">
+        <div className="mx-auto flex min-h-[22rem] max-w-7xl flex-col justify-end px-4 pb-10 pt-8 text-white sm:px-6 sm:min-h-[26rem]">
           <Link to="/explore" className="mb-auto inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-white/85 hover:text-white">
             <ArrowLeft className="h-4 w-4" aria-hidden /> All tours
           </Link>
@@ -131,7 +131,7 @@ export function PackageDetailPage() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_22rem]">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_22rem]">
         <div className="min-w-0 space-y-12">
           <section aria-labelledby="classes-heading">
             <h2 id="classes-heading" className="mb-4 font-heading text-h2 text-fg">
@@ -177,7 +177,7 @@ function DetailSkeleton() {
   return (
     <div role="status" aria-label="Loading tour" className="space-y-8">
       <Skeleton className="h-96 w-full rounded-none" />
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_22rem]">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-6">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-40" />

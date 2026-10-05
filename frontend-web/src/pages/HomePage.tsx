@@ -18,7 +18,7 @@ export function HomePage() {
 
   return (
     <>
-      <section className="relative flex min-h-[620px] items-center justify-center overflow-hidden py-20">
+      <section className="relative flex min-h-[620px] items-center justify-center overflow-hidden pb-28 pt-20 sm:pb-20">
         <HeroSlideshow />
 
         <div className="relative z-10 mx-auto w-full max-w-4xl px-4 text-center text-white sm:px-6">

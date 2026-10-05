@@ -23,19 +23,23 @@ export function FeaturedCarousel() {
 
   if (state.status === 'hidden') return null;
 
+  const hasReviews = state.status === 'ready' && state.packages.some((p) => (p.reviewCount ?? 0) > 0);
+
   function scrollBy(direction: 1 | -1) {
     const el = scroller.current;
     if (el) el.scrollBy({ left: direction * Math.max(280, el.clientWidth * 0.8), behavior: 'smooth' });
   }
 
   return (
-    <section aria-labelledby="featured-heading" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <section aria-labelledby="featured-heading" className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
           <h2 id="featured-heading" className="font-heading text-h1 text-fg">
-            Top-rated tours
+            {hasReviews ? 'Top-rated tours' : 'Featured tours'}
           </h2>
-          <p className="mt-1 text-body text-fg-muted">Loved by travelers, ready to book.</p>
+          <p className="mt-1 text-body text-fg-muted">
+            {hasReviews ? 'Loved by travelers, ready to book.' : 'Handpicked tours, ready to book.'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link to="/explore" className="mr-2 hidden text-body font-semibold text-brand-text hover:underline sm:inline">
@@ -53,7 +57,7 @@ export function FeaturedCarousel() {
           ))}
         </div>
       ) : (
-        <ul ref={scroller} className="-mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6" aria-label="Featured tours">
+        <ul ref={scroller} className="-mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 [&>li:first-child]:ml-auto [&>li:last-child]:mr-auto" aria-label="Featured tours">
           {state.packages.map((pkg) => (
             <li key={pkg.id} className="w-72 shrink-0 snap-start sm:w-80">
               <PackageCard pkg={pkg} />

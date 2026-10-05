@@ -22,7 +22,7 @@ export function Testimonials() {
   if (reviews === null) {
     return (
       <section aria-label="Traveler reviews" className="bg-surface-sunken py-16">
-        <div role="status" aria-label="Loading reviews" className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div role="status" aria-label="Loading reviews" className="mx-auto max-w-7xl px-4 sm:px-6">
           <Skeleton className="h-9 w-64" />
           <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((i) => (
@@ -38,7 +38,7 @@ export function Testimonials() {
 
   return (
     <section aria-labelledby="testimonials-heading" className="bg-surface-sunken py-16">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <h2 id="testimonials-heading" className="font-heading text-h1 text-fg">
           What travelers say
         </h2>

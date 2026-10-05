@@ -10,7 +10,7 @@ import { StarRating } from './StarRating';
 
 /** Wide row variant for the explorer's list view. */
 export function PackageListItem({ pkg, linkSearch = '' }: { pkg: TourPackage; linkSearch?: string }) {
-  const { shown, more } = locationSummary(pkg, 5);
+  const { shown, more, full } = locationSummary(pkg, 5);
   return (
     <Card interactive padded={false} className="group relative flex flex-col overflow-hidden sm:flex-row">
       <div className="aspect-[16/9] shrink-0 overflow-hidden sm:aspect-auto sm:w-64 lg:w-72">
@@ -38,7 +38,7 @@ export function PackageListItem({ pkg, linkSearch = '' }: { pkg: TourPackage; li
         </div>
 
         {shown.length > 0 && (
-          <p className="flex items-start gap-1.5 text-body text-fg-muted">
+          <p className="flex items-start gap-1.5 text-body text-fg-muted" title={full}>
             <MapPin className="mt-1 h-4 w-4 shrink-0" aria-hidden />
             <span>
               {shown.join(' · ')}

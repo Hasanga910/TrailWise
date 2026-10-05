@@ -19,7 +19,7 @@ const STEPS = [
 
 export function HowItPlans() {
   return (
-    <section aria-labelledby="how-heading" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+    <section aria-labelledby="how-heading" className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
       <h2 id="how-heading" className="font-heading text-h1 text-fg">
         How TrailWise plans your trip
       </h2>

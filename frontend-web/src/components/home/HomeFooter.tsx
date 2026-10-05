@@ -8,7 +8,7 @@ const linkClass = 'flex items-center gap-2 text-sm text-white/75 transition hove
 export function HomeFooter() {
   return (
     <footer className="bg-brand-950 text-white">
-      <div className="mx-auto max-w-6xl px-6 py-16">
+      <div className="mx-auto max-w-7xl px-6 py-16">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <Logo onDark className="h-8 w-auto" />
@@ -73,7 +73,7 @@ export function HomeFooter() {
       </div>
 
       <div className="border-t border-white/10">
-        <p className="mx-auto max-w-6xl px-6 py-6 text-center text-sm text-white/60 sm:text-left">
+        <p className="mx-auto max-w-7xl px-6 py-6 text-center text-sm text-white/60 sm:text-left">
           &copy; {new Date().getFullYear()} TrailWise. All rights reserved.
         </p>
       </div>

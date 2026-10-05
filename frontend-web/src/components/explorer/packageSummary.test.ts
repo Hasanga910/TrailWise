@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TourPackage } from '../../api/packages';
-import { bookingTarget, locationSummary, plottable, ratingDistribution, startingPrice, tierClasses } from './packageSummary';
+import { bookingTarget, locationSummary, plottable, ratingDistribution, shortLocationName, startingPrice, tierClasses } from './packageSummary';
 
 const base: TourPackage = {
   id: 'p',
@@ -36,7 +36,19 @@ describe('packageSummary', () => {
 
   it('summarises locations', () => {
     const locations = ['A', 'B', 'C', 'D', 'E'].map((name, i) => ({ id: String(i), name }));
-    expect(locationSummary({ ...base, locations }, 3)).toEqual({ shown: ['A', 'B', 'C'], more: 2 });
+    expect(locationSummary({ ...base, locations }, 3)).toEqual({ shown: ['A', 'B', 'C'], more: 2, full: 'A · B · C · D · E' });
+  });
+
+  it('shows only the place name before the first comma, keeping the full text for the tooltip', () => {
+    expect(shortLocationName('Kandy, Central Province, Sri Lanka')).toBe('Kandy');
+    expect(shortLocationName('  Ella  ')).toBe('Ella');
+    expect(shortLocationName(', Galle')).toBe(', Galle');
+    const locations = [{ id: '1', name: 'Sigiriya, Central Province' }, { id: '2', name: 'Galle' }];
+    expect(locationSummary({ ...base, locations })).toEqual({
+      shown: ['Sigiriya', 'Galle'],
+      more: 0,
+      full: 'Sigiriya, Central Province · Galle',
+    });
   });
 
   it('numbers stops by their position in the full route and drops unplaced ones', () => {
