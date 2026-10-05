@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPackages, type TourPackage } from '../api/packages';
 import { getFeaturedReviews, type FeaturedReview } from '../api/reviews';
 import { AuthContext, type AuthContextValue } from '../auth/AuthContext';
@@ -83,6 +83,25 @@ describe('HomePage', () => {
     expect(screen.getByRole('heading', { name: 'How TrailWise plans your trip' })).toBeInTheDocument();
     expect(await screen.findByText(/unforgettable week/i)).toBeInTheDocument();
     expect(mockedGetPackages).toHaveBeenCalledWith({ sort: 'rating', dir: 'desc' }, expect.any(AbortSignal));
+  });
+
+  describe('carousel arrows', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('hides the scroll arrows when the cards fit the row', async () => {
+      renderHome();
+      await screen.findByRole('heading', { name: 'Top-rated tours' });
+      expect(screen.queryByRole('button', { name: 'Scroll tours left' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Scroll tours right' })).not.toBeInTheDocument();
+    });
+
+    it('shows the scroll arrows when the cards overflow the row', async () => {
+      vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(1600);
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
+      renderHome();
+      expect(await screen.findByRole('button', { name: 'Scroll tours left' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Scroll tours right' })).toBeInTheDocument();
+    });
   });
 
   it('explains the smart booking check in traveler terms', () => {

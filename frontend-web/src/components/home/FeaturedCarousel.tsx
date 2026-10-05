@@ -12,6 +12,7 @@ type State = { status: 'loading' } | { status: 'ready'; packages: TourPackage[] 
 export function FeaturedCarousel() {
   const [state, setState] = useState<State>({ status: 'loading' });
   const scroller = useRef<HTMLUListElement>(null);
+  const [canScroll, setCanScroll] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -20,6 +21,19 @@ export function FeaturedCarousel() {
       .catch(() => setState({ status: 'hidden' }));
     return () => controller.abort();
   }, []);
+
+  // Arrows only make sense when the cards overflow the row.
+  const ready = state.status === 'ready';
+  useEffect(() => {
+    const el = scroller.current;
+    if (!ready || !el) return;
+    const measure = () => setCanScroll(el.scrollWidth > el.clientWidth + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ready]);
 
   if (state.status === 'hidden') return null;
 
@@ -45,8 +59,12 @@ export function FeaturedCarousel() {
           <Link to="/explore" className="mr-2 hidden text-body font-semibold text-brand-text hover:underline sm:inline">
             View all tours
           </Link>
-          <IconButton label="Scroll tours left" variant="secondary" icon={<ChevronLeft className="h-5 w-5" />} onClick={() => scrollBy(-1)} className="hidden md:inline-flex" />
-          <IconButton label="Scroll tours right" variant="secondary" icon={<ChevronRight className="h-5 w-5" />} onClick={() => scrollBy(1)} className="hidden md:inline-flex" />
+          {canScroll && (
+            <>
+              <IconButton label="Scroll tours left" variant="secondary" icon={<ChevronLeft className="h-5 w-5" />} onClick={() => scrollBy(-1)} className="hidden md:inline-flex" />
+              <IconButton label="Scroll tours right" variant="secondary" icon={<ChevronRight className="h-5 w-5" />} onClick={() => scrollBy(1)} className="hidden md:inline-flex" />
+            </>
+          )}
         </div>
       </div>
 
