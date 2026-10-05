@@ -6,6 +6,8 @@ import '../auth/auth_provider.dart';
 import '../models/booking.dart';
 import '../models/review.dart';
 import 'booking_status.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({
@@ -103,8 +105,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
   }
 
   Widget _buildBody() {
+    final colors = AppColors.of(context);
     final booking = widget.booking;
-    final bookingColor = BookingStatus.color(booking.status);
     final isCompleted = booking.status == BookingStatus.completed;
 
     return Center(
@@ -134,22 +136,18 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Chip(
-                            label: Text(booking.status, style: TextStyle(color: bookingColor, fontSize: 12)),
-                            backgroundColor: bookingColor.withValues(alpha: 0.15),
-                            visualDensity: VisualDensity.compact,
-                          ),
+                          StatusBadge(status: booking.status),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${booking.packageTier.classType} Class · ${booking.startDate} to ${booking.endDate}',
-                        style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+                        style: TextStyle(color: colors.fgMuted, fontSize: 14),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${booking.groupSize} ${booking.groupSize == 1 ? 'traveler' : 'travelers'}',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        style: TextStyle(color: colors.fgMuted, fontSize: 13),
                       ),
                     ],
                   ),
@@ -159,12 +157,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
               // B. Non-Completed Guard
               if (!isCompleted)
                 Card(
-                  color: Colors.amber.shade50,
+                  color: colors.warningSoft,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.amber.shade800),
+                        Icon(Icons.info_outline, color: colors.warningFg),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
@@ -178,12 +176,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 )
               else if (booking.hasPendingPayment)
                 Card(
-                  color: Colors.amber.shade50,
+                  color: colors.warningSoft,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.hourglass_top, color: Colors.amber.shade800),
+                        Icon(Icons.hourglass_top, color: colors.warningFg),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
@@ -197,12 +195,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 )
               else if (!booking.isFullyPaid)
                 Card(
-                  color: Colors.amber.shade50,
+                  color: colors.warningSoft,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.amber.shade800),
+                        Icon(Icons.info_outline, color: colors.warningFg),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
@@ -217,17 +215,17 @@ class _ReviewScreenState extends State<ReviewScreen> {
               // Success State Banner
               else if (_submitted || widget.booking.hasReview)
                 Card(
-                  color: Colors.green.shade50,
-                  child: const Padding(
+                  color: colors.successSoft,
+                  child: Padding(
                     padding: EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_outline, color: Colors.green),
+                        Icon(Icons.check_circle_outline, color: colors.success),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Review submitted successfully.',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green),
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.success),
                           ),
                         ),
                       ],
@@ -255,7 +253,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                                 key: Key('star_$i'),
                                 icon: Icon(
                                   i <= _rating ? Icons.star : Icons.star_border,
-                                  color: i <= _rating ? Colors.amber.shade700 : Colors.grey,
+                                  color: i <= _rating ? colors.warning : colors.fgMuted,
                                   size: 32,
                                 ),
                                 tooltip: '$i star${i == 1 ? '' : 's'}',
@@ -279,10 +277,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         ),
                         if (_ratingError != null)
                           Padding(
-                            padding: const EdgeInsets.only(top: 4, left: 4),
+                            padding: EdgeInsets.only(top: 4, left: 4),
                             child: Text(
                               _ratingError!,
-                              style: const TextStyle(color: Colors.red, fontSize: 12),
+                              style: TextStyle(color: colors.danger, fontSize: 12),
                             ),
                           ),
                         const SizedBox(height: 16),
@@ -302,7 +300,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Text(
                               _submitError!,
-                              style: const TextStyle(color: Colors.red),
+                              style: TextStyle(color: colors.danger),
                             ),
                           ),
                         FilledButton(

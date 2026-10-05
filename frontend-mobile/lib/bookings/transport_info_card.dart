@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/vehicle_assignment.dart';
+import '../theme/app_theme.dart';
 
 /// A reusable widget displaying vehicle and driver details or a pending state
 /// notice for traveler itinerary and booking screens.
@@ -56,13 +57,14 @@ class TransportInfoCard extends StatelessWidget {
   }
 
   Widget _buildPendingCard(BuildContext context) {
+    final colors = AppColors.of(context);
     final theme = Theme.of(context);
 
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.amber.shade200, width: 1),
+        side: BorderSide(color: colors.border, width: 1),
       ),
       color: Colors.amber.shade50.withValues(alpha: 0.5),
       child: Padding(
@@ -75,12 +77,12 @@ class TransportInfoCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
+                    color: colors.warningSoft,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.airport_shuttle_outlined,
-                    color: Colors.amber.shade900,
+                    color: colors.warningFg,
                     size: 26,
                   ),
                 ),
@@ -93,14 +95,14 @@ class TransportInfoCard extends StatelessWidget {
                         'Transport Allocation Pending',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade900,
+                          color: colors.warningFg,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Our coordinator is assigning your fleet',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.amber.shade800,
+                          color: colors.warningFg,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -113,7 +115,7 @@ class TransportInfoCard extends StatelessWidget {
             Text(
               'Your dedicated vehicle and verified driver will appear here once allocated. Check back soon or refresh for live status updates.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.black87,
+                color: colors.fg,
                 height: 1.35,
               ),
             ),
@@ -124,6 +126,7 @@ class TransportInfoCard extends StatelessWidget {
   }
 
   Widget _buildAssignedCard(BuildContext context, VehicleAssignment data) {
+    final colors = AppColors.of(context);
     final theme = Theme.of(context);
     final typeName = data.vehicleType ?? _inferVehicleType(data.vehicleName);
     final hasAc = data.hasAC ?? true;
@@ -133,7 +136,7 @@ class TransportInfoCard extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.teal.shade100, width: 1),
+        side: BorderSide(color: colors.brandSoft, width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -144,47 +147,55 @@ class TransportInfoCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        _getVehicleIcon(typeName),
-                        color: Colors.teal.shade700,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Assigned Transport',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colors.brandSoft,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        Text(
-                          'Vehicle & Driver Details',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade600,
-                          ),
+                        child: Icon(
+                          _getVehicleIcon(typeName),
+                          color: colors.brandText,
+                          size: 24,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Assigned Transport',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colors.fg,
+                              ),
+                            ),
+                            Text(
+                              'Vehicle & Driver Details',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.fgMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.teal.shade50,
+                    color: colors.brandSoft,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.teal.shade300, width: 1),
+                    border: Border.all(color: colors.border, width: 1),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -193,7 +204,7 @@ class TransportInfoCard extends StatelessWidget {
                         width: 7,
                         height: 7,
                         decoration: BoxDecoration(
-                          color: Colors.teal.shade600,
+                          color: colors.brandText,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -201,7 +212,7 @@ class TransportInfoCard extends StatelessWidget {
                       Text(
                         'Allocated',
                         style: TextStyle(
-                          color: Colors.teal.shade800,
+                          color: colors.brandText,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -222,7 +233,7 @@ class TransportInfoCard extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
-                color: Colors.teal.shade800,
+                color: colors.brandText,
               ),
             ),
             const SizedBox(height: 10),
@@ -234,10 +245,10 @@ class TransportInfoCard extends StatelessWidget {
                     children: [
                       Text(
                         data.vehicleName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: colors.fg,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -246,7 +257,7 @@ class TransportInfoCard extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: colors.fgMuted,
                         ),
                       ),
                     ],
@@ -264,24 +275,24 @@ class TransportInfoCard extends StatelessWidget {
                 _buildBadge(
                   icon: _getVehicleIcon(typeName),
                   label: typeName,
-                  bgColor: Colors.teal.shade50,
-                  textColor: Colors.teal.shade900,
-                  borderColor: Colors.teal.shade200,
+                  bgColor: colors.brandSoft,
+                  textColor: colors.brandText,
+                  borderColor: colors.border,
                 ),
                 _buildBadge(
                   icon: hasAc ? Icons.ac_unit : Icons.mode_fan_off_outlined,
                   label: hasAc ? 'Air Conditioned (AC)' : 'Non-AC',
-                  bgColor: hasAc ? Colors.blue.shade50 : Colors.grey.shade100,
-                  textColor: hasAc ? Colors.blue.shade900 : Colors.grey.shade700,
-                  borderColor: hasAc ? Colors.blue.shade200 : Colors.grey.shade300,
+                  bgColor: hasAc ? colors.infoSoft : colors.surfaceSunken,
+                  textColor: hasAc ? colors.infoFg : colors.fgMuted,
+                  borderColor: hasAc ? colors.border : colors.border,
                 ),
                 if (capacity != null && capacity > 0)
                   _buildBadge(
                     icon: Icons.airline_seat_recline_normal,
                     label: '$capacity Seats',
-                    bgColor: Colors.purple.shade50,
-                    textColor: Colors.purple.shade900,
-                    borderColor: Colors.purple.shade200,
+                    bgColor: colors.neutralSoft,
+                    textColor: colors.neutralFg,
+                    borderColor: colors.border,
                   ),
               ],
             ),
@@ -296,27 +307,27 @@ class TransportInfoCard extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,
-                color: Colors.teal.shade800,
+                color: colors.brandText,
               ),
             ),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: colors.surfaceSunken,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: Colors.teal.shade100,
+                    backgroundColor: colors.brandSoft,
                     child: Text(
                       _initials(data.driverName),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.teal.shade800,
+                        color: colors.brandText,
                       ),
                     ),
                   ),
@@ -327,10 +338,10 @@ class TransportInfoCard extends StatelessWidget {
                       children: [
                         Text(
                           data.driverName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                            color: colors.fg,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -338,10 +349,7 @@ class TransportInfoCard extends StatelessWidget {
                           data.driverContact.isNotEmpty
                               ? data.driverContact
                               : 'No direct phone provided',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
-                          ),
+                          style: TextStyle(fontSize: 13, color: colors.fgMuted),
                         ),
                       ],
                     ),
@@ -369,27 +377,27 @@ class TransportInfoCard extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
-                  color: Colors.teal.shade800,
+                  color: colors.brandText,
                 ),
               ),
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: colors.surfaceSunken,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Row(
                   children: [
                     CircleAvatar(
                       radius: 22,
-                      backgroundColor: Colors.blue.shade100,
+                      backgroundColor: colors.infoSoft,
                       child: Text(
                         _initials(data.guideName!),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade900,
+                          color: colors.infoFg,
                         ),
                       ),
                     ),
@@ -400,26 +408,28 @@ class TransportInfoCard extends StatelessWidget {
                         children: [
                           Text(
                             data.guideName!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: Colors.black87,
+                              color: colors.fg,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            (data.guideContact != null && data.guideContact!.isNotEmpty)
+                            (data.guideContact != null &&
+                                    data.guideContact!.isNotEmpty)
                                 ? data.guideContact!
                                 : 'Licensed Tour Guide',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.grey.shade700,
+                              color: colors.fgMuted,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    if (data.guideContact != null && data.guideContact!.isNotEmpty)
+                    if (data.guideContact != null &&
+                        data.guideContact!.isNotEmpty)
                       IconButton.filledTonal(
                         icon: const Icon(Icons.phone, size: 20),
                         tooltip: 'Copy guide contact',
@@ -437,11 +447,10 @@ class TransportInfoCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Service period: ${data.startDate} to ${data.endDate}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
+                Expanded(
+                  child: Text(
+                    'Service period: ${data.startDate} to ${data.endDate}',
+                    style: TextStyle(fontSize: 12, color: colors.fgMuted),
                   ),
                 ),
                 TextButton.icon(
@@ -451,10 +460,13 @@ class TransportInfoCard extends StatelessWidget {
                     'Transport details',
                   ),
                   icon: const Icon(Icons.copy, size: 14),
-                  label: const Text('Share info', style: TextStyle(fontSize: 12)),
+                  label: const Text(
+                    'Share info',
+                    style: TextStyle(fontSize: 12),
+                  ),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    foregroundColor: Colors.teal.shade700,
+                    foregroundColor: colors.brandText,
                   ),
                 ),
               ],
@@ -484,12 +496,14 @@ class TransportInfoCard extends StatelessWidget {
         children: [
           Icon(icon, size: 15, color: textColor),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: textColor,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -500,7 +514,9 @@ class TransportInfoCard extends StatelessWidget {
   IconData _getVehicleIcon(String type) {
     final lower = type.toLowerCase();
     if (lower.contains('van')) return Icons.airport_shuttle;
-    if (lower.contains('coach') || lower.contains('bus')) return Icons.directions_bus;
+    if (lower.contains('coach') || lower.contains('bus')) {
+      return Icons.directions_bus;
+    }
     if (lower.contains('suv')) return Icons.directions_car_filled;
     return Icons.directions_car;
   }

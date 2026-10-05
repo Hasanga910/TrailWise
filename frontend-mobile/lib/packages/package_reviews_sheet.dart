@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../models/review.dart';
+import '../theme/app_theme.dart';
 
 Future<void> showPackageReviewsBottomSheet({
   required BuildContext context,
@@ -93,6 +94,7 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     final maxHeight = MediaQuery.of(context).size.height * 0.85;
 
     return ConstrainedBox(
@@ -110,7 +112,7 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: colors.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -143,8 +145,9 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
   }
 
   Widget _buildContent() {
+    final colors = AppColors.of(context);
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator());
     }
 
     if (_error != null) {
@@ -154,7 +157,7 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
           children: [
             Text(
               _error!,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: colors.danger),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
@@ -176,8 +179,8 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey),
+            children: [
+              Icon(Icons.rate_review_outlined, size: 48, color: colors.fgMuted),
               SizedBox(height: 12),
               Text(
                 'No reviews yet',
@@ -190,7 +193,7 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
               Text(
                 'Be the first verified traveler to review this tour after completing a trip.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: colors.fgMuted),
               ),
             ],
           ),
@@ -202,10 +205,10 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.only(bottom: 12),
           child: Row(
             children: [
-              const Icon(Icons.star, color: Colors.amber, size: 24),
+              Icon(Icons.star, color: colors.warning, size: 24),
               const SizedBox(width: 6),
               Text(
                 data.averageRating.toStringAsFixed(1),
@@ -217,9 +220,9 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
               const SizedBox(width: 8),
               Text(
                 '(${data.totalReviews} ${data.totalReviews == 1 ? 'review' : 'reviews'})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  color: Colors.grey,
+                  color: colors.fgMuted,
                 ),
               ),
             ],
@@ -237,28 +240,28 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
   }
 
   Widget _buildReviewCard(Review review) {
+    final colors = AppColors.of(context);
     return Card(
-      elevation: 0.5,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     ...List.generate(
                       5,
                       (index) => Icon(
                         index < review.rating ? Icons.star : Icons.star_border,
                         size: 16,
-                        color: Colors.amber,
+                        color: colors.warning,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -273,12 +276,15 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
                 ),
                 Text(
                   _formatDate(review.submittedAt),
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 12, color: colors.fgMuted),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 Text(
                   review.reviewerDisplayName,
@@ -287,15 +293,14 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
                     fontSize: 13,
                   ),
                 ),
-                if (review.isVerifiedTrip) ...[
-                  const SizedBox(width: 8),
+                if (review.isVerifiedTrip)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                      color: colors.successSoft,
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(color: colors.border),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -303,7 +308,7 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
                         Icon(
                           Icons.verified,
                           size: 12,
-                          color: Colors.green.shade700,
+                          color: colors.success,
                         ),
                         const SizedBox(width: 3),
                         Text(
@@ -311,13 +316,12 @@ class _PackageReviewsBottomSheetState extends State<PackageReviewsBottomSheet> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: Colors.green.shade700,
+                            color: colors.success,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
               ],
             ),
             if (review.comment != null && review.comment!.trim().isNotEmpty) ...[

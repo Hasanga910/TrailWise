@@ -17,7 +17,7 @@ const Map<String, StatusMeta> statusMeta = {
   'PlanProposed': StatusMeta(BadgeTone.info, Icons.auto_awesome, 'Plan Proposed'),
   'PendingApproval': StatusMeta(BadgeTone.warning, Icons.hourglass_empty, 'Pending Approval'),
   'NeedsManualReview': StatusMeta(BadgeTone.orange, Icons.warning_amber_rounded, 'Needs Manual Review'),
-  'Confirmed': StatusMeta(BadgeTone.brand, Icons.check_circle_outline, 'Confirmed'),
+  'Confirmed': StatusMeta(BadgeTone.brand, Icons.task_alt, 'Confirmed'),
   'Completed': StatusMeta(BadgeTone.success, Icons.flag_outlined, 'Completed'),
   'Cancelled': StatusMeta(BadgeTone.neutral, Icons.cancel_outlined, 'Cancelled'),
 };

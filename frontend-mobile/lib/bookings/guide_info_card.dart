@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/booking.dart';
+import '../theme/app_theme.dart';
 
 /// A card displaying assigned Tour Guide details or a pending state notice
 /// for traveler booking and itinerary screens.
@@ -56,13 +57,14 @@ class GuideInfoCard extends StatelessWidget {
   }
 
   Widget _buildPendingCard(BuildContext context) {
+    final colors = AppColors.of(context);
     final theme = Theme.of(context);
 
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.amber.shade200, width: 1),
+        side: BorderSide(color: colors.border, width: 1),
       ),
       color: Colors.amber.shade50.withValues(alpha: 0.5),
       child: Padding(
@@ -72,12 +74,12 @@ class GuideInfoCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.amber.shade100,
+                color: colors.warningSoft,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.person_search_outlined,
-                color: Colors.amber.shade900,
+                color: colors.warningFg,
                 size: 24,
               ),
             ),
@@ -91,16 +93,16 @@ class GuideInfoCard extends StatelessWidget {
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
-                      color: Colors.amber.shade900,
+                      color: colors.warningFg,
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Text(
+                  Text(
                     'Tour Guide not assigned yet',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: colors.fg,
                     ),
                   ),
                 ],
@@ -113,6 +115,7 @@ class GuideInfoCard extends StatelessWidget {
   }
 
   Widget _buildAssignedCard(BuildContext context, AssignedGuide guide) {
+    final colors = AppColors.of(context);
     final theme = Theme.of(context);
 
     return Card(
@@ -129,12 +132,12 @@ class GuideInfoCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.teal.shade50,
+                    color: colors.brandSoft,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.tour_outlined,
-                    color: Colors.teal,
+                    color: colors.brandText,
                     size: 20,
                   ),
                 ),
@@ -151,16 +154,16 @@ class GuideInfoCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: colors.successSoft,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade200),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Text(
                     'Assigned',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Colors.green.shade800,
+                      color: colors.successFg,
                     ),
                   ),
                 ),
@@ -178,17 +181,17 @@ class GuideInfoCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Name',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                        style: TextStyle(fontSize: 11, color: colors.fgMuted),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         guide.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: colors.fg,
                         ),
                       ),
                     ],
@@ -200,46 +203,46 @@ class GuideInfoCard extends StatelessWidget {
                           onTap: () => _copyToClipboard(context, guide.contactInfo!, 'Contact number'),
                           borderRadius: BorderRadius.circular(8),
                           child: Padding(
-                            padding: const EdgeInsets.all(2),
+                            padding: EdgeInsets.all(2),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Row(
+                                Row(
                                   children: [
                                     Text(
                                       'Contact',
-                                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                                      style: TextStyle(fontSize: 11, color: colors.fgMuted),
                                     ),
                                     SizedBox(width: 4),
-                                    Icon(Icons.copy, size: 10, color: Colors.grey),
+                                    Icon(Icons.copy, size: 10, color: colors.fgMuted),
                                   ],
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   guide.contactInfo!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.teal,
+                                    color: colors.brandText,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         )
-                      : const Column(
+                      : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Contact',
-                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                              style: TextStyle(fontSize: 11, color: colors.fgMuted),
                             ),
                             SizedBox(height: 2),
                             Text(
                               'Not provided',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.grey,
+                                color: colors.fgMuted,
                               ),
                             ),
                           ],
@@ -251,9 +254,9 @@ class GuideInfoCard extends StatelessWidget {
             // Languages
             if (guide.languages.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Languages',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
+                style: TextStyle(fontSize: 11, color: colors.fgMuted),
               ),
               const SizedBox(height: 4),
               Wrap(
@@ -263,8 +266,8 @@ class GuideInfoCard extends StatelessWidget {
                     .map(
                       (lang) => Chip(
                         label: Text(lang, style: const TextStyle(fontSize: 11)),
-                        backgroundColor: Colors.blue.shade50,
-                        side: BorderSide(color: Colors.blue.shade100),
+                        backgroundColor: colors.infoSoft,
+                        side: BorderSide(color: colors.infoSoft),
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                       ),
@@ -276,9 +279,9 @@ class GuideInfoCard extends StatelessWidget {
             // Specializations
             if (guide.specializations.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Specializations',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
+                style: TextStyle(fontSize: 11, color: colors.fgMuted),
               ),
               const SizedBox(height: 4),
               Wrap(
@@ -288,8 +291,8 @@ class GuideInfoCard extends StatelessWidget {
                     .map(
                       (spec) => Chip(
                         label: Text(spec, style: const TextStyle(fontSize: 11)),
-                        backgroundColor: Colors.purple.shade50,
-                        side: BorderSide(color: Colors.purple.shade100),
+                        backgroundColor: colors.neutralSoft,
+                        side: BorderSide(color: colors.neutralSoft),
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                       ),

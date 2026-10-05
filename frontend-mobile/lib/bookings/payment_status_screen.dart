@@ -10,6 +10,8 @@ import '../config/bank_transfer_config.dart';
 import '../models/booking.dart';
 import '../models/payment_status.dart';
 import 'booking_status.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class SelectedSlipFile {
   final String name;
@@ -344,21 +346,22 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   }
 
   Color _paymentStatusColor(String status, bool hasPendingVerification) {
+    final colors = AppColors.of(context);
     if (hasPendingVerification || status == 'Pending') {
-      return Colors.orange;
+      return colors.warning;
     }
     switch (status) {
       case 'DepositPaid':
-        return Colors.teal;
+        return colors.brandText;
       case 'FullyPaid':
-        return Colors.green;
+        return colors.success;
       case 'Refunded':
-        return Colors.red;
+        return colors.danger;
       case 'Failed':
-        return Colors.redAccent;
+        return colors.danger;
       case 'Unpaid':
       default:
-        return Colors.grey;
+        return colors.fgMuted;
     }
   }
 
@@ -397,29 +400,17 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   }
 
   Widget _buildBody() {
+    final colors = AppColors.of(context);
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingView();
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: _loadPaymentStatus, child: const Text('Retry')),
-            ],
-          ),
-        ),
-      );
+      return ErrorState(message: _error!, onRetry: _loadPaymentStatus);
     }
 
     final payment = _paymentStatus!;
     final booking = widget.booking;
-    final bookingColor = BookingStatus.color(_effectiveBookingStatus);
     final statusColor = _paymentStatusColor(payment.status, payment.hasPendingVerification);
     final statusLabel = _paymentStatusLabel(payment.status, payment.hasPendingVerification);
 
@@ -476,22 +467,19 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                           ),
-                          Chip(
-                            label: Text(_effectiveBookingStatus, style: TextStyle(color: bookingColor, fontSize: 12)),
-                            backgroundColor: bookingColor.withValues(alpha: 0.15),
-                            visualDensity: VisualDensity.compact,
-                          ),
+                          const SizedBox(width: 8),
+                          StatusBadge(status: _effectiveBookingStatus),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${booking.packageTier.classType} Class · ${booking.startDate} to ${booking.endDate}',
-                        style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+                        style: TextStyle(color: colors.fgMuted, fontSize: 14),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${booking.groupSize} ${booking.groupSize == 1 ? 'traveler' : 'travelers'}',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        style: TextStyle(color: colors.fgMuted, fontSize: 13),
                       ),
                     ],
                   ),
@@ -544,10 +532,10 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(child: Text('Total Verified Paid:')),
+                          Expanded(child: Text('Total Verified Paid:')),
                           Text(
                             '\$${payment.totalPaid.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                            style: TextStyle(fontWeight: FontWeight.bold, color: colors.success),
                           ),
                         ],
                       ),
@@ -560,7 +548,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             '\$${isFullyPaid ? '0.00' : payment.remainingAmount.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: isFullyPaid ? Colors.grey : Colors.orange.shade800,
+                              color: isFullyPaid ? colors.fgMuted : colors.warningFg,
                             ),
                           ),
                         ],
@@ -575,7 +563,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               '\$${minAdvance.toStringAsFixed(2)}',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
+                                color: colors.infoFg,
                               ),
                             ),
                           ],
@@ -585,7 +573,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Payment Status:'),
+                          const Expanded(child: Text('Payment Status:')),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
@@ -603,8 +591,8 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 8,
-                          color: Colors.teal,
-                          backgroundColor: Colors.grey.shade200,
+                          color: colors.brandText,
+                          backgroundColor: colors.border,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -612,7 +600,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         alignment: Alignment.centerRight,
                         child: Text(
                           '${(progress * 100).toStringAsFixed(0)}% paid',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          style: TextStyle(fontSize: 12, color: colors.fgMuted),
                         ),
                       ),
                     ],
@@ -623,7 +611,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
               // C. Bank Account Information Section
               Card(
                 margin: const EdgeInsets.only(bottom: 16),
-                color: Colors.grey.shade50,
+                color: colors.surfaceSunken,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -631,7 +619,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.account_balance, color: Colors.teal.shade700, size: 20),
+                          Icon(Icons.account_balance, color: colors.brandText, size: 20),
                           const SizedBox(width: 8),
                           const Expanded(
                             child: Text(
@@ -652,7 +640,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       const SizedBox(height: 10),
                       Text(
                         'Please transfer the payment to the bank account above and upload the transfer receipt below for verification.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontStyle: FontStyle.italic),
+                        style: TextStyle(fontSize: 12, color: colors.fgMuted, fontStyle: FontStyle.italic),
                       ),
                     ],
                   ),
@@ -663,10 +651,10 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
               if (isExpiredOrCancelled)
                 Card(
                   key: const Key('payment_deadline_expired_card'),
-                  color: Colors.red.shade50,
+                  color: colors.dangerSoft,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.red.shade200),
+                    side: BorderSide(color: colors.border),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -675,7 +663,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 24),
+                            Icon(Icons.cancel_outlined, color: colors.danger, size: 24),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
@@ -683,7 +671,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.red.shade900,
+                                  color: colors.dangerFg,
                                 ),
                               ),
                             ),
@@ -692,7 +680,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         const SizedBox(height: 10),
                         Text(
                           'Your booking was cancelled because the advance payment was not submitted within 1 hour.',
-                          style: TextStyle(fontSize: 14, color: Colors.red.shade800),
+                          style: TextStyle(fontSize: 14, color: colors.dangerFg),
                         ),
                       ],
                     ),
@@ -701,10 +689,10 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
               else if (isBalanceDeadlineExpired)
                 Card(
                   key: const Key('completed_balance_deadline_expired_card'),
-                  color: Colors.red.shade50,
+                  color: colors.dangerSoft,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.red.shade200),
+                    side: BorderSide(color: colors.border),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -713,7 +701,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: 24),
+                            Icon(Icons.cancel_outlined, color: colors.danger, size: 24),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
@@ -721,7 +709,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.red.shade900,
+                                  color: colors.dangerFg,
                                 ),
                               ),
                             ),
@@ -730,7 +718,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         const SizedBox(height: 10),
                         Text(
                           'Please contact TrailWise Support for assistance with the remaining balance.',
-                          style: TextStyle(fontSize: 14, color: Colors.red.shade800),
+                          style: TextStyle(fontSize: 14, color: colors.dangerFg),
                         ),
                       ],
                     ),
@@ -738,12 +726,12 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 )
               else if (!isPayableLifecycle)
                 Card(
-                  color: Colors.amber.shade50,
+                  color: colors.warningSoft,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.amber.shade800),
+                        Icon(Icons.info_outline, color: colors.warningFg),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
@@ -757,7 +745,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 )
               else if (isPendingVerification)
                 Card(
-                  color: Colors.orange.shade50,
+                  color: colors.warningSoft,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -765,12 +753,12 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.hourglass_top, color: Colors.orange.shade800, size: 24),
+                            Icon(Icons.hourglass_top, color: colors.warningFg, size: 24),
                             const SizedBox(width: 12),
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'Payment verification pending',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange),
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.warning),
                               ),
                             ),
                           ],
@@ -797,17 +785,17 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                 )
               else if (isFullyPaid)
                 Card(
-                  color: Colors.green.shade50,
-                  child: const Padding(
+                  color: colors.successSoft,
+                  child: Padding(
                     padding: EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_outline, color: Colors.green, size: 28),
+                        Icon(Icons.check_circle_outline, color: colors.success, size: 28),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Booking is fully paid.',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green),
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.success),
                           ),
                         ),
                       ],
@@ -829,11 +817,11 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     return Card(
                       key: const Key('advance_payment_deadline_card'),
                       margin: const EdgeInsets.only(bottom: 16),
-                      color: isUnder15Minutes ? Colors.amber.shade50 : Colors.blue.shade50,
+                      color: isUnder15Minutes ? colors.warningSoft : colors.infoSoft,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
-                          color: isUnder15Minutes ? Colors.amber.shade400 : Colors.blue.shade200,
+                          color: isUnder15Minutes ? colors.border : colors.border,
                           width: isUnder15Minutes ? 1.5 : 1,
                         ),
                       ),
@@ -846,7 +834,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               children: [
                                 Icon(
                                   isUnder15Minutes ? Icons.warning_amber_rounded : Icons.timer_outlined,
-                                  color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade800,
+                                  color: isUnder15Minutes ? colors.warningFg : colors.infoFg,
                                   size: 22,
                                 ),
                                 const SizedBox(width: 8),
@@ -856,7 +844,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
-                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                      color: isUnder15Minutes ? colors.warningFg : colors.infoFg,
                                     ),
                                   ),
                                 ),
@@ -868,14 +856,14 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                color: isUnder15Minutes ? colors.warningFg : colors.infoFg,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: isUnder15Minutes ? Colors.amber.shade100 : Colors.blue.shade100,
+                                color: isUnder15Minutes ? colors.warningSoft : colors.infoSoft,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Column(
@@ -887,7 +875,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                       fontFamily: 'monospace',
-                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                      color: isUnder15Minutes ? colors.warningFg : colors.infoFg,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
@@ -895,7 +883,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                     'Time remaining: $countdownStr',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                      color: isUnder15Minutes ? colors.warningFg : colors.infoFg,
                                     ),
                                   ),
                                 ],
@@ -906,7 +894,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               'Submit your advance bank transfer before:\n${_formatDateTime(payment.paymentDueAt!.toLocal())}',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isUnder15Minutes ? Colors.amber.shade900 : Colors.blue.shade900,
+                                color: isUnder15Minutes ? colors.warningFg : colors.infoFg,
                               ),
                             ),
                           ],
@@ -928,11 +916,11 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     return Card(
                       key: const Key('balance_payment_deadline_card'),
                       margin: const EdgeInsets.only(bottom: 16),
-                      color: isUnder4Hours ? Colors.amber.shade50 : Colors.blue.shade50,
+                      color: isUnder4Hours ? colors.warningSoft : colors.infoSoft,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
-                          color: isUnder4Hours ? Colors.amber.shade400 : Colors.blue.shade200,
+                          color: isUnder4Hours ? colors.border : colors.border,
                           width: isUnder4Hours ? 1.5 : 1,
                         ),
                       ),
@@ -945,7 +933,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               children: [
                                 Icon(
                                   isUnder4Hours ? Icons.warning_amber_rounded : Icons.timer_outlined,
-                                  color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade800,
+                                  color: isUnder4Hours ? colors.warningFg : colors.infoFg,
                                   size: 22,
                                 ),
                                 const SizedBox(width: 8),
@@ -955,7 +943,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
-                                      color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                                      color: isUnder4Hours ? colors.warningFg : colors.infoFg,
                                     ),
                                   ),
                                 ),
@@ -967,14 +955,14 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                                color: isUnder4Hours ? colors.warningFg : colors.infoFg,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: isUnder4Hours ? Colors.amber.shade100 : Colors.blue.shade100,
+                                color: isUnder4Hours ? colors.warningSoft : colors.infoSoft,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Column(
@@ -986,7 +974,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                       fontFamily: 'monospace',
-                                      color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                                      color: isUnder4Hours ? colors.warningFg : colors.infoFg,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
@@ -994,7 +982,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                     'Remaining balance due in $countdownStr',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                                      color: isUnder4Hours ? colors.warningFg : colors.infoFg,
                                     ),
                                   ),
                                 ],
@@ -1005,7 +993,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               'Submit your remaining balance before:\n${_formatDateTime(payment.balancePaymentDueAt!.toLocal())}',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isUnder4Hours ? Colors.amber.shade900 : Colors.blue.shade900,
+                                color: isUnder4Hours ? colors.warningFg : colors.infoFg,
                               ),
                             ),
                           ],
@@ -1019,7 +1007,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                     !isFullyPaid)
                   Card(
                     margin: const EdgeInsets.only(bottom: 16),
-                    color: Colors.red.shade50,
+                    color: colors.dangerSoft,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -1027,7 +1015,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.error_outline, color: Colors.red.shade700, size: 22),
+                              Icon(Icons.error_outline, color: colors.danger, size: 22),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -1035,7 +1023,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.red.shade900,
+                                    color: colors.dangerFg,
                                   ),
                                 ),
                               ),
@@ -1047,7 +1035,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Colors.red.shade800,
+                              color: colors.dangerFg,
                             ),
                           ),
                           if (payment.latestRejectedAt != null) ...[
@@ -1056,7 +1044,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               'Rejected on: ${_formatDateTime(payment.latestRejectedAt!)}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade700,
+                                color: colors.fgMuted,
                               ),
                             ),
                           ],
@@ -1065,7 +1053,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             'Please correct the issue and submit a new bank transfer slip.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade800,
+                              color: colors.fg,
                               fontStyle: FontStyle.italic,
                             ),
                           ),
@@ -1093,21 +1081,21 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             margin: const EdgeInsets.only(bottom: 16),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.teal.shade50,
+                              color: colors.brandSoft,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.teal.shade200),
+                              border: Border.all(color: colors.border),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.check_circle, color: Colors.teal.shade700, size: 20),
-                                const SizedBox(width: 10),
+                                Icon(Icons.check_circle, color: colors.brandText, size: 20),
+                                SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         isCompleted ? 'Balance payment' : 'Advance payment verified',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal),
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colors.brandText),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
@@ -1127,22 +1115,22 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             margin: const EdgeInsets.only(bottom: 16),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
+                              color: colors.infoSoft,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue.shade200),
+                              border: Border.all(color: colors.border),
                             ),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.info, color: Colors.blue.shade700, size: 20),
+                                Icon(Icons.info, color: colors.info, size: 20),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'First Payment Rule',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue),
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colors.info),
                                       ),
                                       const SizedBox(height: 2),
                                       const Text(
@@ -1165,13 +1153,13 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: colors.surfaceSunken,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300),
+                            border: Border.all(color: colors.border),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
-                              Icon(Icons.account_balance, size: 20, color: Colors.teal),
+                              Icon(Icons.account_balance, size: 20, color: colors.brandText),
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -1212,7 +1200,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.teal.shade300),
+                              border: Border.all(color: colors.border),
                               borderRadius: BorderRadius.circular(8),
                               color: Colors.teal.shade50.withValues(alpha: 0.3),
                             ),
@@ -1221,7 +1209,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.receipt_long, color: Colors.teal),
+                                    Icon(Icons.receipt_long, color: colors.brandText),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
@@ -1235,7 +1223,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                           const SizedBox(height: 2),
                                           Text(
                                             '${_selectedSlip!.fileTypeDisplay} · ${_selectedSlip!.formattedSize}',
-                                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                            style: TextStyle(fontSize: 12, color: colors.fgMuted),
                                           ),
                                         ],
                                       ),
@@ -1258,7 +1246,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                                       icon: const Icon(Icons.delete_outline, size: 16),
                                       label: const Text('Remove'),
                                       style: TextButton.styleFrom(
-                                        foregroundColor: Colors.red.shade700,
+                                        foregroundColor: colors.danger,
                                       ),
                                     ),
                                   ],
@@ -1268,17 +1256,17 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                           ),
                         if (_slipError != null)
                           Padding(
-                            padding: const EdgeInsets.only(top: 6),
+                            padding: EdgeInsets.only(top: 6),
                             child: Text(
                               _slipError!,
-                              style: const TextStyle(color: Colors.red, fontSize: 12),
+                              style: TextStyle(color: colors.danger, fontSize: 12),
                             ),
                           ),
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             'Allowed formats: JPG, JPEG, PNG, WEBP, PDF (max 5MB)',
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
+                            style: TextStyle(color: colors.fgMuted, fontSize: 11),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -1288,7 +1276,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Text(
                               _submitError!,
-                              style: const TextStyle(color: Colors.red),
+                              style: TextStyle(color: colors.danger),
                             ),
                           ),
                         FilledButton(
@@ -1314,6 +1302,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   }
 
   Widget _buildCostBreakdownCard(PricingBreakdown? breakdown, double totalCost) {
+    final colors = AppColors.of(context);
     if (breakdown == null) {
       return const SizedBox.shrink();
     }
@@ -1351,20 +1340,20 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
             _buildBreakdownRow(
               discountLabel,
               discountFormatted,
-              valueColor: hasDiscount ? Colors.green.shade700 : null,
+              valueColor: hasDiscount ? colors.success : null,
               isBold: hasDiscount,
             ),
             if (hasDiscount && breakdown.discountDescription != null && breakdown.discountDescription!.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(
                 breakdown.discountDescription!,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                style: TextStyle(fontSize: 12, color: colors.fgMuted, fontStyle: FontStyle.italic),
               ),
             ] else if (!hasDiscount) ...[
               const SizedBox(height: 2),
               Text(
                 'No discount applied',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                style: TextStyle(fontSize: 12, color: colors.fgMuted, fontStyle: FontStyle.italic),
               ),
             ],
             const Divider(height: 24),
@@ -1373,7 +1362,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
               '\$${breakdown.finalTotal.toStringAsFixed(2)}',
               isBold: true,
               fontSize: 16,
-              valueColor: Colors.teal.shade800,
+              valueColor: colors.brandText,
             ),
           ],
         ),
@@ -1413,11 +1402,12 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
   }
 
   Widget _buildBankDetailRow(String label, String value) {
+    final colors = AppColors.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        Text(label, style: TextStyle(color: colors.fgMuted, fontSize: 13)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
