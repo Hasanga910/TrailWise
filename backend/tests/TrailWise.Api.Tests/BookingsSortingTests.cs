@@ -166,26 +166,23 @@ public class BookingsSortingTests : IClassFixture<TrailWiseWebApplicationFactory
     [Fact]
     public async Task GetMine_WithSortByStatus_SortsCorrectly()
     {
-        var client = await AuthenticatedTravelerAsync();
+        var (client, travelerId) = await AuthenticatedTravelerWithIdAsync();
         var tier = await GetFirstTierAsync(client);
 
-        var b1 = await CreateBookingAsync(client, tier.Id, startDaysFromNow: 10);
-        var b2 = await CreateBookingAsync(client, tier.Id, startDaysFromNow: 20);
+        // Seed rows directly so the background coordinator workflow cannot change their status.
+        // Status is stored as a string: Postgres sorts it alphabetically while EF InMemory sorts
+        // by enum value. Cancelled < NeedsManualReview holds under both, so the assertions are
+        // provider independent.
+        var cancelledId = await SeedBookingAsync(travelerId, tier.Id, BookingStatus.Cancelled, startDaysFromNow: 10);
+        var manualReviewId = await SeedBookingAsync(travelerId, tier.Id, BookingStatus.NeedsManualReview, startDaysFromNow: 20);
 
-        // Cancel b1 so its status is Cancelled (index 5) while b2 is active (Requested 0 or Confirmed 3)
-        var cancelRes = await client.PatchAsJsonAsync($"/api/bookings/{b1.Id}/cancel", new { Reason = "Change of plans" });
-        cancelRes.EnsureSuccessStatusCode();
-
-        // Alphabetical status ordering: "Cancelled" (b1) < "Confirmed"/"Requested" (b2)
         var ascRes = await client.GetFromJsonAsync<PagedResult<BookingDto>>(
             "/api/bookings/mine?sortBy=status&sortDirection=asc", JsonOptions);
-        Assert.Equal(b1.Id, ascRes!.Items[0].Id); // Cancelled
-        Assert.Equal(b2.Id, ascRes.Items[1].Id);
+        Assert.Equal(new[] { cancelledId, manualReviewId }, ascRes!.Items.Select(x => x.Id));
 
         var descRes = await client.GetFromJsonAsync<PagedResult<BookingDto>>(
             "/api/bookings/mine?sortBy=status&sortDirection=desc", JsonOptions);
-        Assert.Equal(b2.Id, descRes!.Items[0].Id);
-        Assert.Equal(b1.Id, descRes.Items[1].Id); // Cancelled
+        Assert.Equal(new[] { manualReviewId, cancelledId }, descRes!.Items.Select(x => x.Id));
     }
 
     [Fact]
@@ -229,6 +226,12 @@ public class BookingsSortingTests : IClassFixture<TrailWiseWebApplicationFactory
 
     private async Task<HttpClient> AuthenticatedTravelerAsync()
     {
+        var (client, _) = await AuthenticatedTravelerWithIdAsync();
+        return client;
+    }
+
+    private async Task<(HttpClient Client, Guid TravelerId)> AuthenticatedTravelerWithIdAsync()
+    {
         var client = _factory.CreateClient();
         var email = $"traveler-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
@@ -238,7 +241,33 @@ public class BookingsSortingTests : IClassFixture<TrailWiseWebApplicationFactory
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
-        return client;
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var travelerId = await db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync();
+        return (client, travelerId);
+    }
+
+    private async Task<Guid> SeedBookingAsync(Guid travelerId, Guid packageTierId, BookingStatus status, int startDaysFromNow)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var tier = await db.PackageTiers.SingleAsync(t => t.Id == packageTierId);
+        var start = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(startDaysFromNow));
+        var booking = new Booking
+        {
+            TravelerId = travelerId,
+            TourPackageId = tier.TourPackageId,
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = start,
+            EndDate = start.AddDays(3),
+            BudgetPerPerson = 500m,
+            Status = status
+        };
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+        return booking.Id;
     }
 
     private static async Task<PackageTierDto> GetFirstTierAsync(HttpClient client)
