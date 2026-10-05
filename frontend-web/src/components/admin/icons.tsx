@@ -27,6 +27,7 @@ import {
   X,
   type LucideIcon,
   ClipboardCheck,
+  Workflow,
 } from 'lucide-react';
 
 /**
@@ -72,3 +73,4 @@ export const PaymentIcon = wrap(CreditCard);
 export const SupportIcon = wrap(LifeBuoy);
 export const PhoneIcon = wrap(Phone);
 export const ApprovalsIcon = wrap(ClipboardCheck);
+export const WorkflowsIcon = wrap(Workflow);

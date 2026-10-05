@@ -2,11 +2,17 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import * as wf from './api/agentWorkflows';
 import * as api from './api/approvals';
 import { AuthContext, type AuthContextValue } from './auth/AuthContext';
 import type { UserRole } from './auth/types';
 import { useApprovalsStore } from './stores/approvalsStore';
 import { ThemeProvider } from './theme/ThemeProvider';
+
+vi.mock('./api/agentWorkflows', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./api/agentWorkflows')>()),
+  listWorkflowRuns: vi.fn(),
+}));
 
 vi.mock('./api/approvals', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api/approvals')>()),
@@ -35,7 +41,7 @@ function renderAt(path: string, role: UserRole) {
   );
 }
 
-describe('approval queue route', () => {
+describe('Ops routes', () => {
   beforeEach(() => {
     useApprovalsStore.getState().reset();
     vi.mocked(api.getPendingApprovals).mockReset();
@@ -75,5 +81,26 @@ describe('approval queue route', () => {
 
     await screen.findByRole('heading', { name: 'Approval queue' });
     expect(vi.mocked(api.getPendingApprovals).mock.calls.length).toBeLessThanOrEqual(2);
+  });
+
+  describe('agent workflow monitor', () => {
+    beforeEach(() => {
+      vi.mocked(wf.listWorkflowRuns).mockReset();
+      vi.mocked(wf.listWorkflowRuns).mockResolvedValue({ items: [], totalCount: 0, page: 1, pageSize: 20 });
+    });
+
+    it.each(['Traveler', 'TourGuide', 'FleetCoordinator', 'Driver'] as const)('sends %s to the no-access page', async (role) => {
+      renderAt('/ops/workflows', role);
+
+      expect(await screen.findByText(/don't have access to this page/i)).toBeInTheDocument();
+      expect(wf.listWorkflowRuns).not.toHaveBeenCalled();
+    });
+
+    it.each(['OperationsManager', 'Admin'] as const)('lets %s open it, with a nav link', async (role) => {
+      renderAt('/ops/workflows', role);
+
+      expect(await screen.findByRole('heading', { name: 'Agent workflows' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Agent Workflows' })).toHaveAttribute('href', '/ops/workflows');
+    });
   });
 });

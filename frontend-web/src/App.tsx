@@ -30,6 +30,7 @@ const PackagesOverviewPage = lazyNamed(() => import('./pages/admin/PackagesOverv
 const StaffRolePage = lazyNamed(() => import('./pages/admin/StaffRolePage'), 'StaffRolePage');
 const UserManagementIndexPage = lazyNamed(() => import('./pages/admin/UserManagementIndexPage'), 'UserManagementIndexPage');
 const OpsApprovalsPage = lazyNamed(() => import('./pages/ops/OpsApprovalsPage'), 'OpsApprovalsPage');
+const OpsWorkflowsPage = lazyNamed(() => import('./pages/ops/OpsWorkflowsPage'), 'OpsWorkflowsPage');
 const AgentWorkflowPage = lazyNamed(() => import('./pages/ops/AgentWorkflowPage'), 'AgentWorkflowPage');
 const OpsBookingsPage = lazyNamed(() => import('./pages/ops/OpsBookingsPage'), 'OpsBookingsPage');
 const OpsDashboardPage = lazyNamed(() => import('./pages/ops/OpsDashboardPage'), 'OpsDashboardPage');
@@ -154,6 +155,7 @@ function App() {
         <Route path="payments" element={<OpsPaymentsPage />} />
         <Route path="reports" element={<OpsReportsPage />} />
         <Route path="approvals" element={<OpsApprovalsPage />} />
+        <Route path="workflows" element={<OpsWorkflowsPage />} />
         <Route path="bookings" element={<OpsBookingsPage />} />
         <Route path="bookings/:bookingId/workflow" element={<AgentWorkflowPage />} />
         <Route path="support" element={<OpsSupportPage />} />

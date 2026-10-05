@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useApprovalsStore, selectPendingTotal } from '../../stores/approvalsStore';
-import { ApprovalsIcon, BookingsIcon, CalendarIcon, DashboardIcon, PackagesIcon, PaymentIcon, ProfileIcon, ReportsIcon, SupportIcon, TagIcon } from '../admin/icons';
+import { WorkflowsIcon, ApprovalsIcon, BookingsIcon, CalendarIcon, DashboardIcon, PackagesIcon, PaymentIcon, ProfileIcon, ReportsIcon, SupportIcon, TagIcon } from '../admin/icons';
 import { AppShell, type SidebarNavItem } from '../layout/AppShell';
 
 const BASE_NAV_ITEMS: SidebarNavItem[] = [
@@ -9,6 +9,7 @@ const BASE_NAV_ITEMS: SidebarNavItem[] = [
   { to: '/ops/discounts', label: 'Discounts', icon: TagIcon },
   { to: '/ops/payments', label: 'Payment Verification', icon: PaymentIcon },
   { to: '/ops/approvals', label: 'Approvals', icon: ApprovalsIcon, section: 'Operations' },
+  { to: '/ops/workflows', label: 'Agent Workflows', icon: WorkflowsIcon },
   { to: '/ops/bookings', label: 'Bookings', icon: BookingsIcon },
   { to: '/ops/support', label: 'Support Tickets', icon: SupportIcon },
   { to: '/ops/reports', label: 'Reports', icon: ReportsIcon, section: 'Insights' },
@@ -34,6 +35,9 @@ function resolveTitle(pathname: string): string {
   }
   if (pathname === '/ops/approvals') {
     return 'Approval Queue';
+  }
+  if (pathname === '/ops/workflows') {
+    return 'Agent Workflows';
   }
   if (pathname === '/ops/bookings') {
     return 'Bookings';
