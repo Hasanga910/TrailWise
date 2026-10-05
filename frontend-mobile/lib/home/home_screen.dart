@@ -10,12 +10,21 @@ import '../theme/theme_toggle_button.dart';
 import '../widgets/widgets.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onSelectTab});
+
+  /// Switches the bottom-nav tab (provided by MainShell). Traveler quick
+  /// actions are inert without it.
+  final ValueChanged<int>? onSelectTab;
+
+  void _push(BuildContext context, Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
+    final text = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -39,60 +48,98 @@ class HomeScreen extends StatelessWidget {
       body: user == null
           ? const LoadingView()
           : ListView(
-              padding: AppSpacing.page,
               children: [
-                AppCard(
+                BrandBanner(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    AppSpacing.xl,
+                    AppSpacing.xl,
+                    AppSpacing.xxl,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
+                        'Discover Sri Lanka, your way.',
+                        style: text.labelMedium?.copyWith(color: Brand.accent400),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
                         'Welcome, ${user.name}',
-                        style: Theme.of(context).textTheme.headlineSmall,
+                        style: text.displaySmall?.copyWith(color: Colors.white),
                       ),
                       const SizedBox(height: AppSpacing.xs),
-                      Text(user.email, style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        user.email,
+                        style: text.bodyMedium?.copyWith(color: Colors.white70),
+                      ),
                       const SizedBox(height: AppSpacing.md),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Chip(label: Text(user.role)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(AppRadius.badge),
+                        ),
+                        child: Text(
+                          user.role,
+                          style: text.labelMedium?.copyWith(color: Colors.white),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                if (user.role == 'TourGuide') ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.assignment),
-                    label: const Text('My Assigned Tours'),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AssignedToursScreen(),
-                      ),
-                    ),
+                Padding(
+                  padding: AppSpacing.page,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SectionHeader(title: 'Quick actions'),
+                      if (user.role == 'TourGuide')
+                        QuickActionCard(
+                          icon: Icons.assignment_outlined,
+                          title: 'My Assigned Tours',
+                          description: 'See the tours assigned to you.',
+                          onTap: () => _push(context, const AssignedToursScreen()),
+                        )
+                      else if (user.role == 'Driver') ...[
+                        QuickActionCard(
+                          icon: Icons.directions_car_outlined,
+                          title: 'My Driving Tasks',
+                          description: 'Upcoming and past transport assignments.',
+                          onTap: () => _push(context, const DriverTasksScreen()),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        QuickActionCard(
+                          icon: Icons.person_outline,
+                          title: 'Driver Profile & Settings',
+                          description: 'Update your details and password.',
+                          onTap: () => _push(context, const DriverProfileScreen()),
+                        ),
+                      ] else ...[
+                        QuickActionCard(
+                          icon: Icons.card_travel_outlined,
+                          title: 'Browse Packages',
+                          description: 'Explore tour packages and their pricing tiers.',
+                          onTap: onSelectTab == null ? null : () => onSelectTab!(1),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        QuickActionCard(
+                          icon: Icons.event_note_outlined,
+                          title: 'Track your bookings',
+                          description: 'Follow the status of your booking requests.',
+                          onTap: onSelectTab == null ? null : () => onSelectTab!(2),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        QuickActionCard(
+                          icon: Icons.support_agent_outlined,
+                          title: 'Get help',
+                          description: 'Create or follow a support ticket.',
+                          onTap: onSelectTab == null ? null : () => onSelectTab!(3),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-                if (user.role == 'Driver') ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.directions_car),
-                    label: const Text('My Driving Tasks'),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const DriverTasksScreen(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.person_outline),
-                    label: const Text('Driver Profile & Settings'),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const DriverProfileScreen(),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ],
             ),
     );

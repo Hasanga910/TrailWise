@@ -27,23 +27,25 @@ class _MainShellState extends State<MainShell> {
     final isTourGuide = user?.role == 'TourGuide';
     final isDriver = user?.role == 'Driver';
 
+    void selectTab(int i) => setState(() => _selectedIndex = i);
+
     final tabs = isTourGuide
-        ? const <Widget>[
-            HomeScreen(),
-            AssignedToursScreen(),
-            GuideProfileScreen(),
+        ? <Widget>[
+            HomeScreen(onSelectTab: selectTab),
+            const AssignedToursScreen(),
+            const GuideProfileScreen(),
           ]
         : isDriver
-            ? const <Widget>[
-                HomeScreen(),
-                DriverTasksScreen(),
-                DriverProfileScreen(),
+            ? <Widget>[
+                HomeScreen(onSelectTab: selectTab),
+                const DriverTasksScreen(),
+                const DriverProfileScreen(),
               ]
-            : const <Widget>[
-                HomeScreen(),
-                PackagesScreen(),
-                MyBookingsScreen(),
-                SupportTicketsScreen(),
+            : <Widget>[
+                HomeScreen(onSelectTab: selectTab),
+                const PackagesScreen(),
+                const MyBookingsScreen(),
+                const SupportTicketsScreen(),
               ];
 
     final destinations = isTourGuide

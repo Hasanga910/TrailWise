@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import 'app_card.dart';
+import 'brand_banner.dart';
 import 'logo.dart';
 
 /// Phone version of the web auth pages: a branded hero (photo with a brand
@@ -90,51 +91,19 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: Brand.c950,
-      child: Stack(
+    return BrandBanner(
+      padding: EdgeInsets.fromLTRB(AppSpacing.xl, topInset + AppSpacing.sm, AppSpacing.xl, 72),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.55,
-              child: Image.asset(
-                'assets/branding/hero-sigiriya.webp',
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Brand.c950.withValues(alpha: 0.35),
-                    Brand.c950.withValues(alpha: 0.9),
-                  ],
+          const Logo(height: 34, onDark: true),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            tagline,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  height: 1.25,
                 ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(AppSpacing.xl, topInset + AppSpacing.sm, AppSpacing.xl, 72),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Logo(height: 34, onDark: true),
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  tagline,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        height: 1.25,
-                      ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
