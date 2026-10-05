@@ -5,12 +5,15 @@ import {
   addTier,
   createPackage,
   deletePackage,
+  deleteTier,
   getPackages,
   updatePackage,
+  updateTier,
   uploadPackagePhoto,
   type TourPackage,
 } from '../../api/packages';
 import { searchLocations } from '../../api/locations';
+import { notify } from '../ui/notify';
 import { PackageManager } from './PackageManager';
 
 vi.mock('../../api/packages', () => ({
@@ -19,20 +22,26 @@ vi.mock('../../api/packages', () => ({
   updatePackage: vi.fn(),
   deletePackage: vi.fn(),
   addTier: vi.fn(),
+  updateTier: vi.fn(),
+  deleteTier: vi.fn(),
   uploadPackagePhoto: vi.fn(),
 }));
 
-vi.mock('../../api/locations', () => ({
-  searchLocations: vi.fn(),
-}));
+vi.mock('../../api/locations', () => ({ searchLocations: vi.fn() }));
+vi.mock('../ui/notify', () => ({ notify: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 
 const mockedGetPackages = vi.mocked(getPackages);
 const mockedCreatePackage = vi.mocked(createPackage);
 const mockedUpdatePackage = vi.mocked(updatePackage);
 const mockedDeletePackage = vi.mocked(deletePackage);
 const mockedAddTier = vi.mocked(addTier);
+const mockedUpdateTier = vi.mocked(updateTier);
+const mockedDeleteTier = vi.mocked(deleteTier);
 const mockedUploadPackagePhoto = vi.mocked(uploadPackagePhoto);
 const mockedSearchLocations = vi.mocked(searchLocations);
+
+const NORMAL = { id: 'tier-1', classType: 'Normal', includesFood: false, basePricePerPerson: 250, requiresAC: false } as const;
+const FIRST = { id: 'tier-2', classType: 'First', includesFood: true, basePricePerPerson: 400, requiresAC: true } as const;
 
 function samplePackage(overrides: Partial<TourPackage> = {}): TourPackage {
   return {
@@ -43,64 +52,78 @@ function samplePackage(overrides: Partial<TourPackage> = {}): TourPackage {
     basePricePerPerson: 250,
     maxGroupSize: 12,
     photoUrl: null,
-    tiers: [
-      { id: 'tier-1', classType: 'Normal', includesFood: false, basePricePerPerson: 250, requiresAC: false },
-    ],
+    tiers: [{ ...NORMAL }],
     locations: [{ id: 'loc-1', name: 'Sigiriya' }],
     ...overrides,
   };
-}
-
-function renderManager() {
-  render(<PackageManager />);
 }
 
 function apiError(title: string) {
   return { isAxiosError: true, response: { data: { title } } };
 }
 
+async function openEditor(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByText('Cultural Triangle Explorer');
+  await user.click(screen.getByRole('button', { name: /^edit$/i }));
+  return screen.getByRole('dialog');
+}
+
 describe('PackageManager', () => {
   beforeEach(() => {
-    mockedGetPackages.mockReset();
-    mockedCreatePackage.mockReset();
-    mockedUpdatePackage.mockReset();
-    mockedDeletePackage.mockReset();
-    mockedAddTier.mockReset();
-    mockedUploadPackagePhoto.mockReset();
-    mockedSearchLocations.mockReset();
+    vi.clearAllMocks();
     mockedSearchLocations.mockResolvedValue([]);
-    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock') });
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() });
   });
 
-  describe('load/list states', () => {
-    it('renders loading then the package name, tier price, and location pill', async () => {
-      mockedGetPackages.mockResolvedValue([samplePackage()]);
-      renderManager();
+  describe('catalogue', () => {
+    it('shows a loading state, then each package with its tiers and locations', async () => {
+      mockedGetPackages.mockResolvedValue([samplePackage({ tiers: [{ ...FIRST }, { ...NORMAL }] })]);
+      render(<PackageManager />);
 
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      expect(screen.getByRole('status', { name: 'Loading packages' })).toBeInTheDocument();
 
       expect(await screen.findByText('Cultural Triangle Explorer')).toBeInTheDocument();
-      expect(screen.getByText('$250.00')).toBeInTheDocument();
+      const tiers = within(screen.getByRole('list', { name: 'Cultural Triangle Explorer tiers' })).getAllByRole('listitem');
+      // cheapest class first
+      expect(tiers[0]).toHaveTextContent('Normal');
+      expect(tiers[0]).toHaveTextContent('$250.00');
+      expect(tiers[1]).toHaveTextContent('First');
+      expect(tiers[1]).toHaveTextContent('Food');
+      expect(tiers[1]).toHaveTextContent('AC');
+      expect(tiers[1]).toHaveTextContent('$400.00');
       expect(screen.getByText('Sigiriya')).toBeInTheDocument();
     });
 
-    it('renders an empty state when there are no packages', async () => {
+    it('shows an empty state with a call to action', async () => {
       mockedGetPackages.mockResolvedValue([]);
-      renderManager();
+      render(<PackageManager />);
 
       expect(await screen.findByText('No tour packages yet.')).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'New package' })).toHaveLength(2);
     });
 
-    it('renders an error banner when loading fails', async () => {
-      mockedGetPackages.mockRejectedValue(apiError('Could not load packages.'));
-      renderManager();
+    it('shows a load error with a working retry', async () => {
+      mockedGetPackages.mockRejectedValueOnce(apiError('Could not load packages.')).mockResolvedValueOnce([samplePackage()]);
+      const user = userEvent.setup();
+      render(<PackageManager />);
 
       expect(await screen.findByText('Could not load packages.')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+      expect(await screen.findByText('Cultural Triangle Explorer')).toBeInTheDocument();
     });
   });
 
   describe('create', () => {
-    async function fillRequiredCreateFields(user: ReturnType<typeof userEvent.setup>) {
+    async function openCreate(user: ReturnType<typeof userEvent.setup>) {
+      mockedGetPackages.mockResolvedValue([]);
+      render(<PackageManager />);
+      await screen.findByText('No tour packages yet.');
+      await user.click(screen.getAllByRole('button', { name: 'New package' })[0]);
+      return screen.getByRole('dialog');
+    }
+
+    async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
       await user.type(screen.getByLabelText('Name'), 'New Package');
       await user.type(screen.getByLabelText('Theme'), 'Adventure');
       await user.clear(screen.getByLabelText('Duration (days)'));
@@ -109,26 +132,19 @@ describe('PackageManager', () => {
       await user.type(screen.getByLabelText('Max group size'), '10');
       await user.clear(screen.getByLabelText('Base price per person'));
       await user.type(screen.getByLabelText('Base price per person'), '199');
-      // The default tier's price input starts at 0, which is required + min=0.01 — an
-      // invalid value that silently blocks native form submission if left unfilled.
-      await user.clear(screen.getByPlaceholderText('Price'));
-      await user.type(screen.getByPlaceholderText('Price'), '120');
+      await user.clear(screen.getByLabelText('Price per person'));
+      await user.type(screen.getByLabelText('Price per person'), '120');
     }
 
-    it('submits with a tier and a location, and resets the form on success', async () => {
-      mockedGetPackages.mockResolvedValue([]);
+    it('submits the package with a tier and a location, then closes and reloads', async () => {
       mockedCreatePackage.mockResolvedValue(samplePackage({ id: 'new-pkg' }));
-
       const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('No tour packages yet.');
-
-      await fillRequiredCreateFields(user);
+      await openCreate(user);
+      await fillRequiredFields(user);
 
       await user.type(screen.getByPlaceholderText('Search for a location...'), 'Galle');
-      const addAsTypedButton = await screen.findByRole('button', { name: /add "galle" as typed/i });
-      await user.click(addAsTypedButton);
-
+      await user.click(await screen.findByRole('button', { name: /add "galle" as typed/i }));
+      mockedGetPackages.mockResolvedValue([samplePackage({ name: 'New Package' })]);
       await user.click(screen.getByRole('button', { name: /create package/i }));
 
       expect(mockedCreatePackage).toHaveBeenCalledWith({
@@ -140,110 +156,97 @@ describe('PackageManager', () => {
         locationNames: ['Galle'],
         tiers: [{ classType: 'Normal', includesFood: false, basePricePerPerson: 120, requiresAC: false }],
       });
-
-      expect(await screen.findByLabelText('Name')).toHaveValue('');
+      expect(await screen.findByText('New Package')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(notify.success).toHaveBeenCalledWith('Package created.', 'Cultural Triangle Explorer');
     });
 
-    it('uploads a selected photo after successful creation', async () => {
-      mockedGetPackages.mockResolvedValue([]);
+    it('uploads a selected photo after the package is created', async () => {
       mockedCreatePackage.mockResolvedValue(samplePackage({ id: 'new-pkg' }));
       mockedUploadPackagePhoto.mockResolvedValue(samplePackage({ id: 'new-pkg' }));
-
       const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('No tour packages yet.');
-
-      await fillRequiredCreateFields(user);
+      await openCreate(user);
+      await fillRequiredFields(user);
       const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
       await user.upload(screen.getByLabelText('Photo'), file);
-
       await user.click(screen.getByRole('button', { name: /create package/i }));
 
-      expect(await screen.findByLabelText('Name')).toHaveValue('');
-      expect(mockedUploadPackagePhoto).toHaveBeenCalledWith('new-pkg', file);
+      await vi.waitFor(() => expect(mockedUploadPackagePhoto).toHaveBeenCalledWith('new-pkg', file));
     });
 
-    it('shows a warning (not an error) when the post-create photo upload fails', async () => {
-      mockedGetPackages.mockResolvedValue([]);
+    it('warns (not errors) when the photo upload fails after creation, and still closes', async () => {
       mockedCreatePackage.mockResolvedValue(samplePackage({ id: 'new-pkg' }));
       mockedUploadPackagePhoto.mockRejectedValue(apiError('Photo too large.'));
-
       const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('No tour packages yet.');
-
-      await fillRequiredCreateFields(user);
-      const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
-      await user.upload(screen.getByLabelText('Photo'), file);
-
+      await openCreate(user);
+      await fillRequiredFields(user);
+      await user.upload(screen.getByLabelText('Photo'), new File(['photo'], 'photo.jpg', { type: 'image/jpeg' }));
       await user.click(screen.getByRole('button', { name: /create package/i }));
 
-      expect(await screen.findByText('Photo too large.')).toBeInTheDocument();
-      // The package itself is still treated as created: the form still resets.
-      expect(screen.getByLabelText('Name')).toHaveValue('');
+      await vi.waitFor(() => expect(notify.warning).toHaveBeenCalledWith('Photo too large.'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    it('shows an error and does not reset the form when createPackage fails', async () => {
-      mockedGetPackages.mockResolvedValue([]);
+    it('keeps the form open and shows the error when creating fails', async () => {
       mockedCreatePackage.mockRejectedValue(apiError('A package with this name already exists.'));
-
       const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('No tour packages yet.');
-
-      await fillRequiredCreateFields(user);
+      await openCreate(user);
+      await fillRequiredFields(user);
       await user.click(screen.getByRole('button', { name: /create package/i }));
 
       expect(await screen.findByText('A package with this name already exists.')).toBeInTheDocument();
       expect(screen.getByLabelText('Name')).toHaveValue('New Package');
     });
 
-    it('adds and removes tier rows without calling the API', async () => {
-      mockedGetPackages.mockResolvedValue([]);
+    it('adds and removes draft tier rows without calling the API', async () => {
       const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('No tour packages yet.');
+      await openCreate(user);
 
       expect(screen.getAllByLabelText('Class type')).toHaveLength(1);
-
-      await user.click(screen.getByRole('button', { name: /\+ add tier/i }));
+      await user.click(screen.getByRole('button', { name: 'Add tier' }));
       expect(screen.getAllByLabelText('Class type')).toHaveLength(2);
-
-      const removeButtons = screen.getAllByRole('button', { name: /remove/i });
-      await user.click(removeButtons[0]);
+      await user.click(screen.getByRole('button', { name: 'Remove tier 1' }));
       expect(screen.getAllByLabelText('Class type')).toHaveLength(1);
-
       expect(mockedCreatePackage).not.toHaveBeenCalled();
+    });
+
+    it('refuses two tiers with the same class and food option, but allows the same class with different food', async () => {
+      mockedCreatePackage.mockResolvedValue(samplePackage());
+      const user = userEvent.setup();
+      await openCreate(user);
+      await fillRequiredFields(user);
+      await user.click(screen.getByRole('button', { name: 'Add tier' }));
+      const prices = screen.getAllByLabelText('Price per person');
+      await user.clear(prices[1]);
+      await user.type(prices[1], '140');
+
+      await user.click(screen.getByRole('button', { name: /create package/i }));
+      expect(await screen.findByText('Two tiers cannot share the same class and food option.')).toBeInTheDocument();
+      expect(mockedCreatePackage).not.toHaveBeenCalled();
+
+      await user.click(screen.getAllByLabelText('Food included')[1]);
+      await user.click(screen.getByRole('button', { name: /create package/i }));
+      await vi.waitFor(() => expect(mockedCreatePackage).toHaveBeenCalledTimes(1));
     });
   });
 
-  describe('edit', () => {
-    it('pre-fills the inline form, saves via updatePackage, and exits edit mode', async () => {
+  describe('edit details', () => {
+    it('pre-fills the form and saves through updatePackage', async () => {
       mockedGetPackages.mockResolvedValue([samplePackage()]);
       mockedUpdatePackage.mockResolvedValue(samplePackage({ name: 'Updated Name' }));
-
       const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('Cultural Triangle Explorer');
+      render(<PackageManager />);
+      const dialog = within(await openEditor(user));
 
-      await user.click(screen.getByRole('button', { name: /^edit$/i }));
+      const form = dialog.getByRole('form', { name: 'Package details' });
+      expect(within(form).getByLabelText('Name')).toHaveValue('Cultural Triangle Explorer');
+      await user.clear(within(form).getByLabelText('Name'));
+      await user.type(within(form).getByLabelText('Name'), 'Updated Name');
+      await user.click(within(form).getByRole('button', { name: 'Save details' }));
 
-      const saveButton = screen.getByRole('button', { name: /^save$/i });
-      const editForm = saveButton.closest('form')!;
-
-      expect(within(editForm).getByLabelText('Name')).toHaveValue('Cultural Triangle Explorer');
-
-      await user.clear(within(editForm).getByLabelText('Name'));
-      await user.type(within(editForm).getByLabelText('Name'), 'Updated Name');
-      await user.click(saveButton);
-
-      expect(mockedUpdatePackage).toHaveBeenCalledWith(
-        'pkg-1',
-        expect.objectContaining({ name: 'Updated Name' }),
-      );
-
-      expect(await screen.findByRole('button', { name: /^edit$/i })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument();
+      expect(mockedUpdatePackage).toHaveBeenCalledWith('pkg-1', expect.objectContaining({ name: 'Updated Name' }));
+      expect(await screen.findByText('Updated Name', { selector: 'h3' })).toBeInTheDocument();
+      expect(notify.success).toHaveBeenCalledWith('Package details saved.');
     });
 
     it('flags locations that are not on the map and keeps existing coordinates when saving', async () => {
@@ -256,155 +259,164 @@ describe('PackageManager', () => {
         }),
       ]);
       mockedUpdatePackage.mockResolvedValue(samplePackage());
-
       const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('Cultural Triangle Explorer');
-      await user.click(screen.getByRole('button', { name: /^edit$/i }));
+      render(<PackageManager />);
+      const dialog = within(await openEditor(user));
 
-      const form = screen.getByRole('button', { name: /^save$/i }).closest('form')!;
-      expect(within(form).getAllByText('Not on map')).toHaveLength(1);
-
-      await user.click(within(form).getByRole('button', { name: 'Remove Atlantis' }));
-      await user.click(screen.getByRole('button', { name: /^save$/i }));
+      expect(dialog.getAllByText('Not on map')).toHaveLength(1);
+      await user.click(dialog.getByRole('button', { name: 'Remove Atlantis' }));
+      await user.click(dialog.getByRole('button', { name: 'Save details' }));
 
       expect(mockedUpdatePackage).toHaveBeenCalledWith(
         'pkg-1',
         expect.objectContaining({
           locationNames: ['Sigiriya'],
-          // only names still in the form are sent, with the coordinates they already had
           locationCoordinates: [{ name: 'Sigiriya', latitude: 7.957, longitude: 80.76 }],
         }),
       );
     });
 
-    it('cancels edit mode without calling updatePackage', async () => {
-      mockedGetPackages.mockResolvedValue([samplePackage()]);
-
-      const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('Cultural Triangle Explorer');
-
-      await user.click(screen.getByRole('button', { name: /^edit$/i }));
-      await user.click(screen.getByRole('button', { name: /^cancel$/i }));
-
-      expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
-      expect(mockedUpdatePackage).not.toHaveBeenCalled();
-    });
-
-    it('shows an error and stays in edit mode when updatePackage fails', async () => {
+    it('closes without saving, and shows an error when saving fails', async () => {
       mockedGetPackages.mockResolvedValue([samplePackage()]);
       mockedUpdatePackage.mockRejectedValue(apiError('Could not update package.'));
-
       const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('Cultural Triangle Explorer');
+      render(<PackageManager />);
+      const dialog = within(await openEditor(user));
 
-      await user.click(screen.getByRole('button', { name: /^edit$/i }));
-      await user.click(screen.getByRole('button', { name: /^save$/i }));
+      await user.click(dialog.getByRole('button', { name: 'Save details' }));
+      expect(await dialog.findByText('Could not update package.')).toBeInTheDocument();
 
-      expect(await screen.findByText('Could not update package.')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^save$/i })).toBeInTheDocument();
+      await user.click(dialog.getByRole('button', { name: 'Close panel' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('uploads a photo for the package and shows an error scoped to the editor when it fails', async () => {
+      mockedGetPackages.mockResolvedValue([samplePackage()]);
+      mockedUploadPackagePhoto.mockResolvedValueOnce(samplePackage({ photoUrl: '/uploads/p.jpg' })).mockRejectedValueOnce(apiError('Photo must be 5MB or smaller.'));
+      const user = userEvent.setup();
+      render(<PackageManager />);
+      const dialog = within(await openEditor(user));
+
+      const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
+      await user.upload(dialog.getByLabelText('Upload photo'), file);
+      expect(mockedUploadPackagePhoto).toHaveBeenCalledWith('pkg-1', file);
+
+      await user.upload(await dialog.findByLabelText('Replace photo'), file);
+      expect(await dialog.findByText('Photo must be 5MB or smaller.')).toBeInTheDocument();
     });
   });
 
-  describe('delete', () => {
-    it('calls deletePackage and refreshes the list', async () => {
+  describe('tier configuration', () => {
+    async function openTiers(user: ReturnType<typeof userEvent.setup>, pkg = samplePackage({ tiers: [{ ...NORMAL }, { ...FIRST }] })) {
+      mockedGetPackages.mockResolvedValue([pkg]);
+      render(<PackageManager />);
+      const dialog = within(await openEditor(user));
+      return within(dialog.getByRole('region', { name: 'Tiers' }));
+    }
+
+    it('adds a tier with the package id and payload', async () => {
+      mockedAddTier.mockResolvedValue(samplePackage({ tiers: [{ ...NORMAL }, { id: 'tier-3', classType: 'Normal', includesFood: true, basePricePerPerson: 75, requiresAC: false }] }));
+      const user = userEvent.setup();
+      const tiers = await openTiers(user, samplePackage());
+
+      await user.click(tiers.getByRole('button', { name: 'Add tier' }));
+      const form = within(tiers.getByRole('form', { name: 'New tier' }));
+      await user.clear(form.getByLabelText('Price per person'));
+      await user.type(form.getByLabelText('Price per person'), '75');
+      await user.click(form.getByLabelText('Food included'));
+      await user.click(form.getByRole('button', { name: 'Add this tier' }));
+
+      expect(mockedAddTier).toHaveBeenCalledWith('pkg-1', { classType: 'Normal', includesFood: true, basePricePerPerson: 75, requiresAC: false });
+      expect(notify.success).toHaveBeenCalledWith('Tier added.');
+      expect(tiers.queryByRole('form', { name: 'New tier' })).not.toBeInTheDocument();
+    });
+
+    it('shows the API conflict when a duplicate tier is added', async () => {
+      mockedAddTier.mockRejectedValue(apiError('This package already has a Normal tier without food.'));
+      const user = userEvent.setup();
+      const tiers = await openTiers(user, samplePackage());
+
+      await user.click(tiers.getByRole('button', { name: 'Add tier' }));
+      const form = within(tiers.getByRole('form', { name: 'New tier' }));
+      await user.clear(form.getByLabelText('Price per person'));
+      await user.type(form.getByLabelText('Price per person'), '75');
+      await user.click(form.getByRole('button', { name: 'Add this tier' }));
+
+      expect(await tiers.findByText('This package already has a Normal tier without food.')).toBeInTheDocument();
+    });
+
+    it('edits a tier in place', async () => {
+      mockedUpdateTier.mockResolvedValue(samplePackage({ tiers: [{ ...NORMAL, basePricePerPerson: 275 }, { ...FIRST }] }));
+      const user = userEvent.setup();
+      const tiers = await openTiers(user);
+
+      await user.click(tiers.getByRole('button', { name: 'Edit Normal tier' }));
+      const form = within(tiers.getByRole('form', { name: 'Edit Normal tier' }));
+      expect(form.getByLabelText('Price per person')).toHaveValue(250);
+      await user.clear(form.getByLabelText('Price per person'));
+      await user.type(form.getByLabelText('Price per person'), '275');
+      await user.click(form.getByRole('button', { name: 'Save tier' }));
+
+      expect(mockedUpdateTier).toHaveBeenCalledWith('pkg-1', 'tier-1', { classType: 'Normal', includesFood: false, basePricePerPerson: 275, requiresAC: false });
+      expect(await tiers.findByText('$275.00')).toBeInTheDocument();
+    });
+
+    it('asks for confirmation before deleting a tier', async () => {
+      mockedDeleteTier.mockResolvedValue(samplePackage());
+      const user = userEvent.setup();
+      const tiers = await openTiers(user);
+
+      await user.click(tiers.getByRole('button', { name: 'Delete First tier' }));
+      expect(mockedDeleteTier).not.toHaveBeenCalled();
+      await user.click(tiers.getByRole('button', { name: 'Confirm delete' }));
+
+      expect(mockedDeleteTier).toHaveBeenCalledWith('pkg-1', 'tier-2');
+      expect(await tiers.findByText('$250.00')).toBeInTheDocument();
+      expect(tiers.queryByText('$400.00')).not.toBeInTheDocument();
+    });
+
+    it('shows why a tier could not be deleted', async () => {
+      mockedDeleteTier.mockRejectedValue(apiError('This tier has existing bookings and cannot be deleted.'));
+      const user = userEvent.setup();
+      const tiers = await openTiers(user);
+
+      await user.click(tiers.getByRole('button', { name: 'Delete First tier' }));
+      await user.click(tiers.getByRole('button', { name: 'Confirm delete' }));
+
+      expect(await tiers.findByText('This tier has existing bookings and cannot be deleted.')).toBeInTheDocument();
+      expect(tiers.getByText('$400.00')).toBeInTheDocument();
+    });
+  });
+
+  describe('delete package', () => {
+    it('confirms, deletes and refreshes the list', async () => {
       mockedGetPackages.mockResolvedValue([samplePackage()]);
       mockedDeletePackage.mockResolvedValue(undefined);
-
       const user = userEvent.setup();
-      renderManager();
+      render(<PackageManager />);
       await screen.findByText('Cultural Triangle Explorer');
 
-      mockedGetPackages.mockResolvedValue([]);
       await user.click(screen.getByRole('button', { name: /^delete$/i }));
+      expect(mockedDeletePackage).not.toHaveBeenCalled();
+      mockedGetPackages.mockResolvedValue([]);
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete package' }));
 
       expect(mockedDeletePackage).toHaveBeenCalledWith('pkg-1');
       expect(await screen.findByText('No tour packages yet.')).toBeInTheDocument();
     });
 
-    it('shows a list-level error banner when deletePackage fails', async () => {
+    it('shows the reason inside the dialog when the package cannot be deleted', async () => {
       mockedGetPackages.mockResolvedValue([samplePackage()]);
       mockedDeletePackage.mockRejectedValue(apiError('This package has existing bookings.'));
-
       const user = userEvent.setup();
-      renderManager();
+      render(<PackageManager />);
       await screen.findByText('Cultural Triangle Explorer');
 
       await user.click(screen.getByRole('button', { name: /^delete$/i }));
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete package' }));
 
-      expect(await screen.findByText('This package has existing bookings.')).toBeInTheDocument();
-    });
-  });
-
-  describe('add tier to existing package', () => {
-    it('calls addTier with the package id and payload', async () => {
-      mockedGetPackages.mockResolvedValue([samplePackage()]);
-      mockedAddTier.mockResolvedValue(samplePackage());
-
-      const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('Cultural Triangle Explorer');
-
-      const priceInputs = screen.getAllByPlaceholderText('Price');
-      const miniFormPrice = priceInputs[priceInputs.length - 1];
-      await user.clear(miniFormPrice);
-      await user.type(miniFormPrice, '75');
-
-      const addTierButtons = screen.getAllByRole('button', { name: /\+ add tier/i });
-      await user.click(addTierButtons[addTierButtons.length - 1]);
-
-      expect(mockedAddTier).toHaveBeenCalledWith('pkg-1', {
-        classType: 'Normal',
-        includesFood: false,
-        basePricePerPerson: 75,
-        requiresAC: false,
-      });
-    });
-
-    it('shows an error scoped to that package when addTier fails', async () => {
-      mockedGetPackages.mockResolvedValue([samplePackage()]);
-      mockedAddTier.mockRejectedValue(apiError('Could not add tier.'));
-
-      const user = userEvent.setup();
-      renderManager();
-      const article = (await screen.findByText('Cultural Triangle Explorer')).closest('article')!;
-
-      const addTierButton = within(article).getByRole('button', { name: /\+ add tier/i });
-      await user.click(addTierButton);
-
-      expect(await within(article).findByText('Could not add tier.')).toBeInTheDocument();
-    });
-  });
-
-  describe('photo upload for existing package', () => {
-    it('calls uploadPackagePhoto for that package', async () => {
-      mockedGetPackages.mockResolvedValue([samplePackage()]);
-      mockedUploadPackagePhoto.mockResolvedValue(samplePackage());
-
-      const user = userEvent.setup();
-      renderManager();
-      await screen.findByText('Cultural Triangle Explorer');
-
-      const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
-      await user.upload(screen.getByLabelText(/upload photo/i), file);
-
-      expect(mockedUploadPackagePhoto).toHaveBeenCalledWith('pkg-1', file);
-    });
-
-    it('shows an error scoped to that package when uploadPackagePhoto fails', async () => {
-      mockedGetPackages.mockResolvedValue([samplePackage()]);
-      mockedUploadPackagePhoto.mockRejectedValue(apiError('Photo must be 5MB or smaller.'));
-
-      const user = userEvent.setup();
-      renderManager();
-      const article = (await screen.findByText('Cultural Triangle Explorer')).closest('article')!;
-
-      const file = new File(['photo'], 'photo.jpg', { type: 'image/jpeg' });
-      await user.upload(within(article).getByLabelText(/upload photo/i), file);
-
-      expect(await within(article).findByText('Photo must be 5MB or smaller.')).toBeInTheDocument();
+      expect(await within(screen.getByRole('dialog')).findByText('This package has existing bookings.')).toBeInTheDocument();
+      expect(screen.getByText('Cultural Triangle Explorer')).toBeInTheDocument();
     });
   });
 });

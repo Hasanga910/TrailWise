@@ -123,6 +123,16 @@ export async function addTier(id: string, input: PackageTierInput): Promise<Tour
   return response.data;
 }
 
+export async function updateTier(id: string, tierId: string, input: PackageTierInput): Promise<TourPackage> {
+  const response = await apiClient.put<TourPackage>(`/api/packages/${id}/tiers/${tierId}`, input);
+  return response.data;
+}
+
+export async function deleteTier(id: string, tierId: string): Promise<TourPackage> {
+  const response = await apiClient.delete<TourPackage>(`/api/packages/${id}/tiers/${tierId}`);
+  return response.data;
+}
+
 export async function uploadPackagePhoto(id: string, file: File): Promise<TourPackage> {
   const formData = new FormData();
   formData.append('photo', file);
