@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/assigned_tour.dart';
 import '../models/driver_assignment.dart';
+import '../models/guide_availability.dart';
 import '../models/guide_profile.dart';
 import '../models/itinerary_step.dart';
 
@@ -170,6 +171,44 @@ class ApiClient {
       return response
           .whereType<Map<String, dynamic>>()
           .map(AssignedTour.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<GuideAvailability>> getGuideAvailability(
+    String guideId, {
+    String? from,
+    String? to,
+  }) async {
+    final response = await get(
+      '/api/guides/$guideId/availability',
+      query: {
+        'from': ?from,
+        'to': ?to,
+      },
+    );
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(GuideAvailability.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<GuideAvailability>> updateGuideAvailability(
+    String guideId,
+    List<Map<String, dynamic>> dates,
+  ) async {
+    final response = await put(
+      '/api/guides/$guideId/availability',
+      {'dates': dates},
+    );
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(GuideAvailability.fromJson)
           .toList();
     }
     return [];

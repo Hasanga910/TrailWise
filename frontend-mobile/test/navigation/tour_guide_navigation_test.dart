@@ -77,13 +77,34 @@ void main() {
       await tester.pumpAndSettle();
 
       // Navigation bar destinations for TourGuide
-      expect(find.text('Dashboard'), findsOneWidget);
-      expect(find.text('Assigned Tours'), findsOneWidget);
-      expect(find.text('Profile'), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(NavigationBar), matching: find.text('Dashboard')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(NavigationBar), matching: find.text('Assigned Tours')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(NavigationBar), matching: find.text('Availability')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(NavigationBar), matching: find.text('Profile')),
+        findsOneWidget,
+      );
 
       // Packages should NOT exist for TourGuide
       expect(find.text('Packages'), findsNothing);
       expect(find.text('My Bookings'), findsNothing);
+
+      // Tap Availability tab
+      await tester.tap(
+        find.descendant(of: find.byType(NavigationBar), matching: find.text('Availability')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Guide Availability'), findsOneWidget);
     });
 
     testWidgets('Traveler bottom nav shows Dashboard, Packages, My Bookings (unchanged)',
