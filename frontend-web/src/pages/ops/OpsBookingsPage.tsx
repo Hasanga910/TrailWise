@@ -12,15 +12,16 @@ import {
 import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
 import { ItineraryEditor } from '../../components/itinerary/ItineraryEditor';
 import { ItineraryList } from '../../components/itinerary/ItineraryList';
+import { notify } from '../../components/ui/notify';
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
-  Requested: 'bg-slate-100 text-slate-600',
-  PlanProposed: 'bg-accent-500/15 text-accent-700',
-  PendingApproval: 'bg-amber-50 text-amber-700',
-  Confirmed: 'bg-brand-50 text-brand-700',
-  Completed: 'bg-emerald-50 text-emerald-700',
-  Cancelled: 'bg-red-50 text-red-700',
-  NeedsManualReview: 'bg-red-50 text-red-700',
+  Requested: 'bg-neutral-soft text-fg-muted',
+  PlanProposed: 'bg-accent-500/15 text-warning-fg',
+  PendingApproval: 'bg-warning-soft text-warning-fg',
+  Confirmed: 'bg-brand-soft text-brand-text',
+  Completed: 'bg-success-soft text-success-fg',
+  Cancelled: 'bg-danger-soft text-danger-fg',
+  NeedsManualReview: 'bg-danger-soft text-danger-fg',
 };
 
 const CANCELLABLE_STATUSES: BookingStatus[] = [
@@ -42,7 +43,6 @@ interface PromptState {
 export function OpsBookingsPage() {
   const [bookings, setBookings] = useState<BookingSummaryDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
 
@@ -95,12 +95,11 @@ export function OpsBookingsPage() {
 
   async function handleApprove(bookingId: string) {
     setActioningId(bookingId);
-    setActionError(null);
     try {
       const updated = await decideBooking(bookingId, { decision: 'Approve' });
       patchStatus(bookingId, updated.status);
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Could not approve this booking.'));
+      notify.error(extractErrorMessage(err, 'Could not approve this booking.'));
     } finally {
       setActioningId(null);
     }
@@ -108,12 +107,11 @@ export function OpsBookingsPage() {
 
   async function handleComplete(bookingId: string) {
     setActioningId(bookingId);
-    setActionError(null);
     try {
       const updated = await completeBooking(bookingId);
       patchStatus(bookingId, updated.status);
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Could not mark this booking as completed.'));
+      notify.error(extractErrorMessage(err, 'Could not mark this booking as completed.'));
     } finally {
       setActioningId(null);
     }
@@ -126,7 +124,6 @@ export function OpsBookingsPage() {
     }
     const { kind, bookingId, text } = prompt;
     setActioningId(bookingId);
-    setActionError(null);
     try {
       const updated =
         kind === 'reject'
@@ -135,9 +132,7 @@ export function OpsBookingsPage() {
       patchStatus(bookingId, updated.status);
       setPrompt(null);
     } catch (err) {
-      setActionError(
-        extractErrorMessage(err, kind === 'reject' ? 'Could not reject this booking.' : 'Could not cancel this booking.'),
-      );
+      notify.error(extractErrorMessage(err, kind === 'reject' ? 'Could not reject this booking.' : 'Could not cancel this booking.'),);
     } finally {
       setActioningId(null);
     }
@@ -146,19 +141,13 @@ export function OpsBookingsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-slate-900">Bookings</h2>
-        <p className="mt-1 text-sm text-slate-500">All traveler booking requests.</p>
+        <h2 className="font-heading text-xl font-bold text-fg">Bookings</h2>
+        <p className="mt-1 text-sm text-fg-muted">All traveler booking requests.</p>
       </div>
 
       {error && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
           {error}
-        </p>
-      )}
-
-      {actionError && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {actionError}
         </p>
       )}
 
@@ -167,22 +156,22 @@ export function OpsBookingsPage() {
       {!error && bookings === null && (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl border border-slate-200 bg-white" />
+            <div key={i} className="h-14 animate-pulse rounded-xl border border-border bg-surface-raised" />
           ))}
         </div>
       )}
 
       {!error && bookings !== null && bookings.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-          <p className="font-medium text-slate-600">No bookings yet.</p>
+        <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-16 text-center">
+          <p className="font-medium text-fg-muted">No bookings yet.</p>
         </div>
       )}
 
       {bookings && bookings.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-border bg-surface-sunken text-left text-xs font-semibold uppercase tracking-wide text-fg-muted">
                 <th className="px-4 py-3">Traveler</th>
                 <th className="px-4 py-3">Package</th>
                 <th className="px-4 py-3">Status</th>
@@ -192,7 +181,7 @@ export function OpsBookingsPage() {
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {bookings.map((booking) => {
                 const isActioning = actioningId === booking.id;
                 const canApprove =
@@ -209,9 +198,9 @@ export function OpsBookingsPage() {
 
                 return (
                   <Fragment key={booking.id}>
-                    <tr className="transition hover:bg-slate-50">
-                      <td className="px-4 py-3 font-medium text-slate-900">{booking.travelerName}</td>
-                      <td className="px-4 py-3 text-slate-600">{booking.packageName}</td>
+                    <tr className="transition hover:bg-surface-sunken">
+                      <td className="px-4 py-3 font-medium text-fg">{booking.travelerName}</td>
+                      <td className="px-4 py-3 text-fg-muted">{booking.packageName}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[booking.status]}`}
@@ -219,9 +208,9 @@ export function OpsBookingsPage() {
                           {booking.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{booking.createdAt}</td>
-                      <td className="px-4 py-3 text-slate-600">{booking.startDate}</td>
-                      <td className="px-4 py-3 text-slate-600">{booking.groupSize}</td>
+                      <td className="px-4 py-3 text-fg-muted">{booking.createdAt}</td>
+                      <td className="px-4 py-3 text-fg-muted">{booking.startDate}</td>
+                      <td className="px-4 py-3 text-fg-muted">{booking.groupSize}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           {canApprove && (
@@ -229,7 +218,7 @@ export function OpsBookingsPage() {
                               type="button"
                               disabled={isActioning}
                               onClick={() => handleApprove(booking.id)}
-                              className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                              className="rounded-lg border border-success/30 px-3 py-1.5 text-sm font-semibold text-success-fg transition hover:bg-success-soft disabled:opacity-50"
                             >
                               Approve
                             </button>
@@ -239,7 +228,7 @@ export function OpsBookingsPage() {
                               type="button"
                               disabled={isActioning}
                               onClick={() => setPrompt({ kind: 'reject', bookingId: booking.id, text: '' })}
-                              className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                              className="rounded-lg border border-danger/30 px-3 py-1.5 text-sm font-semibold text-danger-fg transition hover:bg-danger-soft disabled:opacity-50"
                             >
                               Reject
                             </button>
@@ -249,7 +238,7 @@ export function OpsBookingsPage() {
                               type="button"
                               disabled={isActioning}
                               onClick={() => handleComplete(booking.id)}
-                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                              className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken disabled:opacity-50"
                             >
                               Mark Completed
                             </button>
@@ -259,7 +248,7 @@ export function OpsBookingsPage() {
                               type="button"
                               disabled={isActioning}
                               onClick={() => setPrompt({ kind: 'cancel', bookingId: booking.id, text: '' })}
-                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                              className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken disabled:opacity-50"
                             >
                               Cancel
                             </button>
@@ -268,7 +257,7 @@ export function OpsBookingsPage() {
                             <button
                               type="button"
                               onClick={() => toggleItinerary(booking.id)}
-                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                              className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
                             >
                               {isExpanded ? 'Hide Itinerary' : 'Itinerary'}
                             </button>
@@ -276,7 +265,7 @@ export function OpsBookingsPage() {
 
                           <Link
                             to={`/ops/bookings/${booking.id}/workflow`}
-                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
                           >
                             View agent workflow
                           </Link>
@@ -285,12 +274,12 @@ export function OpsBookingsPage() {
                     </tr>
                     {isExpanded && (
                       <tr key={`${booking.id}-itinerary`}>
-                        <td colSpan={7} className="border-t border-slate-100 bg-slate-50 px-4 py-4">
+                        <td colSpan={7} className="border-t border-border bg-surface-sunken px-4 py-4">
                           {itineraryLoadingId === booking.id && (
-                            <div className="h-12 animate-pulse rounded-lg bg-white" />
+                            <div className="h-12 animate-pulse rounded-lg bg-surface-raised" />
                           )}
                           {itineraryErrors[booking.id] && (
-                            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                            <p role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger-fg">
                               {itineraryErrors[booking.id]}
                             </p>
                           )}
@@ -300,7 +289,7 @@ export function OpsBookingsPage() {
                               <button
                                 type="button"
                                 onClick={() => setEditingItineraryId(booking.id)}
-                                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-white"
+                                className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg hover:bg-surface-raised"
                               >
                                 {itineraryCache[booking.id].length > 0 ? 'Edit Itinerary' : 'Set Itinerary'}
                               </button>
@@ -330,13 +319,13 @@ export function OpsBookingsPage() {
 
       {prompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-            <h3 className="font-heading text-base font-bold text-slate-900">
+          <div className="w-full max-w-md rounded-xl bg-surface-raised p-6 shadow-lg">
+            <h3 className="font-heading text-base font-bold text-fg">
               {prompt.kind === 'reject' ? 'Reject booking' : 'Cancel booking'}
             </h3>
             <form onSubmit={handlePromptSubmit} className="mt-4 space-y-4">
               <div>
-                <label htmlFor="booking-prompt-text" className="mb-1 block text-sm font-medium text-slate-700">
+                <label htmlFor="booking-prompt-text" className="mb-1 block text-sm font-medium text-fg">
                   {prompt.kind === 'reject' ? 'Notes (optional)' : 'Reason (optional)'}
                 </label>
                 <textarea
@@ -344,14 +333,14 @@ export function OpsBookingsPage() {
                   value={prompt.text}
                   onChange={(e) => setPrompt({ ...prompt, text: e.target.value })}
                   rows={3}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setPrompt(null)}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
                 >
                   Back
                 </button>

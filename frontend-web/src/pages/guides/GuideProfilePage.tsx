@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/apiClient';
 import {
   AVAILABLE_LANGUAGES,
@@ -10,15 +10,13 @@ import {
 } from '../../api/guides';
 import { changePassword } from '../../api/profile';
 import { useAuth } from '../../auth/AuthContext';
-import { getHomeRouteForRole } from '../../auth/roleHome';
 import { Avatar } from '../../components/Avatar';
-import { Logo } from '../../components/Logo';
-import { LockIcon, LogoutIcon, MailIcon } from '../../components/admin/icons';
+import { LockIcon, MailIcon } from '../../components/admin/icons';
+import { notify } from '../../components/ui/notify';
 
 export function GuideProfilePage() {
   const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
-  const homeRoute = user ? getHomeRouteForRole(user.role) : '/login';
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -40,23 +38,20 @@ export function GuideProfilePage() {
   const [specializationError, setSpecializationError] = useState<string | null>(null);
 
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingProfile, setDeletingProfile] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const inputClass =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-  const labelClass = 'text-xs font-semibold text-slate-600';
+    'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const labelClass = 'text-xs font-semibold text-fg-muted';
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -146,8 +141,6 @@ export function GuideProfilePage() {
 
   async function handleSaveProfile(e: FormEvent) {
     e.preventDefault();
-    setProfileError(null);
-    setProfileSuccess(null);
     setSavingProfile(true);
 
     try {
@@ -160,7 +153,7 @@ export function GuideProfilePage() {
       });
 
       populateForm(updated);
-      setProfileSuccess('Profile updated successfully.');
+      notify.success('Profile updated successfully.');
 
       if (user) {
         updateUser({
@@ -172,7 +165,7 @@ export function GuideProfilePage() {
       }
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, 'Could not update profile.');
-      setProfileError(msg);
+      notify.error(msg);
     } finally {
       setSavingProfile(false);
     }
@@ -180,16 +173,14 @@ export function GuideProfilePage() {
 
   async function handleChangePassword(e: FormEvent) {
     e.preventDefault();
-    setPasswordError(null);
-    setPasswordSuccess(null);
 
     if (newPassword !== confirmPassword) {
-      setPasswordError('New password and confirmation do not match.');
+      setConfirmError('New password and confirmation do not match.');
       return;
     }
 
     if (newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters.');
+      notify.error('New password must be at least 6 characters.');
       return;
     }
 
@@ -199,9 +190,9 @@ export function GuideProfilePage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setPasswordSuccess('Password updated successfully.');
+      notify.success('Password updated successfully.');
     } catch (err) {
-      setPasswordError(extractErrorMessage(err, 'Could not change password.'));
+      notify.error(extractErrorMessage(err, 'Could not change password.'));
     } finally {
       setSavingPassword(false);
     }
@@ -234,64 +225,14 @@ export function GuideProfilePage() {
   }
 
   return (
-    <div className="min-h-svh bg-slate-50">
-      {/* Top Header */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-brand-500 before:via-accent-500 before:to-brand-500">
-        <div className="flex items-center gap-4">
-          <Link to={homeRoute} title="Home" className="flex items-center gap-2">
-            <Logo className="h-7 w-auto" />
-          </Link>
-          <span className="hidden text-slate-300 sm:inline">|</span>
-          <h1 className="font-heading text-lg font-bold text-slate-900">
-            Tour Guide Profile & Settings
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link
-            to="/guides/my-tours"
-            className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 sm:inline-block"
-          >
-            My Tours
-          </Link>
-          <Link
-            to="/guides/availability"
-            className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 sm:inline-block"
-          >
-            Guide Availability
-          </Link>
-          <Link
-            to="/guides/profile"
-            className="rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 sm:inline-block"
-          >
-            Profile
-          </Link>
-
-          <div className="hidden text-right sm:block ml-2">
-            <p className="text-sm font-semibold text-slate-700">{user?.name}</p>
-            <p className="text-xs text-slate-500">Tour Guide</p>
-          </div>
-          {user && <Avatar name={name || user.name} size="sm" />}
-
-          <button
-            onClick={logout}
-            title="Log out"
-            aria-label="Log out"
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-          >
-            <LogoutIcon className="h-5 w-5" />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+    <>
+    <div className="mx-auto max-w-3xl">
         {loading ? (
-          <div className="flex items-center justify-center py-20 text-slate-500">
+          <div className="flex items-center justify-center py-20 text-fg-muted">
             <p className="text-sm">Loading profile...</p>
           </div>
         ) : loadError ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-700">
+          <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-6 text-center text-danger-fg">
             <p className="text-sm font-semibold">Failed to load profile</p>
             <p className="mt-1 text-xs">{loadError}</p>
             <button
@@ -304,26 +245,26 @@ export function GuideProfilePage() {
         ) : (
           <>
             {/* Profile Card Banner */}
-            <div className="mb-6 flex items-center gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-brand-50 to-white p-5 shadow-xs">
+            <div className="mb-6 flex items-center gap-4 rounded-2xl border border-border bg-gradient-to-br from-brand-soft to-surface-raised p-5 shadow-xs">
               <Avatar name={name || user?.name || 'Guide'} size="lg" />
               <div>
-                <h2 className="font-heading text-lg font-bold text-slate-900">
+                <h2 className="font-heading text-lg font-bold text-fg">
                   {name || user?.name}
                 </h2>
-                <p className="text-sm text-slate-500">{email || user?.email}</p>
-                <span className="mt-2 inline-flex items-center rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-semibold text-teal-700">
+                <p className="text-sm text-fg-muted">{email || user?.email}</p>
+                <span className="mt-2 inline-flex items-center rounded-full bg-success-soft border border-success/30 px-2.5 py-0.5 text-xs font-semibold text-success-fg">
                   ROLE: TOUR GUIDE
                 </span>
               </div>
             </div>
 
             {/* Personal Details Section */}
-            <section className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+            <section className="mb-8 rounded-xl border border-border bg-surface-raised p-6 shadow-xs">
               <div className="flex items-center gap-2">
-                <MailIcon className="h-5 w-5 text-brand-600" />
-                <h2 className="font-heading text-lg font-bold text-slate-900">Personal Details</h2>
+                <MailIcon className="h-5 w-5 text-brand-text" />
+                <h2 className="font-heading text-lg font-bold text-fg">Personal Details</h2>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-fg-muted">
                 Update your guide name, email address, contact information, languages, and specializations.
               </p>
 
@@ -358,7 +299,7 @@ export function GuideProfilePage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className={labelClass}>Languages</label>
-                  <p className="mb-2 text-xs text-slate-500">
+                  <p className="mb-2 text-xs text-fg-muted">
                     Select languages you can fluently guide in.
                   </p>
 
@@ -367,21 +308,21 @@ export function GuideProfilePage() {
                     {languages.map((lang) => (
                       <span
                         key={lang}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 border border-brand-200 px-3 py-1 text-xs font-semibold text-brand-800 shadow-2xs"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft border border-brand-500/30 px-3 py-1 text-xs font-semibold text-brand-fg shadow-2xs"
                       >
                         <span>{lang}</span>
                         <button
                           type="button"
                           aria-label={`Remove ${lang}`}
                           onClick={() => removeLanguage(lang)}
-                          className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-brand-400 hover:bg-brand-200 hover:text-brand-900 transition font-bold"
+                          className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-brand-text hover:bg-brand-soft hover:text-brand-fg transition font-bold"
                         >
                           ×
                         </button>
                       </span>
                     ))}
                     {languages.length === 0 && (
-                      <span className="text-xs italic text-slate-400">No languages selected yet.</span>
+                      <span className="text-xs italic text-fg-muted">No languages selected yet.</span>
                     )}
                   </div>
 
@@ -418,7 +359,7 @@ export function GuideProfilePage() {
                         }}
                       />
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                        <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="h-4 w-4 text-fg-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
@@ -429,10 +370,10 @@ export function GuideProfilePage() {
                       <div
                         role="listbox"
                         data-testid="language-dropdown"
-                        className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg focus:outline-none"
+                        className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-border bg-surface-raised py-1 shadow-lg focus:outline-none"
                       >
                         {filteredLanguages.length === 0 ? (
-                          <div className="px-4 py-3 text-center text-xs text-slate-500">
+                          <div className="px-4 py-3 text-center text-xs text-fg-muted">
                             No languages found
                           </div>
                         ) : (
@@ -450,13 +391,13 @@ export function GuideProfilePage() {
                                 onClick={() => handleSelectLanguage(lang)}
                                 className={`flex w-full items-center justify-between px-4 py-2 text-left text-xs transition ${
                                   isSelected
-                                    ? 'cursor-not-allowed bg-slate-50 text-slate-400'
-                                    : 'text-slate-800 hover:bg-brand-50 hover:text-brand-900 cursor-pointer'
+                                    ? 'cursor-not-allowed bg-surface-sunken text-fg-muted'
+                                    : 'text-fg hover:bg-brand-soft hover:text-brand-fg cursor-pointer'
                                 }`}
                               >
                                 <span>{lang}</span>
                                 {isSelected && (
-                                  <span className="text-[11px] font-medium text-brand-600">Selected</span>
+                                  <span className="text-[11px] font-medium text-brand-text">Selected</span>
                                 )}
                               </button>
                             );
@@ -466,13 +407,13 @@ export function GuideProfilePage() {
                     )}
                   </div>
                   {languageError && (
-                    <p className="mt-1 text-xs text-red-600 font-medium">{languageError}</p>
+                    <p className="mt-1 text-xs text-danger font-medium">{languageError}</p>
                   )}
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className={labelClass}>Specializations</label>
-                  <p className="mb-2 text-xs text-slate-500">
+                  <p className="mb-2 text-xs text-fg-muted">
                     Add tour guide specializations (e.g. Cultural, Hiking, Wildlife).
                   </p>
 
@@ -481,21 +422,21 @@ export function GuideProfilePage() {
                     {specializations.map((spec) => (
                       <span
                         key={spec}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-800 shadow-2xs"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-neutral-soft border border-border px-3 py-1 text-xs font-semibold text-fg shadow-2xs"
                       >
                         <span>{spec}</span>
                         <button
                           type="button"
                           aria-label={`Remove ${spec}`}
                           onClick={() => removeSpecialization(spec)}
-                          className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:bg-slate-300 hover:text-slate-900 transition font-bold"
+                          className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-fg-muted hover:bg-border hover:text-fg transition font-bold"
                         >
                           ×
                         </button>
                       </span>
                     ))}
                     {specializations.length === 0 && (
-                      <span className="text-xs italic text-slate-400">No specializations added yet.</span>
+                      <span className="text-xs italic text-fg-muted">No specializations added yet.</span>
                     )}
                   </div>
 
@@ -523,32 +464,21 @@ export function GuideProfilePage() {
                       type="button"
                       aria-label="Add Specialization Button"
                       onClick={() => addSpecialization()}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shrink-0"
+                      className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs font-semibold text-fg hover:bg-surface-sunken transition shrink-0"
                     >
                       + Add
                     </button>
                   </div>
                   {specializationError && (
-                    <p className="mt-1 text-xs text-red-600 font-medium">{specializationError}</p>
+                    <p className="mt-1 text-xs text-danger font-medium">{specializationError}</p>
                   )}
                 </div>
-
-                {profileError && (
-                  <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-                    {profileError}
-                  </div>
-                )}
-                {profileSuccess && (
-                  <div className="sm:col-span-2 rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs font-semibold text-teal-800">
-                    {profileSuccess}
-                  </div>
-                )}
 
                 <div className="sm:col-span-2 flex justify-end">
                   <button
                     type="submit"
                     disabled={savingProfile}
-                    className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-800 disabled:opacity-50"
                   >
                     {savingProfile ? 'Saving...' : 'Save Profile'}
                   </button>
@@ -557,12 +487,12 @@ export function GuideProfilePage() {
             </section>
 
             {/* Change Password Section */}
-            <section className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+            <section className="mb-8 rounded-xl border border-border bg-surface-raised p-6 shadow-xs">
               <div className="flex items-center gap-2">
-                <LockIcon className="h-5 w-5 text-brand-600" />
-                <h2 className="font-heading text-lg font-bold text-slate-900">Change Password</h2>
+                <LockIcon className="h-5 w-5 text-brand-text" />
+                <h2 className="font-heading text-lg font-bold text-fg">Change Password</h2>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-fg-muted">
                 Update your account password with at least 6 characters.
               </p>
 
@@ -597,27 +527,25 @@ export function GuideProfilePage() {
                       minLength={6}
                       className={inputClass}
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      aria-invalid={confirmError ? true : undefined}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setConfirmError(null);
+                      }}
                     />
+                    {confirmError && (
+                      <p role="alert" className="mt-1 text-xs font-medium text-danger">
+                        {confirmError}
+                      </p>
+                    )}
                   </div>
                 </div>
-
-                {passwordError && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-                    {passwordError}
-                  </div>
-                )}
-                {passwordSuccess && (
-                  <div className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs font-semibold text-teal-800">
-                    {passwordSuccess}
-                  </div>
-                )}
 
                 <div className="flex justify-end">
                   <button
                     type="submit"
                     disabled={savingPassword}
-                    className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-700 disabled:opacity-50"
+                    className="rounded-lg bg-brand-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-800 disabled:opacity-50"
                   >
                     {savingPassword ? 'Updating...' : 'Change Password'}
                   </button>
@@ -626,9 +554,9 @@ export function GuideProfilePage() {
             </section>
 
             {/* Danger Zone: Delete Profile */}
-            <section className="rounded-xl border border-red-200 bg-red-50/50 p-6">
-              <h2 className="font-heading text-lg font-bold text-red-900">Delete Profile</h2>
-              <p className="mt-1 text-xs text-red-700">
+            <section className="rounded-xl border border-danger/30 bg-danger-soft/50 p-6">
+              <h2 className="font-heading text-lg font-bold text-danger-fg">Delete Profile</h2>
+              <p className="mt-1 text-xs text-danger-fg">
                 You cannot delete your Tour Guide profile while tours are assigned to you.
               </p>
               <div className="mt-4">
@@ -646,21 +574,21 @@ export function GuideProfilePage() {
             </section>
           </>
         )}
-      </main>
+      </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="font-heading text-lg font-bold text-slate-900">
+          <div className="w-full max-w-md rounded-2xl bg-surface-raised p-6 shadow-xl">
+            <h3 className="font-heading text-lg font-bold text-fg">
               Delete Profile Confirmation
             </h3>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-fg-muted">
               Are you sure you want to delete your Tour Guide profile? This permanently removes your account and profile data. You cannot delete your profile while tours are assigned to you.
             </p>
 
             {deleteError && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+              <div role="alert" className="mt-3 rounded-lg border border-danger/30 bg-danger-soft p-3 text-xs font-semibold text-danger-fg">
                 {deleteError}
               </div>
             )}
@@ -670,7 +598,7 @@ export function GuideProfilePage() {
                 type="button"
                 disabled={deletingProfile}
                 onClick={() => setShowDeleteModal(false)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-fg hover:bg-surface-sunken"
               >
                 Cancel
               </button>
@@ -686,6 +614,6 @@ export function GuideProfilePage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

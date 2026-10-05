@@ -84,27 +84,27 @@ export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel:
   }
 
   const inputClass =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-  const labelClass = 'text-xs font-semibold text-slate-600';
+    'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const labelClass = 'text-xs font-semibold text-fg-muted';
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-brand-50 to-white p-5">
+      <div className="mb-6 flex items-center gap-4 rounded-2xl border border-border bg-gradient-to-br from-brand-soft to-surface-raised p-5">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
           <RoleIcon className="h-6 w-6" />
         </div>
         <div>
-          <h2 className="font-heading text-lg font-bold text-slate-900">{roleLabel} accounts</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="font-heading text-lg font-bold text-fg">{roleLabel} accounts</h2>
+          <p className="text-sm text-fg-muted">
             {roleStaff === null ? 'Loading roster…' : `${roleStaff.length} active ${roleStaff.length === 1 ? 'account' : 'accounts'}`}
           </p>
         </div>
       </div>
 
-      <section className="mb-10 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="mb-10 rounded-xl border border-border bg-surface-raised p-6 shadow-sm">
         <div className="flex items-center gap-2">
-          <PlusCircleIcon className="h-5 w-5 text-brand-600" />
-          <h2 className="font-heading text-lg font-bold text-slate-900">Add a {roleLabel.toLowerCase()}</h2>
+          <PlusCircleIcon className="h-5 w-5 text-brand-text" />
+          <h2 className="font-heading text-lg font-bold text-fg">Add a {roleLabel.toLowerCase()}</h2>
         </div>
         <form onSubmit={handleCreate} className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
@@ -149,13 +149,13 @@ export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel:
           </div>
           <div>
             <label className={labelClass}>Role</label>
-            <p className={`${inputClass} flex items-center gap-2 bg-brand-50 text-brand-800`}>
+            <p className={`${inputClass} flex items-center gap-2 bg-brand-soft text-brand-fg`}>
               <RoleIcon className="h-4 w-4" /> {roleLabel}
             </p>
           </div>
 
           {createError && (
-            <p className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700">
+            <p role="alert" className="sm:col-span-2 rounded-lg border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger-fg">
               {createError}
             </p>
           )}
@@ -164,7 +164,7 @@ export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel:
             <button
               type="submit"
               disabled={creating}
-              className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
             >
               {creating ? 'Creating...' : 'Create account'}
             </button>
@@ -174,17 +174,17 @@ export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel:
 
       <section>
         <div className="mb-4 flex items-center gap-2">
-          <UsersIcon className="h-5 w-5 text-slate-400" />
-          <h2 className="font-heading text-lg font-bold text-slate-900">Existing {roleLabel.toLowerCase()}s</h2>
+          <UsersIcon className="h-5 w-5 text-fg-muted" />
+          <h2 className="font-heading text-lg font-bold text-fg">Existing {roleLabel.toLowerCase()}s</h2>
         </div>
 
         {listError && (
-          <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
             {listError}
           </p>
         )}
         {deleteError && (
-          <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
             {deleteError}
           </p>
         )}
@@ -192,48 +192,48 @@ export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel:
         {roleStaff === null && !listError && (
           <div className="space-y-2">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-xl border border-slate-200 bg-white" />
+              <div key={i} className="h-14 animate-pulse rounded-xl border border-border bg-surface-raised" />
             ))}
           </div>
         )}
 
         {roleStaff !== null && roleStaff.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+          <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-16 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand-text">
               <RoleIcon className="h-6 w-6" />
             </div>
-            <p className="mt-3 font-medium text-slate-600">No {roleLabel.toLowerCase()} accounts yet.</p>
-            <p className="mt-1 text-sm text-slate-400">Use the form above to add the first one.</p>
+            <p className="mt-3 font-medium text-fg-muted">No {roleLabel.toLowerCase()} accounts yet.</p>
+            <p className="mt-1 text-sm text-fg-muted">Use the form above to add the first one.</p>
           </div>
         )}
 
         {roleStaff && roleStaff.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-border bg-surface-sunken text-left text-xs font-semibold uppercase tracking-wide text-fg-muted">
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Contact number</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {roleStaff.map((member) => (
-                  <tr key={member.id} className="transition hover:bg-slate-50">
+                  <tr key={member.id} className="transition hover:bg-surface-sunken">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <Avatar name={member.name} size="sm" />
-                        <span className="font-medium text-slate-900">{member.name}</span>
+                        <span className="font-medium text-fg">{member.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{member.email}</td>
-                    <td className="px-4 py-3 text-slate-600">{member.contactNumber}</td>
+                    <td className="px-4 py-3 text-fg-muted">{member.email}</td>
+                    <td className="px-4 py-3 text-fg-muted">{member.contactNumber}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleDelete(member)}
                         disabled={deletingId === member.id}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-lg border border-danger/30 px-3 py-1.5 text-sm font-semibold text-danger-fg transition hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {deletingId === member.id ? 'Removing...' : 'Delete'}
                       </button>

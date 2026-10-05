@@ -7,6 +7,7 @@ import { AuthContext, type AuthContextValue } from '../../auth/AuthContext';
 import type { CurrentUser } from '../../auth/types';
 import { GuideLayout } from '../../components/guides/GuideLayout';
 import { GuideDashboardPage } from './GuideDashboardPage';
+import { ThemeProvider } from '../../theme/ThemeProvider';
 
 vi.mock('../../api/assignedTours', () => ({
   getMyAssignedTours: vi.fn(),
@@ -118,6 +119,7 @@ async function renderDashboard(user: CurrentUser = tourGuideUser) {
 
   const utils = render(
     <MemoryRouter initialEntries={['/guides']}>
+      <ThemeProvider>
       <AuthContext.Provider value={authValue}>
         <Routes>
           <Route path="/guides" element={<GuideLayout />}>
@@ -129,6 +131,7 @@ async function renderDashboard(user: CurrentUser = tourGuideUser) {
           <Route path="/guides/profile" element={<div>Destination: Guide Profile Page</div>} />
         </Routes>
       </AuthContext.Provider>
+      </ThemeProvider>
     </MemoryRouter>,
   );
 
@@ -154,7 +157,7 @@ describe('GuideDashboardPage', () => {
     expect(screen.getByText('Tour Guide')).toBeInTheDocument();
 
     // Sidebar navigation items
-    const sidebar = screen.getByRole('navigation');
+    const sidebar = screen.getByRole('navigation', { name: 'Primary' });
     expect(sidebar).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^Dashboard$/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^My Tours$/i })).toBeInTheDocument();

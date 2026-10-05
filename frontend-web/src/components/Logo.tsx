@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { ThemeContext } from '../theme/themeContext';
 import wordmark from '../assets/logo-wordmark.png';
 import wordmarkOnDark from '../assets/logo-wordmark-dark.png';
 
@@ -8,9 +10,10 @@ export function Logo({
   className?: string;
   onDark?: boolean;
 }) {
+  const themeDark = useContext(ThemeContext)?.resolved === 'dark';
   return (
     <img
-      src={onDark ? wordmarkOnDark : wordmark}
+      src={onDark || themeDark ? wordmarkOnDark : wordmark}
       alt="TrailWise"
       className={`${className} object-contain`}
     />

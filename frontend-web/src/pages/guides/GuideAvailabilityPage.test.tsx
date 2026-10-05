@@ -13,6 +13,11 @@ import { AuthContext, type AuthContextValue } from '../../auth/AuthContext';
 import type { CurrentUser } from '../../auth/types';
 import { GuideAvailabilityPage } from './GuideAvailabilityPage';
 
+vi.mock('../../components/ui/notify', () => ({
+  notify: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+import { notify } from '../../components/ui/notify';
+
 vi.mock('../../api/guides', () => ({
   getGuides: vi.fn(),
   getGuideAvailability: vi.fn(),
@@ -272,7 +277,7 @@ describe('GuideAvailabilityPage', () => {
     expect(mockedUpdateGuideAvailability).not.toHaveBeenCalled();
 
     // Should show explanation that booked dates cannot be changed
-    expect(screen.getByText(new RegExp(`Date ${day10Key} is booked and cannot be changed`, 'i'))).toBeInTheDocument();
+    expect(notify.info).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`Date ${day10Key} is booked and cannot be changed`, 'i')));
   });
 
   it('TourGuide clicking an available date sends PUT with isAvailable = false', async () => {

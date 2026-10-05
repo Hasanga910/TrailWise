@@ -12,6 +12,11 @@ import { AuthContext, type AuthContextValue } from '../../auth/AuthContext';
 import type { CurrentUser } from '../../auth/types';
 import { TourDetailPage } from './TourDetailPage';
 
+vi.mock('../../components/ui/notify', () => ({
+  notify: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+import { notify } from '../../components/ui/notify';
+
 vi.mock('../../api/assignedTours', () => ({
   getMyAssignedTours: vi.fn(),
   updateGuideTour: vi.fn(),
@@ -123,7 +128,7 @@ describe('TourDetailPage', () => {
         notes: 'All good',
       });
     });
-    expect(screen.getByText('Tour updates saved.')).toBeInTheDocument();
+    expect(notify.success).toHaveBeenCalledWith('Tour updates saved.');
   });
 
   it('renders Not Started status and neither Start Tour nor End Tour button is rendered', async () => {

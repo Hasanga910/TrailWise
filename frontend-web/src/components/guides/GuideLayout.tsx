@@ -1,5 +1,5 @@
 import { BookingsIcon, CalendarIcon, DashboardIcon, ProfileIcon } from '../admin/icons';
-import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
+import { AppShell, type SidebarNavItem } from '../layout/AppShell';
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/guides', label: 'Dashboard', icon: DashboardIcon, end: true },
@@ -16,6 +16,11 @@ const PAGE_TITLES: Record<string, string> = {
   '/guides/profile': 'Profile',
 };
 
+function resolveTitle(pathname: string): string {
+  if (/^\/guides\/my-tours\/[^/]+$/.test(pathname)) return 'Tour Details';
+  return PAGE_TITLES[pathname] ?? 'Dashboard';
+}
+
 export function GuideLayout() {
-  return <SidebarLayout navItems={NAV_ITEMS} pageTitles={PAGE_TITLES} />;
+  return <AppShell navItems={NAV_ITEMS} pageTitles={resolveTitle} portalLabel="Guide Portal" />;
 }

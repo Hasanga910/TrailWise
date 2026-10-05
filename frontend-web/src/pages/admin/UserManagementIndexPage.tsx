@@ -69,18 +69,18 @@ export function UserManagementIndexPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-fg-muted">
           Each staff role has its own page for creating and removing accounts.
         </p>
         {staff && (
-          <p className="text-sm text-slate-500">
-            <span className="font-semibold text-slate-700">{staff.length}</span> total staff accounts
+          <p className="text-sm text-fg-muted">
+            <span className="font-semibold text-fg">{staff.length}</span> total staff accounts
           </p>
         )}
       </div>
 
       {error && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
           {error}
         </p>
       )}
@@ -93,7 +93,7 @@ export function UserManagementIndexPage() {
             <Link
               key={card.to}
               to={card.to}
-              className="group relative flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+              className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface-raised p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
             >
               <div
                 className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${card.fromClass} ${card.toClass} text-white shadow-sm`}
@@ -101,21 +101,21 @@ export function UserManagementIndexPage() {
                 <Icon className="h-6 w-6" />
               </div>
 
-              <h2 className="mt-4 font-heading text-lg font-bold text-slate-900">{card.title}</h2>
-              <p className="mt-1.5 flex-1 text-sm text-slate-500">{card.description}</p>
+              <h2 className="mt-4 font-heading text-lg font-bold text-fg">{card.title}</h2>
+              <p className="mt-1.5 flex-1 text-sm text-fg-muted">{card.description}</p>
 
-              <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-                <span className="text-2xl font-bold text-slate-900">
+              <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+                <span className="text-2xl font-bold text-fg">
                   {count === null ? (
-                    <span className="inline-block h-7 w-8 animate-pulse rounded bg-slate-200 align-middle" />
+                    <span className="inline-block h-7 w-8 animate-pulse rounded bg-neutral-soft align-middle" />
                   ) : (
                     count
                   )}
-                  <span className="ml-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                  <span className="ml-1.5 text-xs font-medium uppercase tracking-wide text-fg-muted">
                     {count === 1 ? 'account' : 'accounts'}
                   </span>
                 </span>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-brand-text">
                   Manage
                   <ArrowRightIcon className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                 </span>

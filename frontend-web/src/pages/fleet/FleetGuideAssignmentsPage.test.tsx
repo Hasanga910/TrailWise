@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as bookingsApi from '../../api/bookings';
 import type { AvailableGuideDto, BookingSummaryDto } from '../../api/bookings';
 import { FleetGuideAssignmentsPage } from './FleetGuideAssignmentsPage';
+import { notify } from '../../components/ui/notify';
+
+vi.mock('../../components/ui/notify', () => ({
+  notify: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
 
 function sampleBooking(overrides: Partial<BookingSummaryDto> = {}): BookingSummaryDto {
   return {
@@ -183,7 +188,7 @@ describe('FleetGuideAssignmentsPage', () => {
     });
 
     // Success notification shown
-    expect(await screen.findByText(/Tour Guide successfully assigned/i)).toBeInTheDocument();
+    await waitFor(() => expect(notify.success).toHaveBeenCalledWith(expect.stringMatching(/Tour Guide successfully assigned/i)));
     // Modal is closed
     expect(screen.queryByRole('heading', { name: /assign tour guide/i })).not.toBeInTheDocument();
     // Booking list updated: assigned booking disappears from pending list and button is gone
@@ -257,7 +262,7 @@ describe('FleetGuideAssignmentsPage', () => {
     });
 
     // Conflict error message shown in modal
-    expect(await screen.findByText(/selected guide is no longer available/i)).toBeInTheDocument();
+    await waitFor(() => expect(notify.error).toHaveBeenCalledWith(expect.stringMatching(/selected guide is no longer available/i)));
     // Modal reloaded available guides
     expect(guidesSpy).toHaveBeenCalledTimes(2);
 

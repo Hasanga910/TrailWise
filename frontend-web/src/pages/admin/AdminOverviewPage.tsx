@@ -58,12 +58,12 @@ function StatTile({
       ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white'
       : 'bg-gradient-to-br from-accent-400 to-accent-600 text-white';
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg shadow-sm ${badgeClass}`}>
         <Icon className="h-5 w-5" />
       </div>
-      <p className="mt-3 text-2xl font-semibold text-slate-900">{value}</p>
-      <p className="mt-0.5 text-sm text-slate-500">{label}</p>
+      <p className="mt-3 text-2xl font-semibold text-fg">{value}</p>
+      <p className="mt-0.5 text-sm text-fg-muted">{label}</p>
     </div>
   );
 }
@@ -73,10 +73,10 @@ function BarRow({ label, count, max, colorClass }: { label: string; count: numbe
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="font-medium text-slate-700">{label}</span>
-        <span className="font-semibold text-slate-900">{count}</span>
+        <span className="font-medium text-fg">{label}</span>
+        <span className="font-semibold text-fg">{count}</span>
       </div>
-      <div className="h-2.5 w-full rounded-full bg-slate-100">
+      <div className="h-2.5 w-full rounded-full bg-neutral-soft">
         <div
           className={`h-2.5 rounded-full ${colorClass}`}
           style={{ width: `${widthPct}%` }}
@@ -88,8 +88,8 @@ function BarRow({ label, count, max, colorClass }: { label: string; count: numbe
 
 function BarPanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <h2 className="font-heading text-sm font-bold text-slate-900">{title}</h2>
+    <div className="rounded-xl border border-border bg-surface-raised p-5">
+      <h2 className="font-heading text-sm font-bold text-fg">{title}</h2>
       <div className="mt-4 space-y-3">{children}</div>
     </div>
   );
@@ -107,10 +107,10 @@ function Meter({
   trackClass: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-border bg-surface-raised p-5">
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-sm font-medium text-slate-700">{label}</span>
-        <span className="text-lg font-semibold text-slate-900">{Math.round(percent)}%</span>
+        <span className="text-sm font-medium text-fg">{label}</span>
+        <span className="text-lg font-semibold text-fg">{Math.round(percent)}%</span>
       </div>
       <div className={`h-2.5 w-full rounded-full ${trackClass}`}>
         <div className={`h-2.5 rounded-full ${fillClass}`} style={{ width: `${percent}%` }} />
@@ -199,7 +199,7 @@ export function AdminOverviewPage() {
       </div>
 
       {error && (
-        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <p role="alert" className="mt-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
           {error}
         </p>
       )}
@@ -207,7 +207,7 @@ export function AdminOverviewPage() {
       {!error && !stats && (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white" />
+            <div key={i} className="h-24 animate-pulse rounded-xl border border-border bg-surface-raised" />
           ))}
         </div>
       )}
@@ -234,12 +234,12 @@ export function AdminOverviewPage() {
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             <BarPanel title="Staff by role">
               {stats.staffByRole.map((row) => (
-                <BarRow key={row.label} label={row.label} count={row.count} max={stats.totalStaff} colorClass="bg-brand-600" />
+                <BarRow key={row.label} label={row.label} count={row.count} max={stats.totalStaff} colorClass="bg-brand-700" />
               ))}
             </BarPanel>
 
             <BarPanel title="Packages by theme">
-              {stats.packagesByTheme.length === 0 && <p className="text-sm text-slate-500">No packages yet.</p>}
+              {stats.packagesByTheme.length === 0 && <p className="text-sm text-fg-muted">No packages yet.</p>}
               {stats.packagesByTheme.map((row) => (
                 <BarRow
                   key={row.label}
@@ -265,14 +265,14 @@ export function AdminOverviewPage() {
           </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <Meter label="Tiers including food" percent={stats.foodPct} fillClass="bg-brand-500" trackClass="bg-brand-100" />
+            <Meter label="Tiers including food" percent={stats.foodPct} fillClass="bg-brand-500" trackClass="bg-brand-soft" />
             <Meter label="Tiers requiring AC" percent={stats.acPct} fillClass="bg-accent-500" trackClass="bg-accent-400/20" />
           </div>
         </>
       )}
 
       <div className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Quick links</h2>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-muted">Quick links</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           {CARDS.map((card) => {
             const Icon = card.icon;
@@ -280,14 +280,14 @@ export function AdminOverviewPage() {
               <Link
                 key={card.to}
                 to={card.to}
-                className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md"
+                className="group rounded-xl border border-border bg-surface-raised p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-500/30 hover:shadow-md"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-700 transition group-hover:bg-brand-600 group-hover:text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-soft text-brand-text transition group-hover:bg-brand-700 group-hover:text-white">
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="mt-4 font-heading text-lg font-bold text-slate-900">{card.title}</h3>
-                <p className="mt-1 text-sm text-slate-500">{card.description}</p>
-                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
+                <h3 className="mt-4 font-heading text-lg font-bold text-fg">{card.title}</h3>
+                <p className="mt-1 text-sm text-fg-muted">{card.description}</p>
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-text">
                   Open
                   <ArrowRightIcon className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                 </span>

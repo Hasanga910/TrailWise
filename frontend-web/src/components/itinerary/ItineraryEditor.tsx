@@ -71,50 +71,50 @@ export function ItineraryEditor({
 
   return (
     <div className="space-y-3">
-      {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger-fg">{error}</p>}
 
       {rows.map((row, index) => (
         <div
           key={index}
-          className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[80px_1fr_1fr_110px_auto] sm:items-end"
+          className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 sm:grid-cols-[80px_1fr_1fr_110px_auto] sm:items-end"
         >
           <div>
-            <label className="text-xs font-semibold text-slate-500">Day</label>
+            <label className="text-xs font-semibold text-fg-muted">Day</label>
             <input
               type="number"
               min={1}
               value={row.dayNumber}
               onChange={(e) => updateRow(index, { dayNumber: Number(e.target.value) })}
-              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-500">Activity</label>
+            <label className="text-xs font-semibold text-fg-muted">Activity</label>
             <input
               type="text"
               value={row.activity}
               maxLength={300}
               onChange={(e) => updateRow(index, { activity: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-500">Location</label>
+            <label className="text-xs font-semibold text-fg-muted">Location</label>
             <input
               type="text"
               value={row.location}
               maxLength={300}
               onChange={(e) => updateRow(index, { location: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-500">Start time</label>
+            <label className="text-xs font-semibold text-fg-muted">Start time</label>
             <input
               type="time"
               value={row.startTime}
               onChange={(e) => updateRow(index, { startTime: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm"
             />
           </div>
           <div>
@@ -122,7 +122,7 @@ export function ItineraryEditor({
               type="button"
               onClick={() => removeRow(index)}
               disabled={rows.length === 1}
-              className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-fg-muted hover:bg-surface-sunken disabled:opacity-40"
             >
               Remove
             </button>
@@ -134,7 +134,7 @@ export function ItineraryEditor({
         <button
           type="button"
           onClick={addRow}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg hover:bg-surface-sunken"
         >
           Add Day
         </button>
@@ -142,7 +142,7 @@ export function ItineraryEditor({
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Itinerary'}
         </button>
@@ -150,7 +150,7 @@ export function ItineraryEditor({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700"
+            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-fg-muted hover:text-fg"
           >
             Cancel
           </button>

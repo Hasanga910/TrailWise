@@ -21,8 +21,8 @@ export function TravelerDashboardPage() {
 
   return (
     <div>
-      <p className="text-sm text-slate-500">
-        Welcome back, <span className="font-semibold text-slate-700">{user?.name}</span>.{' '}
+      <p className="text-sm text-fg-muted">
+        Welcome back, <span className="font-semibold text-fg">{user?.name}</span>.{' '}
         {upcomingCount !== null &&
           (upcomingCount === 0
             ? "You haven't made any booking requests yet."
@@ -34,10 +34,10 @@ export function TravelerDashboardPage() {
           <Link
             key={card.to}
             to={card.to}
-            className="rounded-xl border border-slate-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+            className="rounded-xl border border-border bg-surface-raised p-5 transition hover:-translate-y-0.5 hover:shadow-md"
           >
-            <h2 className="font-heading text-lg font-bold text-slate-900">{card.title}</h2>
-            <p className="mt-1 text-sm text-slate-500">{card.description}</p>
+            <h2 className="font-heading text-lg font-bold text-fg">{card.title}</h2>
+            <p className="mt-1 text-sm text-fg-muted">{card.description}</p>
           </Link>
         ))}
       </div>

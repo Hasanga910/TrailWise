@@ -18,8 +18,8 @@ import { PackagesIcon, PlusCircleIcon } from '../../components/admin/icons';
 const CLASS_TYPES: ClassType[] = ['Normal', 'Second', 'First'];
 
 const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'text-xs font-semibold text-slate-600';
+  'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const labelClass = 'text-xs font-semibold text-fg-muted';
 
 function LocationPicker({
   selected,
@@ -76,13 +76,13 @@ function LocationPicker({
           {selected.map((name) => (
             <span
               key={name}
-              className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700"
+              className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand-text"
             >
               {name}
               <button
                 type="button"
                 onClick={() => removeLocation(name)}
-                className="text-brand-500 hover:text-brand-700"
+                className="text-brand-text hover:text-brand-text"
               >
                 ×
               </button>
@@ -98,15 +98,15 @@ function LocationPicker({
           onChange={(e) => handleQueryChange(e.target.value)}
         />
         {trimmedQuery.length >= 2 && (
-          <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
-            {searching && <p className="px-3 py-2 text-xs text-slate-400">Searching...</p>}
+          <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-surface-raised shadow-lg">
+            {searching && <p className="px-3 py-2 text-xs text-fg-muted">Searching...</p>}
             {!searching &&
               visibleSuggestions.map((s) => (
                 <button
                   key={s.name}
                   type="button"
                   onClick={() => addLocation(s.name)}
-                  className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  className="block w-full px-3 py-2 text-left text-sm text-fg hover:bg-surface-sunken"
                 >
                   {s.name}
                 </button>
@@ -115,7 +115,7 @@ function LocationPicker({
               <button
                 type="button"
                 onClick={() => addLocation(trimmedQuery)}
-                className="block w-full px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
+                className="block w-full px-3 py-2 text-left text-sm font-medium text-brand-text hover:bg-brand-soft"
               >
                 Add &quot;{trimmedQuery}&quot; as typed
               </button>
@@ -276,22 +276,22 @@ export function PackagesOverviewPage() {
 
   return (
     <>
-      <div className="mb-6 flex items-center gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-brand-50 to-white p-5">
+      <div className="mb-6 flex items-center gap-4 rounded-2xl border border-border bg-gradient-to-br from-brand-soft to-surface-raised p-5">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
           <PackagesIcon className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="font-heading text-lg font-bold text-slate-900">Package management</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="font-heading text-lg font-bold text-fg">Package management</h1>
+          <p className="text-sm text-fg-muted">
             {packages ? `${packages.length} ${packages.length === 1 ? 'package' : 'packages'} configured` : 'Loading packages…'}
           </p>
         </div>
       </div>
 
-      <section className="mb-10 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="mb-10 rounded-xl border border-border bg-surface-raised p-6 shadow-sm">
         <div className="flex items-center gap-2">
-          <PlusCircleIcon className="h-5 w-5 text-brand-600" />
-          <h2 className="font-heading text-lg font-bold text-slate-900">Create a new package</h2>
+          <PlusCircleIcon className="h-5 w-5 text-brand-text" />
+          <h2 className="font-heading text-lg font-bold text-fg">Create a new package</h2>
         </div>
         <form onSubmit={handleCreate} className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -383,7 +383,7 @@ export function PackagesOverviewPage() {
               <button
                 type="button"
                 onClick={() => setCreateTiers((prev) => [...prev, emptyTier()])}
-                className="text-xs font-semibold text-brand-700 hover:text-brand-800"
+                className="text-xs font-semibold text-brand-text hover:text-brand-fg"
               >
                 + Add tier
               </button>
@@ -392,7 +392,7 @@ export function PackagesOverviewPage() {
               {createTiers.map((tier, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-5 sm:items-center"
+                  className="grid grid-cols-2 gap-3 rounded-lg border border-border p-3 sm:grid-cols-5 sm:items-center"
                 >
                   <select
                     className={inputClass}
@@ -415,7 +415,7 @@ export function PackagesOverviewPage() {
                     value={tier.basePricePerPerson}
                     onChange={(e) => updateCreateTier(index, { basePricePerPerson: Number(e.target.value) })}
                   />
-                  <label className="flex items-center gap-1.5 text-sm text-slate-600">
+                  <label className="flex items-center gap-1.5 text-sm text-fg-muted">
                     <input
                       type="checkbox"
                       checked={tier.includesFood}
@@ -423,7 +423,7 @@ export function PackagesOverviewPage() {
                     />
                     Food
                   </label>
-                  <label className="flex items-center gap-1.5 text-sm text-slate-600">
+                  <label className="flex items-center gap-1.5 text-sm text-fg-muted">
                     <input
                       type="checkbox"
                       checked={tier.requiresAC}
@@ -435,7 +435,7 @@ export function PackagesOverviewPage() {
                     <button
                       type="button"
                       onClick={() => setCreateTiers((prev) => prev.filter((_, i) => i !== index))}
-                      className="text-xs font-semibold text-red-600 hover:text-red-700"
+                      className="text-xs font-semibold text-danger hover:text-danger-fg"
                     >
                       Remove
                     </button>
@@ -446,12 +446,12 @@ export function PackagesOverviewPage() {
           </div>
 
           {createError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700">
+            <p role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger-fg">
               {createError}
             </p>
           )}
           {createWarning && (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700">
+            <p className="rounded-lg border border-warning/30 bg-warning-soft px-4 py-2 text-sm font-medium text-warning-fg">
               {createWarning}
             </p>
           )}
@@ -459,7 +459,7 @@ export function PackagesOverviewPage() {
           <button
             type="submit"
             disabled={creating}
-            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
           >
             {creating ? 'Creating...' : 'Create package'}
           </button>
@@ -468,12 +468,12 @@ export function PackagesOverviewPage() {
 
       <section>
         <div className="mb-4 flex items-center gap-2">
-          <PackagesIcon className="h-5 w-5 text-slate-400" />
-          <h2 className="font-heading text-lg font-bold text-slate-900">Existing packages</h2>
+          <PackagesIcon className="h-5 w-5 text-fg-muted" />
+          <h2 className="font-heading text-lg font-bold text-fg">Existing packages</h2>
         </div>
 
         {listError && (
-          <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
             {listError}
           </p>
         )}
@@ -481,18 +481,18 @@ export function PackagesOverviewPage() {
         {packages === null && !listError && (
           <div className="space-y-4">
             {[0, 1].map((i) => (
-              <div key={i} className="h-28 animate-pulse rounded-xl border border-slate-200 bg-white" />
+              <div key={i} className="h-28 animate-pulse rounded-xl border border-border bg-surface-raised" />
             ))}
           </div>
         )}
 
         {packages !== null && packages.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+          <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-16 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand-text">
               <PackagesIcon className="h-6 w-6" />
             </div>
-            <p className="mt-3 font-medium text-slate-600">No tour packages yet.</p>
-            <p className="mt-1 text-sm text-slate-400">Use the form above to create the first one.</p>
+            <p className="mt-3 font-medium text-fg-muted">No tour packages yet.</p>
+            <p className="mt-1 text-sm text-fg-muted">Use the form above to create the first one.</p>
           </div>
         )}
 
@@ -506,7 +506,7 @@ export function PackagesOverviewPage() {
             return (
               <article
                 key={pkg.id}
-                className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md"
+                className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm transition hover:shadow-md"
               >
                 {isEditing ? (
                   <form onSubmit={handleSaveEdit} className="space-y-3">
@@ -565,7 +565,7 @@ export function PackagesOverviewPage() {
                       </div>
                     </div>
                     {editError && (
-                      <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      <p role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger-fg">
                         {editError}
                       </p>
                     )}
@@ -573,14 +573,14 @@ export function PackagesOverviewPage() {
                       <button
                         type="submit"
                         disabled={savingEdit}
-                        className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                        className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
                       >
                         {savingEdit ? 'Saving...' : 'Save'}
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingId(null)}
-                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-fg hover:bg-surface-sunken"
                       >
                         Cancel
                       </button>
@@ -596,13 +596,13 @@ export function PackagesOverviewPage() {
                           className="h-16 w-24 shrink-0 rounded-lg object-cover"
                         />
                       ) : (
-                        <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] text-slate-400">
+                        <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-lg bg-neutral-soft text-[11px] text-fg-muted">
                           No photo
                         </div>
                       )}
                       <div>
-                        <h3 className="font-heading text-lg font-bold text-slate-900">{pkg.name}</h3>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <h3 className="font-heading text-lg font-bold text-fg">{pkg.name}</h3>
+                        <p className="mt-1 text-sm text-fg-muted">
                           {pkg.theme} · {pkg.durationDays} days · up to {pkg.maxGroupSize} travelers · $
                           {pkg.basePricePerPerson.toFixed(2)}/person
                         </p>
@@ -611,7 +611,7 @@ export function PackagesOverviewPage() {
                             {pkg.locations.map((loc) => (
                               <span
                                 key={loc.id}
-                                className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+                                className="rounded-full bg-neutral-soft px-2 py-0.5 text-[11px] font-medium text-fg-muted"
                               >
                                 {loc.name}
                               </span>
@@ -623,13 +623,13 @@ export function PackagesOverviewPage() {
                     <div className="flex shrink-0 gap-2">
                       <button
                         onClick={() => startEdit(pkg)}
-                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg hover:bg-surface-sunken"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(pkg.id)}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50"
+                        className="rounded-lg border border-danger/30 px-3 py-1.5 text-sm font-semibold text-danger-fg hover:bg-danger-soft"
                       >
                         Delete
                       </button>
@@ -637,22 +637,22 @@ export function PackagesOverviewPage() {
                   </div>
                 )}
 
-                <ul className="mt-4 divide-y divide-slate-100 border-t border-slate-100">
+                <ul className="mt-4 divide-y divide-border border-t border-border">
                   {pkg.tiers.map((tier) => (
                     <li key={tier.id} className="flex items-center justify-between py-2 text-sm">
-                      <span className="font-medium text-slate-700">{tier.classType}</span>
+                      <span className="font-medium text-fg">{tier.classType}</span>
                       <span className="flex items-center gap-1.5">
                         {tier.includesFood && (
-                          <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-700">
+                          <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[11px] font-medium text-brand-text">
                             food
                           </span>
                         )}
                         {tier.requiresAC && (
-                          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                          <span className="rounded-full bg-neutral-soft px-1.5 py-0.5 text-[11px] font-medium text-fg-muted">
                             AC
                           </span>
                         )}
-                        <span className="font-semibold text-slate-900">
+                        <span className="font-semibold text-fg">
                           ${tier.basePricePerPerson.toFixed(2)}
                         </span>
                       </span>
@@ -660,7 +660,7 @@ export function PackagesOverviewPage() {
                   ))}
                 </ul>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-surface-sunken p-3">
                   <select
                     className={`${inputClass} w-auto`}
                     value={newTier.classType}
@@ -691,7 +691,7 @@ export function PackagesOverviewPage() {
                       }))
                     }
                   />
-                  <label className="flex items-center gap-1.5 text-sm text-slate-600">
+                  <label className="flex items-center gap-1.5 text-sm text-fg-muted">
                     <input
                       type="checkbox"
                       checked={newTier.includesFood}
@@ -704,7 +704,7 @@ export function PackagesOverviewPage() {
                     />
                     Food
                   </label>
-                  <label className="flex items-center gap-1.5 text-sm text-slate-600">
+                  <label className="flex items-center gap-1.5 text-sm text-fg-muted">
                     <input
                       type="checkbox"
                       checked={newTier.requiresAC}
@@ -720,15 +720,15 @@ export function PackagesOverviewPage() {
                   <button
                     type="button"
                     onClick={() => handleAddTier(pkg.id)}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+                    className="rounded-lg border border-brand-500/30 bg-brand-soft px-3 py-1.5 text-xs font-semibold text-brand-text hover:bg-brand-soft"
                   >
                     + Add tier
                   </button>
-                  {tierError && <p className="w-full text-xs font-medium text-red-700">{tierError}</p>}
+                  {tierError && <p className="w-full text-xs font-medium text-danger-fg">{tierError}</p>}
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3">
-                  <label className="cursor-pointer rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100">
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-surface-sunken p-3">
+                  <label className="cursor-pointer rounded-lg border border-brand-500/30 bg-brand-soft px-3 py-1.5 text-xs font-semibold text-brand-text hover:bg-brand-soft">
                     {uploadingPhotoId === pkg.id ? 'Uploading...' : pkg.photoUrl ? 'Replace photo' : 'Upload photo'}
                     <input
                       type="file"
@@ -744,7 +744,7 @@ export function PackagesOverviewPage() {
                       }}
                     />
                   </label>
-                  {photoError && <p className="w-full text-xs font-medium text-red-700">{photoError}</p>}
+                  {photoError && <p className="w-full text-xs font-medium text-danger-fg">{photoError}</p>}
                 </div>
               </article>
             );

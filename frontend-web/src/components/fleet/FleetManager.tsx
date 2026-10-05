@@ -24,34 +24,35 @@ import { getAgentWorkflow, type AgentWorkflowDto } from '../../api/agentWorkflow
 import { getGuides, type GuideDto } from '../../api/guides';
 import { BookingsIcon, TruckIcon } from '../admin/icons';
 import { Link } from 'react-router-dom';
+import { notify } from '../ui/notify';
 
 // Exported badge helpers
 export function StatusBadge({ status }: { status: VehicleMaintenanceStatus }) {
   switch (status) {
     case 'Available':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success-fg ring-1 ring-inset ring-success/20">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           Available
         </span>
       );
     case 'UnderMaintenance':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-semibold text-warning-fg ring-1 ring-inset ring-warning/20">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
           Under Maintenance
         </span>
       );
     case 'OutOfService':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2.5 py-1 text-xs font-semibold text-danger-fg ring-1 ring-inset ring-danger/20">
           <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
           Out of Service
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+        <span className="inline-flex items-center rounded-full bg-neutral-soft px-2.5 py-1 text-xs font-medium text-fg-muted">
           {status}
         </span>
       );
@@ -60,14 +61,14 @@ export function StatusBadge({ status }: { status: VehicleMaintenanceStatus }) {
 
 export function VehicleTypeBadge({ type }: { type: VehicleType }) {
   const styles: Record<VehicleType, string> = {
-    Van: 'bg-brand-50 text-brand-700 border-brand-200',
-    Coach: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    SUV: 'bg-amber-50 text-amber-700 border-amber-200',
+    Van: 'bg-brand-soft text-brand-text border-brand-500/30',
+    Coach: 'bg-info-soft text-info-fg border-info/30',
+    SUV: 'bg-warning-soft text-warning-fg border-warning/30',
   };
   return (
     <span
       className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${
-        styles[type] || 'bg-slate-100 text-slate-700 border-slate-200'
+        styles[type] || 'bg-neutral-soft text-fg border-border'
       }`}
     >
       {type}
@@ -79,37 +80,37 @@ export function BookingStatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'NeedsManualReview':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700 border border-rose-200 animate-pulse">
+        <span className="inline-flex items-center gap-1 rounded bg-danger-soft px-2 py-0.5 text-xs font-bold text-danger-fg border border-danger/30 animate-pulse">
           Needs Review
         </span>
       );
     case 'PlanProposed':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-700 border border-purple-200">
+        <span className="inline-flex items-center gap-1 rounded bg-info-soft px-2 py-0.5 text-xs font-bold text-info-fg border border-info/30">
           ✨ Plan Proposed
         </span>
       );
     case 'PendingApproval':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200">
+        <span className="inline-flex items-center gap-1 rounded bg-warning-soft px-2 py-0.5 text-xs font-bold text-warning-fg border border-warning/30">
           Pending Approval
         </span>
       );
     case 'Requested':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 border border-blue-200">
+        <span className="inline-flex items-center gap-1 rounded bg-info-soft px-2 py-0.5 text-xs font-bold text-info-fg border border-info/30">
           Requested
         </span>
       );
     case 'Confirmed':
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+        <span className="inline-flex items-center gap-1 rounded bg-success-soft px-2 py-0.5 text-xs font-bold text-success-fg border border-success/30">
           Confirmed
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+        <span className="inline-flex items-center rounded bg-neutral-soft px-2 py-0.5 text-xs font-medium text-fg-muted">
           {status}
         </span>
       );
@@ -158,12 +159,9 @@ export function FleetManager() {
   const [allGuides, setAllGuides] = useState<GuideDto[]>([]);
   const [loadingGuides, setLoadingGuides] = useState(false);
   const [allocating, setAllocating] = useState(false);
-  const [allocationError, setAllocationError] = useState<string | null>(null);
-  const [allocationSuccess, setAllocationSuccess] = useState<string | null>(null);
 
   // Plan approval state
   const [approving, setApproving] = useState(false);
-  const [approvalError, setApprovalError] = useState<string | null>(null);
 
   function loadData() {
     setError(null);
@@ -318,12 +316,11 @@ export function FleetManager() {
   async function handleApprovePlan() {
     if (!selectedBooking) return;
     setApproving(true);
-    setApprovalError(null);
     try {
       await decideBooking(selectedBooking.id, { decision: 'Approve' });
       loadData();
     } catch (err) {
-      setApprovalError(extractErrorMessage(err, 'Failed to approve plan.'));
+      notify.error(extractErrorMessage(err, 'Failed to approve plan.'));
     } finally {
       setApproving(false);
     }
@@ -336,15 +333,11 @@ export function FleetManager() {
 
     // Capacity validation check
     if (selectedBooking.groupSize > allocatingVehicle.capacity) {
-      setAllocationError(
-        `Group size (${selectedBooking.groupSize}) exceeds vehicle capacity (${allocatingVehicle.capacity}). Assignment blocked.`
-      );
+      notify.error(`Group size (${selectedBooking.groupSize}) exceeds vehicle capacity (${allocatingVehicle.capacity}). Assignment blocked.`);
       return;
     }
 
     setAllocating(true);
-    setAllocationError(null);
-    setAllocationSuccess(null);
 
     try {
       await reserveVehicle(allocatingVehicle.id, {
@@ -355,16 +348,15 @@ export function FleetManager() {
         guideId: selectedGuideId ? selectedGuideId : undefined,
       });
 
-      setAllocationSuccess(`Successfully allocated ${allocatingVehicle.type}, driver, and tour guide to booking!`);
+      notify.success(`Successfully allocated ${allocatingVehicle.type}, driver, and tour guide to booking!`);
       setTimeout(() => {
         setAllocatingVehicle(null);
         setSelectedDriverId('');
         setSelectedGuideId('');
-        setAllocationSuccess(null);
         loadData();
       }, 1200);
     } catch (err) {
-      setAllocationError(extractErrorMessage(err, 'Failed to allocate resources.'));
+      notify.error(extractErrorMessage(err, 'Failed to allocate resources.'));
     } finally {
       setAllocating(false);
     }
@@ -385,16 +377,16 @@ export function FleetManager() {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-surface-raised p-6 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-brand-text">
             <TruckIcon className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="font-heading text-xl font-bold text-slate-900">
+            <h1 className="font-heading text-xl font-bold text-fg">
               Fleet &amp; Transport Workspace
             </h1>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-fg-muted">
               Operational dispatch, conflict-free smart vehicle allocation, and agent proposal approval.
             </p>
           </div>
@@ -403,14 +395,14 @@ export function FleetManager() {
         <div className="flex items-center gap-3">
           <Link
             to="/fleet/vehicles"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3.5 py-2 text-xs font-semibold text-fg shadow-sm hover:bg-surface-sunken transition"
           >
-            <TruckIcon className="h-4 w-4 text-slate-400" />
+            <TruckIcon className="h-4 w-4 text-fg-muted" />
             Manage Vehicles
           </Link>
           <Link
             to="/fleet/assignments"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand-700 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-600 transition"
           >
             View All Schedules
           </Link>
@@ -418,7 +410,7 @@ export function FleetManager() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700 shadow-sm">
+        <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger-fg shadow-sm">
           {error}
         </div>
       )}
@@ -427,24 +419,24 @@ export function FleetManager() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
         {/* Left Column: Operational Allocation Queue (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+          <div className="rounded-2xl border border-border bg-surface-raised p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <BookingsIcon className="h-5 w-5 text-brand-600" />
-                <h2 className="font-heading text-base font-bold text-slate-900">Allocation Queue</h2>
+                <BookingsIcon className="h-5 w-5 text-brand-text" />
+                <h2 className="font-heading text-base font-bold text-fg">Allocation Queue</h2>
               </div>
-              <span className="text-xs font-semibold text-slate-500">{bookings.length} Bookings</span>
+              <span className="text-xs font-semibold text-fg-muted">{bookings.length} Bookings</span>
             </div>
 
             {/* Queue Filter Tabs */}
-            <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-100 p-1 text-xs font-medium sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-neutral-soft p-1 text-xs font-medium sm:grid-cols-4">
               <button
                 type="button"
                 onClick={() => setQueueTab('NeedsManualReview')}
                 className={`flex flex-col items-center rounded-lg py-1.5 px-1 transition ${
                   queueTab === 'NeedsManualReview'
                     ? 'bg-rose-600 text-white font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                    : 'text-fg-muted hover:text-fg hover:bg-white/50'
                 }`}
               >
                 <span>Needs Review</span>
@@ -456,7 +448,7 @@ export function FleetManager() {
                 className={`flex flex-col items-center rounded-lg py-1.5 px-1 transition ${
                   queueTab === 'PlanProposed'
                     ? 'bg-purple-600 text-white font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                    : 'text-fg-muted hover:text-fg hover:bg-white/50'
                 }`}
               >
                 <span>Proposed</span>
@@ -468,7 +460,7 @@ export function FleetManager() {
                 className={`flex flex-col items-center rounded-lg py-1.5 px-1 transition ${
                   queueTab === 'PendingApproval'
                     ? 'bg-amber-600 text-white font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                    : 'text-fg-muted hover:text-fg hover:bg-white/50'
                 }`}
               >
                 <span>Pending</span>
@@ -479,8 +471,8 @@ export function FleetManager() {
                 onClick={() => setQueueTab('Requested')}
                 className={`flex flex-col items-center rounded-lg py-1.5 px-1 transition ${
                   queueTab === 'Requested'
-                    ? 'bg-brand-600 text-white font-bold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                    ? 'bg-brand-700 text-white font-bold shadow-xs'
+                    : 'text-fg-muted hover:text-fg hover:bg-white/50'
                 }`}
               >
                 <span>Requested</span>
@@ -490,11 +482,11 @@ export function FleetManager() {
 
             {/* Bookings List */}
             {loading ? (
-              <div className="py-12 text-center text-xs text-slate-400">Loading queue...</div>
+              <div className="py-12 text-center text-xs text-fg-muted">Loading queue...</div>
             ) : queueBookings.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center">
-                <p className="text-xs font-semibold text-slate-600">No bookings in this state</p>
-                <p className="mt-1 text-[11px] text-slate-400">
+              <div className="rounded-xl border border-dashed border-border p-8 text-center">
+                <p className="text-xs font-semibold text-fg-muted">No bookings in this state</p>
+                <p className="mt-1 text-[11px] text-fg-muted">
                   {queueTab === 'NeedsManualReview'
                     ? 'Awesome! No failed AI allocations require intervention.'
                     : `No bookings currently tagged as ${queueTab}.`}
@@ -510,32 +502,32 @@ export function FleetManager() {
                       onClick={() => setSelectedBooking(b)}
                       className={`cursor-pointer rounded-xl border p-3.5 transition text-left ${
                         isSelected
-                          ? 'border-brand-500 bg-brand-50/40 ring-1 ring-brand-500 shadow-xs'
-                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
+                          ? 'border-brand-500 bg-brand-soft/40 ring-1 ring-brand-500 shadow-xs'
+                          : 'border-border bg-surface-raised hover:border-border hover:bg-surface-sunken/60'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="font-heading text-xs font-bold text-slate-900">
+                          <p className="font-heading text-xs font-bold text-fg">
                             {b.tourPackageName || 'Custom Sri Lanka Tour'}
                           </p>
-                          <p className="text-[11px] text-slate-500">
+                          <p className="text-[11px] text-fg-muted">
                             {b.startDate} to {b.endDate}
                           </p>
                         </div>
                         <BookingStatusBadge status={b.status} />
                       </div>
 
-                      <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-600">
-                        <span className="font-semibold text-slate-800">
+                      <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2 text-[11px] text-fg-muted">
+                        <span className="font-semibold text-fg">
                           👥 {b.groupSize} Guests
                         </span>
                         {b.packageTier?.requiresAC && (
-                          <span className="text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100 font-medium">
+                          <span className="text-info-fg bg-info-soft px-1.5 py-0.5 rounded border border-info/30 font-medium">
                             ❄️ AC Required
                           </span>
                         )}
-                        <span className="font-mono text-slate-400 text-[10px]">
+                        <span className="font-mono text-fg-muted text-[10px]">
                           REF: {b.id.slice(0, 8)}
                         </span>
                       </div>
@@ -550,65 +542,65 @@ export function FleetManager() {
         {/* Right Column: Active Booking Workspace & Smart Vehicle Availability (7 cols) */}
         <div className="lg:col-span-7 space-y-5">
           {!selectedBooking ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
-              <TruckIcon className="mx-auto h-12 w-12 text-slate-300" />
-              <h3 className="mt-3 text-sm font-semibold text-slate-700">No Booking Selected</h3>
-              <p className="mt-1 text-xs text-slate-400">
+            <div className="rounded-2xl border border-dashed border-border bg-surface-raised p-12 text-center">
+              <TruckIcon className="mx-auto h-12 w-12 text-fg-muted" />
+              <h3 className="mt-3 text-sm font-semibold text-fg">No Booking Selected</h3>
+              <p className="mt-1 text-xs text-fg-muted">
                 Select a booking from the allocation queue on the left to verify vehicle dates and assign transport.
               </p>
             </div>
           ) : (
             <>
               {/* Selected Booking Header & Inspection Card */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="rounded-2xl border border-border bg-surface-raised p-5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="font-heading text-base font-bold text-slate-900">
+                      <h2 className="font-heading text-base font-bold text-fg">
                         {selectedBooking.tourPackageName}
                       </h2>
                       <BookingStatusBadge status={selectedBooking.status} />
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Booking ID: <span className="font-mono text-slate-700">{selectedBooking.id}</span>
+                    <p className="text-xs text-fg-muted mt-0.5">
+                      Booking ID: <span className="font-mono text-fg">{selectedBooking.id}</span>
                     </p>
                   </div>
 
-                  <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs text-right">
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Service Window</span>
-                    <span className="font-bold text-slate-800">
+                  <div className="rounded-xl bg-surface-sunken border border-border px-3 py-1.5 text-xs text-right">
+                    <span className="text-fg-muted block text-[10px] uppercase font-semibold">Service Window</span>
+                    <span className="font-bold text-fg">
                       {selectedBooking.startDate} &rarr; {selectedBooking.endDate}
                     </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <span className="text-slate-400 block text-[10px]">Group Size</span>
-                    <span className="font-bold text-slate-800 text-sm">{selectedBooking.groupSize} Guests</span>
+                  <div className="rounded-lg bg-surface-sunken p-2.5">
+                    <span className="text-fg-muted block text-[10px]">Group Size</span>
+                    <span className="font-bold text-fg text-sm">{selectedBooking.groupSize} Guests</span>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <span className="text-slate-400 block text-[10px]">Climate Req.</span>
-                    <span className={`font-bold text-sm ${selectedBooking.packageTier?.requiresAC ? 'text-sky-700' : 'text-slate-700'}`}>
+                  <div className="rounded-lg bg-surface-sunken p-2.5">
+                    <span className="text-fg-muted block text-[10px]">Climate Req.</span>
+                    <span className={`font-bold text-sm ${selectedBooking.packageTier?.requiresAC ? 'text-info-fg' : 'text-fg'}`}>
                       {selectedBooking.packageTier?.requiresAC ? '❄️ AC Required' : 'Standard'}
                     </span>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <span className="text-slate-400 block text-[10px]">Tier Class</span>
-                    <span className="font-bold text-slate-800 text-sm">
+                  <div className="rounded-lg bg-surface-sunken p-2.5">
+                    <span className="text-fg-muted block text-[10px]">Tier Class</span>
+                    <span className="font-bold text-fg text-sm">
                       {selectedBooking.packageTier?.classType || 'Standard'}
                     </span>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <span className="text-slate-400 block text-[10px]">Budget</span>
-                    <span className="font-bold text-slate-800 text-sm">
+                  <div className="rounded-lg bg-surface-sunken p-2.5">
+                    <span className="text-fg-muted block text-[10px]">Budget</span>
+                    <span className="font-bold text-fg text-sm">
                       ${selectedBooking.budgetPerPerson}/pax
                     </span>
                   </div>
                 </div>
 
                 {selectedBooking.specialRequests && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-900">
+                  <div className="rounded-xl border border-warning/30 bg-warning-soft/60 p-3 text-xs text-warning-fg">
                     <span className="font-bold">Special Requests: </span>
                     {selectedBooking.specialRequests}
                   </div>
@@ -616,34 +608,34 @@ export function FleetManager() {
 
                 {/* Assigned Vehicle & Driver Display Card */}
                 {currentAssignment && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="rounded-xl border border-success/30 bg-success-soft/70 p-4 text-xs text-success-fg flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold">
                         🚐
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-emerald-900 text-sm">{currentAssignment.vehicleName}</span>
+                          <span className="font-bold text-success-fg text-sm">{currentAssignment.vehicleName}</span>
                           {currentAssignment.registrationNumber && (
-                            <span className="font-mono text-[11px] bg-white border border-emerald-300 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                            <span className="font-mono text-[11px] bg-surface-raised border border-success/30 text-success-fg px-1.5 py-0.5 rounded font-bold">
                               {currentAssignment.registrationNumber}
                             </span>
                           )}
-                          <span className="text-[10px] font-semibold uppercase bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-semibold uppercase bg-success-soft/80 text-success-fg px-2 py-0.5 rounded-full">
                             Vehicle Assigned
                           </span>
                         </div>
-                        <p className="text-emerald-700 text-xs mt-0.5">
-                          Assigned Driver: <span className="font-semibold text-emerald-900">{currentAssignment.driverName}</span> {currentAssignment.driverContact ? `(${currentAssignment.driverContact})` : ''}
+                        <p className="text-success-fg text-xs mt-0.5">
+                          Assigned Driver: <span className="font-semibold text-success-fg">{currentAssignment.driverName}</span> {currentAssignment.driverContact ? `(${currentAssignment.driverContact})` : ''}
                         </p>
                         {currentAssignment.guideName && (
-                          <p className="text-purple-700 text-xs mt-0.5">
-                            Assigned Guide: <span className="font-semibold text-purple-900">{currentAssignment.guideName}</span> {currentAssignment.guideContact ? `(${currentAssignment.guideContact})` : ''}
+                          <p className="text-info-fg text-xs mt-0.5">
+                            Assigned Guide: <span className="font-semibold text-info-fg">{currentAssignment.guideName}</span> {currentAssignment.guideContact ? `(${currentAssignment.guideContact})` : ''}
                           </p>
                         )}
                       </div>
                     </div>
-                    <span className="text-[11px] text-emerald-800 font-medium bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-200 self-start sm:self-auto">
+                    <span className="text-[11px] text-success-fg font-medium bg-white/80 px-2.5 py-1 rounded-lg border border-success/30 self-start sm:self-auto">
                       Confirmed Dispatch
                     </span>
                   </div>
@@ -666,52 +658,52 @@ export function FleetManager() {
                 const matchedDriver = drivers.find((d) => d.id === fleetOutput?.driverId);
 
                 return (
-                  <div className="rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50/70 via-white to-purple-50/40 p-5 shadow-sm space-y-4 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between border-b border-purple-100 pb-3">
+                  <div className="rounded-2xl border-2 border-info/30 bg-gradient-to-br from-info-soft/70 via-surface-raised to-info-soft/40 p-5 shadow-sm space-y-4 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-info/30 pb-3">
                       <div className="flex items-center gap-2">
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-600 text-white font-bold text-sm shadow-xs">
                           AI
                         </span>
                         <div>
-                          <h3 className="font-heading text-sm font-bold text-purple-950">
+                          <h3 className="font-heading text-sm font-bold text-info-fg">
                             Agent Plan Review &amp; Resource Matching
                           </h3>
-                          <p className="text-xs text-purple-700">
+                          <p className="text-xs text-info-fg">
                             The multi-agent coordinator formulated this complete resource package (Vehicle + Driver + Guide).
                           </p>
                         </div>
                       </div>
 
-                      <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-800 border border-purple-200">
+                      <span className="rounded-full bg-info-soft px-3 py-1 text-xs font-bold text-info-fg border border-info/30">
                         ✨ Plan Proposed
                       </span>
                     </div>
 
                     {workflowLoading ? (
-                      <div className="py-8 text-center text-xs text-purple-600 animate-pulse">Loading agent recommendation...</div>
+                      <div className="py-8 text-center text-xs text-info animate-pulse">Loading agent recommendation...</div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Left: Traveler & Trip Details */}
-                        <div className="rounded-xl border border-purple-200/70 bg-white p-4 text-xs space-y-3 shadow-2xs">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                            <p className="font-semibold uppercase tracking-wider text-[10px] text-purple-600">
+                        <div className="rounded-xl border border-info/30 bg-surface-raised p-4 text-xs space-y-3 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-border pb-2">
+                            <p className="font-semibold uppercase tracking-wider text-[10px] text-info">
                               Traveler &amp; Requirements
                             </p>
-                            <span className="font-mono text-[10px] text-slate-400">
+                            <span className="font-mono text-[10px] text-fg-muted">
                               REF: {selectedBooking.id.slice(0, 8)}
                             </span>
                           </div>
 
-                          <div className="space-y-1.5 text-slate-700">
-                            <p><span className="text-slate-400">Package:</span> <span className="font-bold text-slate-900">{selectedBooking.tourPackageName}</span></p>
-                            <p><span className="text-slate-400">Trip Dates:</span> <span className="font-semibold text-slate-800">{selectedBooking.startDate} &rarr; {selectedBooking.endDate}</span></p>
-                            <p><span className="text-slate-400">Party Size:</span> <span className="font-bold text-slate-900">👥 {selectedBooking.groupSize} Guests</span></p>
-                            <p><span className="text-slate-400">Climate:</span> <span className="font-semibold text-slate-800">{selectedBooking.packageTier?.requiresAC ? '❄️ AC Mandatory' : 'Standard Air'}</span></p>
+                          <div className="space-y-1.5 text-fg">
+                            <p><span className="text-fg-muted">Package:</span> <span className="font-bold text-fg">{selectedBooking.tourPackageName}</span></p>
+                            <p><span className="text-fg-muted">Trip Dates:</span> <span className="font-semibold text-fg">{selectedBooking.startDate} &rarr; {selectedBooking.endDate}</span></p>
+                            <p><span className="text-fg-muted">Party Size:</span> <span className="font-bold text-fg">👥 {selectedBooking.groupSize} Guests</span></p>
+                            <p><span className="text-fg-muted">Climate:</span> <span className="font-semibold text-fg">{selectedBooking.packageTier?.requiresAC ? '❄️ AC Mandatory' : 'Standard Air'}</span></p>
                             {selectedBooking.languagePreference && (
-                              <p><span className="text-slate-400">Language:</span> <span className="font-semibold text-indigo-700">🗣️ {selectedBooking.languagePreference}</span></p>
+                              <p><span className="text-fg-muted">Language:</span> <span className="font-semibold text-info-fg">🗣️ {selectedBooking.languagePreference}</span></p>
                             )}
                             {selectedBooking.specialRequests && (
-                              <div className="mt-2 rounded-lg bg-amber-50/80 p-2.5 text-amber-900 border border-amber-200/80 text-[11px] italic">
+                              <div className="mt-2 rounded-lg bg-warning-soft/80 p-2.5 text-warning-fg border border-warning/30 text-[11px] italic">
                                 "{selectedBooking.specialRequests}"
                               </div>
                             )}
@@ -719,103 +711,97 @@ export function FleetManager() {
                         </div>
 
                         {/* Right: Agent Resource Recommendation & Validation Chips */}
-                        <div className="rounded-xl border border-purple-200/70 bg-white p-4 text-xs space-y-3 shadow-2xs">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                            <p className="font-semibold uppercase tracking-wider text-[10px] text-purple-600">
+                        <div className="rounded-xl border border-info/30 bg-surface-raised p-4 text-xs space-y-3 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-border pb-2">
+                            <p className="font-semibold uppercase tracking-wider text-[10px] text-info">
                               Agent Recommended Allocation
                             </p>
-                            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px]">
+                            <span className="font-semibold text-success-fg bg-success-soft px-2 py-0.5 rounded border border-success/30 text-[10px]">
                               3/3 Allocated
                             </span>
                           </div>
 
                           {/* Vehicle Match */}
-                          <div className="rounded-lg bg-slate-50 p-2.5 border border-slate-200 flex items-center justify-between">
+                          <div className="rounded-lg bg-surface-sunken p-2.5 border border-border flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-base">🚐</span>
                               <div>
-                                <p className="font-bold text-slate-900 text-xs">
+                                <p className="font-bold text-fg text-xs">
                                   {matchedVehicle ? `${matchedVehicle.type} (${matchedVehicle.capacity} seats)` : 'AI-Optimized Vehicle'}
                                 </p>
-                                <p className="text-[10px] text-slate-500 font-mono">
+                                <p className="text-[10px] text-fg-muted font-mono">
                                   {matchedVehicle?.registrationNumber || 'Matched by FleetCapacityAgent'}
                                 </p>
                               </div>
                             </div>
-                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
+                            <span className="text-[10px] font-semibold text-success-fg bg-success-soft/70 px-2 py-0.5 rounded">
                               Fit OK
                             </span>
                           </div>
 
                           {/* Driver Match */}
-                          <div className="rounded-lg bg-slate-50 p-2.5 border border-slate-200 flex items-center justify-between">
+                          <div className="rounded-lg bg-surface-sunken p-2.5 border border-border flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-base">🧑‍✈️</span>
                               <div>
-                                <p className="font-bold text-slate-900 text-xs">
+                                <p className="font-bold text-fg text-xs">
                                   {matchedDriver ? matchedDriver.name : 'AI-Verified Driver'}
                                 </p>
-                                <p className="text-[10px] text-slate-500">
+                                <p className="text-[10px] text-fg-muted">
                                   {matchedDriver?.contactInfo || 'Conflict-free schedule'}
                                 </p>
                               </div>
                             </div>
-                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
+                            <span className="text-[10px] font-semibold text-success-fg bg-success-soft/70 px-2 py-0.5 rounded">
                               Conflict-Free
                             </span>
                           </div>
 
                           {/* Tour Guide Match */}
-                          <div className="rounded-lg bg-purple-50/70 p-2.5 border border-purple-200 flex items-center justify-between">
+                          <div className="rounded-lg bg-info-soft/70 p-2.5 border border-info/30 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-base">🧭</span>
                               <div>
-                                <p className="font-bold text-purple-950 text-xs">
+                                <p className="font-bold text-info-fg text-xs">
                                   {matchedGuide ? matchedGuide.name : 'AI-Matched Tour Guide'}
                                 </p>
-                                <p className="text-[10px] text-purple-700">
+                                <p className="text-[10px] text-info-fg">
                                   {guideOutput?.reasoning ? guideOutput.reasoning : (matchedGuide?.specializations?.join(', ') || 'Specialized guide matched')}
                                 </p>
                               </div>
                             </div>
-                            <span className="text-[10px] font-bold text-purple-800 bg-purple-200/80 px-2 py-0.5 rounded">
+                            <span className="text-[10px] font-bold text-info-fg bg-info-soft/80 px-2 py-0.5 rounded">
                               {guideOutput?.matchScore ? `${Math.round(guideOutput.matchScore * 100)}% Match` : 'Verified'}
                             </span>
                           </div>
 
                           {/* Validation Chips */}
                           <div className="flex flex-wrap gap-1.5 pt-1">
-                            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 rounded bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success-fg border border-success/30">
                               ✓ No Date Conflicts
                             </span>
-                            <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 rounded bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success-fg border border-success/30">
                               ✓ Capacity OK: {selectedBooking.groupSize} Guests
                             </span>
                             {selectedBooking.packageTier?.requiresAC && (
-                              <span className="inline-flex items-center gap-1 rounded bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 border border-sky-200">
+                              <span className="inline-flex items-center gap-1 rounded bg-info-soft px-2 py-0.5 text-[11px] font-semibold text-info-fg border border-info/30">
                                 ✓ Climate AC Verified
                               </span>
                             )}
-                            <span className="inline-flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200">
+                            <span className="inline-flex items-center gap-1 rounded bg-info-soft px-2 py-0.5 text-[11px] font-semibold text-info-fg border border-info/30">
                               ✓ Guide Matched
                             </span>
-                            <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200">
+                            <span className="inline-flex items-center gap-1 rounded bg-info-soft px-2 py-0.5 text-[11px] font-semibold text-info-fg border border-info/30">
                               ✓ Budget Feasible {pricingOutput?.totalCost ? `($${pricingOutput.totalCost})` : ''}
                             </span>
                           </div>
 
                           {workflowPlan?.summaryText && (
-                            <p className="text-[11px] text-slate-600 mt-2 bg-purple-50/50 p-2.5 rounded-lg border border-purple-100">
+                            <p className="text-[11px] text-fg-muted mt-2 bg-info-soft/50 p-2.5 rounded-lg border border-info/30">
                               {workflowPlan.summaryText}
                             </p>
                           )}
                         </div>
-                      </div>
-                    )}
-
-                    {approvalError && (
-                      <div className="rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
-                        {approvalError}
                       </div>
                     )}
 
@@ -828,11 +814,11 @@ export function FleetManager() {
                       return (
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                           {!allAssigned ? (
-                            <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                            <span className="text-[11px] font-medium text-warning-fg bg-warning-soft px-2.5 py-1 rounded-lg border border-warning/30">
                               ⚠️ Cannot confirm: All 3 resources (Vehicle, Driver, Guide) must be allocated before approval.
                             </span>
                           ) : (
-                            <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            <span className="text-[11px] font-medium text-success-fg bg-success-soft px-2.5 py-1 rounded-lg border border-success/30">
                               ✓ All 3 resources ready to be committed on approval.
                             </span>
                           )}
@@ -853,32 +839,32 @@ export function FleetManager() {
               })()}
 
               {/* Smart Vehicle Availability Roster for the Selected Dates */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="rounded-2xl border border-border bg-surface-raised p-5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-3">
                   <div>
-                    <h3 className="font-heading text-sm font-bold text-slate-900">
+                    <h3 className="font-heading text-sm font-bold text-fg">
                       Smart Vehicle Match &amp; Availability
                     </h3>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-fg-muted">
                       Real-time conflict verification for {selectedBooking.startDate} to {selectedBooking.endDate}.
                     </p>
                   </div>
                   {checkingAvailability && (
-                    <span className="text-xs font-medium text-brand-600 animate-pulse">
+                    <span className="text-xs font-medium text-brand-text animate-pulse">
                       Checking schedule conflicts...
                     </span>
                   )}
                 </div>
 
                 {/* Filter bar for Smart Vehicle Match list */}
-                <div className="space-y-3 rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs">
+                <div className="space-y-3 rounded-xl bg-surface-sunken p-3 border border-border text-xs">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-600 font-semibold mb-1">Filter by Vehicle Type</label>
+                      <label className="block text-fg-muted font-semibold mb-1">Filter by Vehicle Type</label>
                       <select
                         value={vehicleTypeFilter}
                         onChange={(e) => setVehicleTypeFilter(e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none"
+                        className="w-full rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-xs text-fg focus:border-brand-500 focus:outline-none"
                       >
                         <option value="all">All Vehicle Types</option>
                         <option value="Van">Van</option>
@@ -887,28 +873,28 @@ export function FleetManager() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-slate-600 font-semibold mb-1">Filter by Min Seats / Capacity</label>
+                      <label className="block text-fg-muted font-semibold mb-1">Filter by Min Seats / Capacity</label>
                       <input
                         type="number"
                         min="1"
                         placeholder="e.g. 8 seats"
                         value={minSeatsFilter}
                         onChange={(e) => setMinSeatsFilter(e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-brand-500 focus:outline-none"
+                        className="w-full rounded-lg border border-border bg-surface-raised px-2.5 py-1.5 text-xs text-fg focus:border-brand-500 focus:outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Single Availability Filter Checkbox */}
-                  <div className="flex items-center gap-3 pt-1 border-t border-slate-200/80">
+                  <div className="flex items-center gap-3 pt-1 border-t border-border/80">
                     <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
                         checked={onlyAvailableVehicles}
                         onChange={(e) => setOnlyAvailableVehicles(e.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                        className="h-4 w-4 rounded border-border text-brand-text focus:ring-brand-500 cursor-pointer"
                       />
-                      <span className="text-slate-700 font-medium">
+                      <span className="text-fg font-medium">
                         Show only available vehicles
                       </span>
                     </label>
@@ -937,14 +923,14 @@ export function FleetManager() {
                   });
 
                   if (!vehicles || vehicles.length === 0) {
-                    return <p className="text-xs text-slate-400 py-6 text-center">No vehicles in fleet.</p>;
+                    return <p className="text-xs text-fg-muted py-6 text-center">No vehicles in fleet.</p>;
                   }
 
                   if (filteredVehicles.length === 0) {
                     return (
-                      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500 bg-slate-50/50">
-                        <p className="font-semibold text-slate-700">No vehicles match the selected criteria.</p>
-                        <p className="mt-1 text-slate-400">
+                      <div className="rounded-xl border border-dashed border-border p-8 text-center text-xs text-fg-muted bg-surface-sunken/50">
+                        <p className="font-semibold text-fg">No vehicles match the selected criteria.</p>
+                        <p className="mt-1 text-fg-muted">
                           Try adjusting your vehicle type, minimum seats, or unchecking the "Show only available vehicles" filter.
                         </p>
                       </div>
@@ -965,21 +951,21 @@ export function FleetManager() {
                             key={veh.id}
                             className={`rounded-xl border p-4 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                               canAssign
-                                ? 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-xs'
-                                : 'border-slate-200 bg-slate-50/70 opacity-60'
+                                ? 'border-border bg-surface-raised hover:border-brand-500/30 hover:shadow-xs'
+                                : 'border-border bg-surface-sunken/70 opacity-60'
                             }`}
                           >
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 <VehicleTypeBadge type={veh.type} />
-                                <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                <span className="font-mono text-xs font-bold text-fg bg-neutral-soft px-2 py-0.5 rounded border border-border">
                                   {veh.registrationNumber || 'REG-PENDING'}
                                 </span>
-                                <span className="text-xs font-semibold text-slate-700">
+                                <span className="text-xs font-semibold text-fg">
                                   {veh.capacity} Seats
                                 </span>
                                 {veh.hasAC && (
-                                  <span className="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100">
+                                  <span className="text-[10px] text-info-fg bg-info-soft px-1.5 py-0.5 rounded border border-info/30">
                                     AC
                                   </span>
                                 )}
@@ -988,23 +974,23 @@ export function FleetManager() {
                               {/* Detailed Conflict or Availability Tags */}
                               <div className="flex flex-wrap items-center gap-2 pt-1">
                                 {isMaintenanceBlocked ? (
-                                  <span className="text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                  <span className="text-[11px] font-semibold text-danger-fg bg-danger-soft px-2 py-0.5 rounded border border-danger/30">
                                     {veh.maintenanceStatus === 'UnderMaintenance'
                                       ? 'Under Maintenance'
                                       : 'Out of Service'}
                                   </span>
                                 ) : isFree ? (
-                                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                  <span className="text-[11px] font-semibold text-success-fg bg-success-soft px-2 py-0.5 rounded border border-success/30">
                                     ✓ Available for these dates
                                   </span>
                                 ) : (
-                                  <span className="text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                  <span className="text-[11px] font-semibold text-danger-fg bg-danger-soft px-2 py-0.5 rounded border border-danger/30">
                                     ✕ Unavailable for these dates (Existing Assignment)
                                   </span>
                                 )}
 
                                 {!hasCapacity && (
-                                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                  <span className="text-[11px] font-semibold text-warning-fg bg-warning-soft px-2 py-0.5 rounded border border-warning/30">
                                     ⚠️ Capacity Shortfall ({veh.capacity} seats &lt; {selectedBooking.groupSize} pax)
                                   </span>
                                 )}
@@ -1016,15 +1002,13 @@ export function FleetManager() {
                                 type="button"
                                 disabled={!canAssign}
                                 onClick={() => {
-                                  setAllocationError(null);
-                                  setAllocationSuccess(null);
                                   setSelectedDriverId('');
                                   setAllocatingVehicle(veh);
                                 }}
                                 className={`rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
                                   canAssign
-                                    ? 'bg-brand-600 text-white hover:bg-brand-500'
-                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    ? 'bg-brand-700 text-white hover:bg-brand-600'
+                                    : 'bg-neutral-soft text-fg-muted cursor-not-allowed'
                                 }`}
                               >
                                 Assign Vehicle
@@ -1049,44 +1033,32 @@ export function FleetManager() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-150">
-              <h2 className="font-heading text-lg font-bold text-slate-900">
+            <div className="w-full max-w-lg rounded-2xl bg-surface-raised p-6 shadow-xl animate-in fade-in zoom-in duration-150">
+              <h2 className="font-heading text-lg font-bold text-fg">
                 Confirm Vehicle, Driver &amp; Guide Allocation
               </h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-fg-muted">
                 Assign {allocatingVehicle.type} ({allocatingVehicle.registrationNumber}) to{' '}
                 {selectedBooking.tourPackageName}.
               </p>
 
-            {allocationError && (
-              <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
-                {allocationError}
-              </div>
-            )}
-
-            {allocationSuccess && (
-              <div className="mt-3 rounded-lg bg-emerald-50 p-2.5 text-xs text-emerald-800 border border-emerald-200">
-                {allocationSuccess}
-              </div>
-            )}
-
             <form onSubmit={handleConfirmAllocation} className="mt-4 space-y-4">
-              <div className="rounded-xl bg-slate-50 p-3 text-xs space-y-1.5 border border-slate-200">
+              <div className="rounded-xl bg-surface-sunken p-3 text-xs space-y-1.5 border border-border">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Booking Dates:</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="text-fg-muted">Booking Dates:</span>
+                  <span className="font-bold text-fg">
                     {selectedBooking.startDate} to {selectedBooking.endDate}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Party Size:</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="text-fg-muted">Party Size:</span>
+                  <span className="font-bold text-fg">
                     {selectedBooking.groupSize} Guests
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Vehicle Capacity:</span>
-                  <span className="font-bold text-emerald-700">
+                  <span className="text-fg-muted">Vehicle Capacity:</span>
+                  <span className="font-bold text-success-fg">
                     {allocatingVehicle.capacity} Seats (Fit OK)
                   </span>
                 </div>
@@ -1094,18 +1066,18 @@ export function FleetManager() {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-700">
+                  <label className="block text-xs font-semibold text-fg">
                     Assign Driver (Conflict-Free Verification) *
                   </label>
                   {checkingDriverAvailability && (
-                    <span className="text-[11px] text-brand-600 animate-pulse">
+                    <span className="text-[11px] text-brand-text animate-pulse">
                       Checking driver schedules...
                     </span>
                   )}
                 </div>
 
                 {drivers.length === 0 ? (
-                  <p className="text-xs text-rose-600">
+                  <p className="text-xs text-danger">
                     No drivers registered. Please register a driver in Drivers Roster first.
                   </p>
                 ) : (
@@ -1126,28 +1098,28 @@ export function FleetManager() {
                           }}
                           className={`rounded-xl border p-3 text-xs transition flex items-center justify-between ${
                             !isFree
-                              ? 'border-slate-200 bg-slate-50/70 opacity-50 cursor-not-allowed'
+                              ? 'border-border bg-surface-sunken/70 opacity-50 cursor-not-allowed'
                               : isSelected
-                              ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500 cursor-pointer'
-                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 cursor-pointer'
+                              ? 'border-brand-500 bg-brand-soft/50 ring-1 ring-brand-500 cursor-pointer'
+                              : 'border-border bg-surface-raised hover:border-border hover:bg-surface-sunken/50 cursor-pointer'
                           }`}
                         >
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900">{d.name}</span>
-                              <span className="font-mono text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                              <span className="font-bold text-fg">{d.name}</span>
+                              <span className="font-mono text-[10px] text-fg-muted bg-neutral-soft px-1.5 py-0.5 rounded border border-border">
                                 {d.licenseNumber}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-500">{d.contactInfo || 'No contact provided'}</p>
+                            <p className="text-[11px] text-fg-muted">{d.contactInfo || 'No contact provided'}</p>
                             <div>
                               {isFree ? (
-                                <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 text-[10px]">
+                                <span className="inline-flex items-center gap-1 font-semibold text-success-fg text-[10px]">
                                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                   Available for these dates
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 font-semibold text-rose-700 text-[10px]">
+                                <span className="inline-flex items-center gap-1 font-semibold text-danger-fg text-[10px]">
                                   <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                                   Unavailable for these dates (Booked)
                                 </span>
@@ -1163,7 +1135,7 @@ export function FleetManager() {
                               disabled={!isFree}
                               checked={isSelected}
                               onChange={() => isFree && setSelectedDriverId(d.id)}
-                              className="h-4 w-4 border-slate-300 text-brand-600 focus:ring-brand-500 disabled:opacity-40"
+                              className="h-4 w-4 border-border text-brand-text focus:ring-brand-500 disabled:opacity-40"
                             />
                           </div>
                         </div>
@@ -1176,18 +1148,18 @@ export function FleetManager() {
               {/* Tour Guide Selection with Date Overlap Checks */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-700">
+                  <label className="block text-xs font-semibold text-fg">
                     Assign Tour Guide (Anti-Double-Booking Check)
                   </label>
                   {loadingGuides && (
-                    <span className="text-[11px] text-purple-600 animate-pulse">
+                    <span className="text-[11px] text-info animate-pulse">
                       Checking guide schedules...
                     </span>
                   )}
                 </div>
 
                 {allGuides.length === 0 ? (
-                  <p className="text-xs text-slate-500">No guides registered in the system.</p>
+                  <p className="text-xs text-fg-muted">No guides registered in the system.</p>
                 ) : (
                   <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                     {/* Option to keep existing guide if already assigned */}
@@ -1196,13 +1168,13 @@ export function FleetManager() {
                         onClick={() => setSelectedGuideId('')}
                         className={`rounded-xl border p-2.5 text-xs transition flex items-center justify-between cursor-pointer ${
                           selectedGuideId === ''
-                            ? 'border-purple-500 bg-purple-50/50 ring-1 ring-purple-500'
-                            : 'border-slate-200 bg-white hover:border-slate-300'
+                            ? 'border-info bg-info-soft/50 ring-1 ring-info'
+                            : 'border-border bg-surface-raised hover:border-border'
                         }`}
                       >
                         <div className="space-y-0.5">
-                          <span className="font-semibold text-slate-700">Keep Current Guide ({existingGuideName})</span>
-                          <p className="text-[11px] text-slate-400">Keep the previously assigned tour guide for this booking.</p>
+                          <span className="font-semibold text-fg">Keep Current Guide ({existingGuideName})</span>
+                          <p className="text-[11px] text-fg-muted">Keep the previously assigned tour guide for this booking.</p>
                         </div>
                         <input
                           type="radio"
@@ -1210,11 +1182,11 @@ export function FleetManager() {
                           value=""
                           checked={selectedGuideId === ''}
                           onChange={() => setSelectedGuideId('')}
-                          className="h-4 w-4 border-slate-300 text-purple-600 focus:ring-purple-500"
+                          className="h-4 w-4 border-border text-info focus:ring-info"
                         />
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 text-xs text-amber-800">
+                      <div className="rounded-xl border border-warning/30 bg-warning-soft/70 p-2.5 text-xs text-warning-fg">
                         <span className="font-semibold">⚠️ Guide Required: </span>
                         A booking requires all 3 resources (Vehicle, Driver, Guide) to be confirmed. Please select an available guide below.
                       </div>
@@ -1236,37 +1208,37 @@ export function FleetManager() {
                           }}
                           className={`rounded-xl border p-3 text-xs transition flex items-center justify-between ${
                             !isFree
-                              ? 'border-slate-200 bg-slate-50/70 opacity-45 cursor-not-allowed'
+                              ? 'border-border bg-surface-sunken/70 opacity-45 cursor-not-allowed'
                               : isSelected
-                              ? 'border-purple-500 bg-purple-50/50 ring-1 ring-purple-500 cursor-pointer'
-                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50 cursor-pointer'
+                              ? 'border-info bg-info-soft/50 ring-1 ring-info cursor-pointer'
+                              : 'border-border bg-surface-raised hover:border-border hover:bg-surface-sunken/50 cursor-pointer'
                           }`}
                         >
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900">{g.name}</span>
+                              <span className="font-bold text-fg">{g.name}</span>
                               {availItem?.matchesSpecialization && (
-                                <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                <span className="text-[10px] font-semibold text-info-fg bg-info-soft px-1.5 py-0.5 rounded border border-info/30">
                                   Theme Match
                                 </span>
                               )}
                               {availItem?.matchesLanguage && (
-                                <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                <span className="text-[10px] font-semibold text-info-fg bg-info-soft px-1.5 py-0.5 rounded border border-info/30">
                                   Language Match
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-500">
+                            <p className="text-[11px] text-fg-muted">
                               {g.specializations?.join(', ') || 'General Guide'} &bull; {g.languages?.join(', ')}
                             </p>
                             <div>
                               {isFree ? (
-                                <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 text-[10px]">
+                                <span className="inline-flex items-center gap-1 font-semibold text-success-fg text-[10px]">
                                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                   Available for this tour window
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 font-semibold text-rose-700 text-[10px]">
+                                <span className="inline-flex items-center gap-1 font-semibold text-danger-fg text-[10px]">
                                   <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                                   Unavailable (Date overlap / Booked)
                                 </span>
@@ -1282,7 +1254,7 @@ export function FleetManager() {
                               disabled={!isFree}
                               checked={isSelected}
                               onChange={() => isFree && setSelectedGuideId(g.id)}
-                              className="h-4 w-4 border-slate-300 text-purple-600 focus:ring-purple-500 disabled:opacity-40"
+                              className="h-4 w-4 border-border text-info focus:ring-info disabled:opacity-40"
                             />
                           </div>
                         </div>
@@ -1297,14 +1269,14 @@ export function FleetManager() {
                   type="button"
                   onClick={() => setAllocatingVehicle(null)}
                   disabled={allocating}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+                  className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-fg-muted hover:bg-surface-sunken transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={allocating || !selectedDriverId || (!selectedGuideId && !hasExistingGuide)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-600 transition disabled:opacity-50"
                 >
                   {allocating ? 'Allocating Resources...' : 'Confirm Allocation'}
                 </button>

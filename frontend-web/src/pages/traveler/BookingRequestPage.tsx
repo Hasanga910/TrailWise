@@ -3,11 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { extractErrorMessage, extractFieldErrors } from '../../api/apiClient';
 import { createBooking } from '../../api/bookings';
 import { getPackages, type TourPackage } from '../../api/packages';
+import { notify } from '../../components/ui/notify';
 
 const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'text-xs font-semibold text-slate-600';
-const fieldErrorClass = 'mt-1 text-xs font-medium text-red-700';
+  'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const labelClass = 'text-xs font-semibold text-fg-muted';
+const fieldErrorClass = 'mt-1 text-xs font-medium text-danger-fg';
 
 interface TierOption {
   tierId: string;
@@ -44,7 +45,6 @@ export function BookingRequestPage() {
   const [specialRequests, setSpecialRequests] = useState('');
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -58,7 +58,6 @@ export function BookingRequestPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFieldErrors({});
-    setSubmitError(null);
 
     if (!packageTierId) {
       setFieldErrors({ packageTierId: 'Please select a package tier.' });
@@ -80,7 +79,7 @@ export function BookingRequestPage() {
       const errors = extractFieldErrors(err);
       setFieldErrors(errors);
       if (Object.keys(errors).length === 0) {
-        setSubmitError(extractErrorMessage(err, 'Could not submit booking request.'));
+        notify.error(extractErrorMessage(err, 'Could not submit booking request.'));
       }
     } finally {
       setSubmitting(false);
@@ -90,25 +89,19 @@ export function BookingRequestPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-slate-900">Request a Booking</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <h2 className="font-heading text-xl font-bold text-fg">Request a Booking</h2>
+        <p className="mt-1 text-sm text-fg-muted">
           Choose a package tier, your dates, group size, and budget per person.
         </p>
       </div>
 
       {loadError && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
           {loadError}
         </p>
       )}
 
-      {submitError && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {submitError}
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-surface-raised p-6">
         <div>
           <label htmlFor="packageTierId" className={labelClass}>
             Package tier
@@ -206,7 +199,7 @@ export function BookingRequestPage() {
             value={specialRequests}
             onChange={(e) => setSpecialRequests(e.target.value)}
           />
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-fg-muted">
             This note is processed by an AI service to help plan your trip. Avoid including sensitive personal
             or payment details.
           </p>
@@ -216,7 +209,7 @@ export function BookingRequestPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          className="rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
         >
           {submitting ? 'Submitting...' : 'Submit request'}
         </button>

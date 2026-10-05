@@ -11,18 +11,18 @@ import {
 import { useAuth } from '../../auth/AuthContext';
 
 const STATUS_BADGES: Record<TicketStatus, string> = {
-  Open: 'bg-blue-50 text-blue-700 border-blue-200',
-  InProgress: 'bg-purple-50 text-purple-700 border-purple-200',
-  WaitingForCustomer: 'bg-amber-50 text-amber-700 border-amber-200',
-  Resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Closed: 'bg-slate-100 text-slate-600 border-slate-200',
+  Open: 'bg-info-soft text-info-fg border-info/30',
+  InProgress: 'bg-info-soft text-info-fg border-info/30',
+  WaitingForCustomer: 'bg-warning-soft text-warning-fg border-warning/30',
+  Resolved: 'bg-success-soft text-success-fg border-success/30',
+  Closed: 'bg-neutral-soft text-fg-muted border-border',
 };
 
 const PRIORITY_BADGES: Record<TicketPriority, string> = {
-  Low: 'bg-slate-100 text-slate-600',
-  Normal: 'bg-sky-50 text-sky-700',
-  High: 'bg-amber-50 text-amber-700',
-  Urgent: 'bg-red-50 text-red-700 font-semibold',
+  Low: 'bg-neutral-soft text-fg-muted',
+  Normal: 'bg-info-soft text-info-fg',
+  High: 'bg-warning-soft text-warning-fg',
+  Urgent: 'bg-danger-soft text-danger-fg font-semibold',
 };
 
 function formatDateTime(isoString: string): string {
@@ -120,26 +120,26 @@ export function OpsSupportPage() {
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-heading text-xl font-bold text-slate-900">Support Tickets</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <h2 className="font-heading text-xl font-bold text-fg">Support Tickets</h2>
+          <p className="mt-1 text-sm text-fg-muted">
             Review, reply to, and resolve customer support inquiries.
           </p>
         </div>
         <button
           onClick={fetchTickets}
           disabled={loading}
-          className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-lg border border-border bg-surface-raised px-4 py-2 text-sm font-semibold text-fg shadow-sm transition hover:bg-surface-sunken disabled:opacity-50"
         >
           {loading ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
       {/* Filter Bar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-border bg-surface-raised p-4 shadow-sm">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {/* Search */}
           <div>
-            <label htmlFor="support-search" className="block text-xs font-semibold uppercase text-slate-500">
+            <label htmlFor="support-search" className="block text-xs font-semibold uppercase text-fg-muted">
               Search
             </label>
             <input
@@ -148,13 +148,13 @@ export function OpsSupportPage() {
               placeholder="Search subject or traveler..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </div>
 
           {/* Status */}
           <div>
-            <label htmlFor="support-status" className="block text-xs font-semibold uppercase text-slate-500">
+            <label htmlFor="support-status" className="block text-xs font-semibold uppercase text-fg-muted">
               Status
             </label>
             <select
@@ -164,7 +164,7 @@ export function OpsSupportPage() {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               <option value="">All Statuses</option>
               <option value="Open">Open</option>
@@ -177,7 +177,7 @@ export function OpsSupportPage() {
 
           {/* Category */}
           <div>
-            <label htmlFor="support-category" className="block text-xs font-semibold uppercase text-slate-500">
+            <label htmlFor="support-category" className="block text-xs font-semibold uppercase text-fg-muted">
               Category
             </label>
             <select
@@ -187,7 +187,7 @@ export function OpsSupportPage() {
                 setCategoryFilter(e.target.value);
                 setPage(1);
               }}
-              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               <option value="">All Categories</option>
               <option value="Trip">Trip</option>
@@ -201,7 +201,7 @@ export function OpsSupportPage() {
 
           {/* Priority */}
           <div>
-            <label htmlFor="support-priority" className="block text-xs font-semibold uppercase text-slate-500">
+            <label htmlFor="support-priority" className="block text-xs font-semibold uppercase text-fg-muted">
               Priority
             </label>
             <select
@@ -211,7 +211,7 @@ export function OpsSupportPage() {
                 setPriorityFilter(e.target.value);
                 setPage(1);
               }}
-              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               <option value="">All Priorities</option>
               <option value="Low">Low</option>
@@ -223,7 +223,7 @@ export function OpsSupportPage() {
 
           {/* Assignment */}
           <div>
-            <label htmlFor="support-assignment" className="block text-xs font-semibold uppercase text-slate-500">
+            <label htmlFor="support-assignment" className="block text-xs font-semibold uppercase text-fg-muted">
               Assignment
             </label>
             <select
@@ -233,7 +233,7 @@ export function OpsSupportPage() {
                 setAssignmentFilter(e.target.value as 'all' | 'me' | 'unassigned');
                 setPage(1);
               }}
-              className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               <option value="all">All Assignments</option>
               <option value="me">Assigned to Me</option>
@@ -246,7 +246,7 @@ export function OpsSupportPage() {
           <div className="mt-3 flex justify-end">
             <button
               onClick={resetFilters}
-              className="text-xs font-semibold text-brand-600 hover:text-brand-800"
+              className="text-xs font-semibold text-brand-text hover:text-brand-fg"
             >
               Clear all filters
             </button>
@@ -256,7 +256,7 @@ export function OpsSupportPage() {
 
       {/* Error Banner */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+        <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger-fg">
           {error}
         </div>
       )}
@@ -265,16 +265,16 @@ export function OpsSupportPage() {
       {loading && (
         <div className="space-y-3">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
+            <div key={i} className="h-16 animate-pulse rounded-xl border border-border bg-surface-raised" />
           ))}
         </div>
       )}
 
       {/* Empty State */}
       {!loading && !error && tickets.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-          <p className="text-base font-semibold text-slate-700">No support tickets found.</p>
-          <p className="mt-1 text-sm text-slate-500">
+        <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-16 text-center">
+          <p className="text-base font-semibold text-fg">No support tickets found.</p>
+          <p className="mt-1 text-sm text-fg-muted">
             {searchQuery || statusFilter || categoryFilter || priorityFilter || assignmentFilter !== 'all'
               ? 'Try adjusting your filters or search terms.'
               : 'There are currently no support tickets in the system.'}
@@ -284,11 +284,11 @@ export function OpsSupportPage() {
 
       {/* Tickets Table */}
       {!loading && !error && tickets.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-border bg-surface-sunken text-xs font-semibold uppercase tracking-wide text-fg-muted">
                   <th className="px-4 py-3">Subject</th>
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Priority</th>
@@ -298,19 +298,19 @@ export function OpsSupportPage() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {tickets.map((ticket) => (
-                  <tr key={ticket.id} className="transition hover:bg-slate-50">
+                  <tr key={ticket.id} className="transition hover:bg-surface-sunken">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{ticket.subject}</div>
+                      <div className="font-semibold text-fg">{ticket.subject}</div>
                       {ticket.packageName && (
-                        <div className="mt-0.5 text-xs text-slate-500">
+                        <div className="mt-0.5 text-xs text-fg-muted">
                           Package: {ticket.packageName}
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                    <td className="px-4 py-3 text-fg">
+                      <span className="inline-flex items-center rounded-md bg-neutral-soft px-2 py-1 text-xs font-medium text-fg">
                         {ticket.category}
                       </span>
                     </td>
@@ -332,22 +332,22 @@ export function OpsSupportPage() {
                         {ticket.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-fg-muted">
                       {ticket.assignedToId ? (
-                        <span className="text-xs font-medium text-slate-800">
+                        <span className="text-xs font-medium text-fg">
                           {ticket.assignedToId === user?.id ? 'Me' : 'Assigned'}
                         </span>
                       ) : (
-                        <span className="text-xs italic text-slate-400">Unassigned</span>
+                        <span className="text-xs italic text-fg-muted">Unassigned</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">
+                    <td className="px-4 py-3 text-xs text-fg-muted">
                       {formatDateTime(ticket.updatedAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link
                         to={`${basePath}/${ticket.id}`}
-                        className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                        className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-neutral-soft"
                       >
                         View
                       </Link>
@@ -359,8 +359,8 @@ export function OpsSupportPage() {
           </div>
 
           {/* Pagination Controls */}
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-            <span className="text-xs text-slate-500">
+          <div className="flex items-center justify-between border-t border-border bg-surface-sunken px-4 py-3 text-sm">
+            <span className="text-xs text-fg-muted">
               Showing {(page - 1) * pageSize + 1} to{' '}
               {Math.min(page * pageSize, totalCount)} of {totalCount} tickets
             </span>
@@ -368,14 +368,14 @@ export function OpsSupportPage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-lg border border-border bg-surface-raised px-3 py-1 text-xs font-semibold text-fg shadow-sm transition hover:bg-surface-sunken disabled:opacity-50"
               >
                 Previous
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-lg border border-border bg-surface-raised px-3 py-1 text-xs font-semibold text-fg shadow-sm transition hover:bg-surface-sunken disabled:opacity-50"
               >
                 Next
               </button>

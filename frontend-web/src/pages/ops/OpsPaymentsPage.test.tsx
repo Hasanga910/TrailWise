@@ -16,6 +16,11 @@ import { RequireRole } from '../../auth/RequireRole';
 import type { UserRole } from '../../auth/types';
 import { OpsPaymentsPage } from './OpsPaymentsPage';
 
+vi.mock('../../components/ui/notify', () => ({
+  notify: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+import { notify } from '../../components/ui/notify';
+
 vi.mock('../../api/payments', () => ({
   getPendingPayments: vi.fn(),
   getPaymentById: vi.fn(),
@@ -100,7 +105,7 @@ function renderAppWithAuth(initialPath: string, role: UserRole) {
               </RequireRole>
             }
           />
-          <Route path="/traveler" element={<div>Traveler Dashboard Fallback</div>} />
+          <Route path="/no-access" element={<div>No Access Page</div>} />
           <Route path="/login" element={<div>Login Page Fallback</div>} />
         </Routes>
       </AuthContext.Provider>
@@ -241,7 +246,7 @@ describe('OpsPaymentsPage', () => {
     await waitFor(() => {
       expect(screen.queryByText('Sarah Traveler')).not.toBeInTheDocument();
     });
-    expect(screen.getByText(/approved successfully \(DepositPaid\)/i)).toBeInTheDocument();
+    expect(notify.success).toHaveBeenCalledWith(expect.stringMatching(/approved successfully \(DepositPaid\)/i));
   });
 
   // 9. Reject modal requires reason
@@ -311,7 +316,7 @@ describe('OpsPaymentsPage', () => {
     await waitFor(() => {
       expect(screen.queryByText('Sarah Traveler')).not.toBeInTheDocument();
     });
-    expect(screen.getByText(/payment of \$350\.00 rejected/i)).toBeInTheDocument();
+    expect(notify.success).toHaveBeenCalledWith(expect.stringMatching(/payment of \$350\.00 rejected/i));
   });
 
   // 12. API approval failure displayed
@@ -328,9 +333,9 @@ describe('OpsPaymentsPage', () => {
     await user.click(screen.getByRole('button', { name: /^approve$/i }));
     await user.click(screen.getByRole('button', { name: /confirm approval/i }));
 
-    expect(
-      await screen.findByText(/failed to approve payment/i),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(notify.error).toHaveBeenCalledWith(expect.stringMatching(/failed to approve payment/i)),
+    );
   });
 
   // 13. API rejection failure displayed
@@ -348,7 +353,7 @@ describe('OpsPaymentsPage', () => {
     await user.type(screen.getByLabelText(/rejection reason/i), 'Slip is unreadable.');
     await user.click(screen.getByRole('button', { name: /confirm rejection/i }));
 
-    expect(await screen.findByText(/failed to reject payment/i)).toBeInTheDocument();
+    await waitFor(() => expect(notify.error).toHaveBeenCalledWith(expect.stringMatching(/failed to reject payment/i)));
   });
 
   // 14. OperationsManager route access
@@ -361,11 +366,11 @@ describe('OpsPaymentsPage', () => {
   });
 
   // 15. Unauthorized role protection
-  it('redirects unauthorized Traveler away from /ops/payments', () => {
+  it('sends unauthorized Traveler to /no-access for /ops/payments', () => {
     renderAppWithAuth('/ops/payments', 'Traveler');
 
     expect(screen.queryByText('Payment Verification')).not.toBeInTheDocument();
-    expect(screen.getByText('Traveler Dashboard Fallback')).toBeInTheDocument();
+    expect(screen.getByText('No Access Page')).toBeInTheDocument();
   });
 
   // 16. Displays Submitted On Time badge when submitted before deadline

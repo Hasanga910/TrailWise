@@ -11,6 +11,7 @@ import {
 } from '../../api/vehicles';
 import { PlusCircleIcon, TruckIcon } from '../../components/admin/icons';
 import { StatusBadge, VehicleTypeBadge } from '../../components/fleet/FleetManager';
+import { notify } from '../../components/ui/notify';
 
 export function FleetVehiclesPage() {
   const [vehicles, setVehicles] = useState<VehicleDto[] | null>(null);
@@ -36,7 +37,6 @@ export function FleetVehiclesPage() {
 
   // Status updating state per vehicle id
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   // Delete Vehicle Modal
   const [deletingVehicle, setDeletingVehicle] = useState<VehicleDto | null>(null);
@@ -84,13 +84,12 @@ export function FleetVehiclesPage() {
   }
 
   async function handleStatusChange(vehicleId: string, newStatus: VehicleMaintenanceStatus) {
-    setActionError(null);
     setUpdatingId(vehicleId);
     try {
       await updateVehicleMaintenanceStatus(vehicleId, { status: newStatus });
       loadVehicles();
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Failed to update vehicle status.'));
+      notify.error(extractErrorMessage(err, 'Failed to update vehicle status.'));
     } finally {
       setUpdatingId(null);
     }
@@ -133,19 +132,19 @@ export function FleetVehiclesPage() {
   });
 
   const inputClass =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+    'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
 
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-surface-raised p-6 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-brand-text">
             <TruckIcon className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="font-heading text-xl font-bold text-slate-900">Vehicle Management</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="font-heading text-xl font-bold text-fg">Vehicle Management</h1>
+            <p className="text-sm text-fg-muted">
               Manage transport fleet assets, capacities, maintenance statuses, and registration numbers.
             </p>
           </div>
@@ -156,48 +155,39 @@ export function FleetVehiclesPage() {
             setCreateError(null);
             setShowModal(true);
           }}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2"
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-600 transition focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2"
         >
           <PlusCircleIcon className="h-5 w-5" />
           Register Vehicle
         </button>
       </div>
 
-      {actionError && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 shadow-sm flex items-center justify-between">
-          <span>{actionError}</span>
-          <button type="button" onClick={() => setActionError(null)} className="text-rose-500 font-bold ml-2">
-            &times;
-          </button>
-        </div>
-      )}
-
       {/* Metrics Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Fleet</p>
-          <p className="mt-2 text-3xl font-bold text-slate-800">{totalFleet}</p>
-          <p className="mt-1 text-xs text-slate-500">Vehicles in system</p>
+        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Total Fleet</p>
+          <p className="mt-2 text-3xl font-bold text-fg">{totalFleet}</p>
+          <p className="mt-1 text-xs text-fg-muted">Vehicles in system</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Available</p>
-          <p className="mt-2 text-3xl font-bold text-emerald-600">{availableCount}</p>
-          <p className="mt-1 text-xs text-slate-500">Ready for allocation</p>
+        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Available</p>
+          <p className="mt-2 text-3xl font-bold text-success">{availableCount}</p>
+          <p className="mt-1 text-xs text-fg-muted">Ready for allocation</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Maintenance</p>
-          <p className="mt-2 text-3xl font-bold text-amber-600">{maintenanceCount}</p>
-          <p className="mt-1 text-xs text-slate-500">In garage / servicing</p>
+        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Maintenance</p>
+          <p className="mt-2 text-3xl font-bold text-warning">{maintenanceCount}</p>
+          <p className="mt-1 text-xs text-fg-muted">In garage / servicing</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Out of Service</p>
-          <p className="mt-2 text-3xl font-bold text-rose-600">{outOfServiceCount}</p>
-          <p className="mt-1 text-xs text-slate-500">Inactive or retired</p>
+        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Out of Service</p>
+          <p className="mt-2 text-3xl font-bold text-danger">{outOfServiceCount}</p>
+          <p className="mt-1 text-xs text-fg-muted">Inactive or retired</p>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-surface-raised p-4 shadow-sm">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <input
@@ -247,27 +237,27 @@ export function FleetVehiclesPage() {
       </div>
 
       {/* Main Vehicle Table/Grid */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-border bg-surface-raised shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex h-64 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
           </div>
         ) : error ? (
-          <div className="p-8 text-center text-sm text-rose-600">
+          <div className="p-8 text-center text-sm text-danger">
             <p>{error}</p>
             <button
               type="button"
               onClick={loadVehicles}
-              className="mt-3 text-xs font-semibold text-brand-600 underline hover:text-brand-500"
+              className="mt-3 text-xs font-semibold text-brand-text underline hover:text-brand-text"
             >
               Try Again
             </button>
           </div>
         ) : !filteredVehicles || filteredVehicles.length === 0 ? (
           <div className="p-12 text-center">
-            <TruckIcon className="mx-auto h-12 w-12 text-slate-300" />
-            <h3 className="mt-3 text-base font-semibold text-slate-700">No vehicles found</h3>
-            <p className="mt-1 text-sm text-slate-400">
+            <TruckIcon className="mx-auto h-12 w-12 text-fg-muted" />
+            <h3 className="mt-3 text-base font-semibold text-fg">No vehicles found</h3>
+            <p className="mt-1 text-sm text-fg-muted">
               {vehicles?.length === 0
                 ? 'Get started by adding your first vehicle to the fleet.'
                 : 'No vehicles match your active search and filter criteria.'}
@@ -275,8 +265,8 @@ export function FleetVehiclesPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <table className="w-full text-left text-sm text-fg-muted">
+              <thead className="border-b border-border bg-surface-sunken text-xs font-semibold uppercase tracking-wider text-fg-muted">
                 <tr>
                   <th scope="col" className="px-6 py-4">Registration</th>
                   <th scope="col" className="px-6 py-4">Type & Capacity</th>
@@ -286,35 +276,35 @@ export function FleetVehiclesPage() {
                   <th scope="col" className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {filteredVehicles.map((veh) => (
-                  <tr key={veh.id} className="hover:bg-slate-50/70 transition">
+                  <tr key={veh.id} className="hover:bg-surface-sunken/70 transition">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                        <span className="font-mono text-xs font-bold text-fg bg-neutral-soft px-2.5 py-1 rounded-md border border-border">
                           {veh.registrationNumber || 'UNREGISTERED'}
                         </span>
-                        <span className="font-mono text-xs text-slate-400">
+                        <span className="font-mono text-xs text-fg-muted">
                           #{veh.id.slice(0, 8)}
                         </span>
                       </div>
                       {veh.seatConfiguration && (
-                        <p className="mt-1 text-xs text-slate-400">Config: {veh.seatConfiguration}</p>
+                        <p className="mt-1 text-xs text-fg-muted">Config: {veh.seatConfiguration}</p>
                       )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <VehicleTypeBadge type={veh.type} />
-                        <span className="font-semibold text-slate-700">{veh.capacity} Seats</span>
+                        <span className="font-semibold text-fg">{veh.capacity} Seats</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       {veh.hasAC ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 border border-sky-200">
+                        <span className="inline-flex items-center gap-1 rounded bg-info-soft px-2 py-0.5 text-xs font-medium text-info-fg border border-info/30">
                           ❄️ AC Enabled
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                        <span className="inline-flex items-center gap-1 rounded bg-neutral-soft px-2 py-0.5 text-xs font-medium text-fg-muted">
                           Non-AC
                         </span>
                       )}
@@ -329,7 +319,7 @@ export function FleetVehiclesPage() {
                         onChange={(e) =>
                           handleStatusChange(veh.id, e.target.value as VehicleMaintenanceStatus)
                         }
-                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                        className="rounded-lg border border-border bg-surface-raised px-2.5 py-1 text-xs font-medium text-fg shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                       >
                         <option value="Available">Available</option>
                         <option value="UnderMaintenance">Under Maintenance</option>
@@ -343,7 +333,7 @@ export function FleetVehiclesPage() {
                           setDeleteError(null);
                           setDeletingVehicle(veh);
                         }}
-                        className="rounded-lg px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50 transition"
+                        className="rounded-lg px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger-soft transition"
                       >
                         Delete
                       </button>
@@ -359,21 +349,21 @@ export function FleetVehiclesPage() {
       {/* Register Vehicle Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-150">
-            <h2 className="font-heading text-lg font-bold text-slate-900">Register New Vehicle</h2>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="w-full max-w-md rounded-2xl bg-surface-raised p-6 shadow-xl animate-in fade-in zoom-in duration-150">
+            <h2 className="font-heading text-lg font-bold text-fg">Register New Vehicle</h2>
+            <p className="mt-1 text-xs text-fg-muted">
               Add a van, coach, or SUV to TrailWise's central fleet.
             </p>
 
             {createError && (
-              <div className="mt-4 rounded-lg bg-rose-50 p-3 text-xs font-medium text-rose-700 border border-rose-200">
+              <div role="alert" className="mt-4 rounded-lg bg-danger-soft p-3 text-xs font-medium text-danger-fg border border-danger/30">
                 {createError}
               </div>
             )}
 
             <form onSubmit={handleCreateVehicle} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg mb-1">
                   Registration Number *
                 </label>
                 <input
@@ -388,7 +378,7 @@ export function FleetVehiclesPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg mb-1">
                     Vehicle Type *
                   </label>
                   <select
@@ -402,7 +392,7 @@ export function FleetVehiclesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg mb-1">
                     Passenger Capacity *
                   </label>
                   <input
@@ -418,7 +408,7 @@ export function FleetVehiclesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg mb-1">
                   Initial Status
                 </label>
                 <select
@@ -433,7 +423,7 @@ export function FleetVehiclesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg mb-1">
                   Seat Configuration (Optional)
                 </label>
                 <input
@@ -451,9 +441,9 @@ export function FleetVehiclesPage() {
                   id="hasAC"
                   checked={hasAC}
                   onChange={(e) => setHasAC(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  className="h-4 w-4 rounded border-border text-brand-text focus:ring-brand-500"
                 />
-                <label htmlFor="hasAC" className="text-xs font-medium text-slate-700">
+                <label htmlFor="hasAC" className="text-xs font-medium text-fg">
                   Air Conditioned (AC Climate Control)
                 </label>
               </div>
@@ -463,14 +453,14 @@ export function FleetVehiclesPage() {
                   type="button"
                   onClick={() => setShowModal(false)}
                   disabled={creating}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+                  className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-fg-muted hover:bg-surface-sunken transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 transition disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-600 transition disabled:opacity-50"
                 >
                   {creating ? 'Saving...' : 'Register Vehicle'}
                 </button>
@@ -483,18 +473,18 @@ export function FleetVehiclesPage() {
       {/* Delete Vehicle Modal */}
       {deletingVehicle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-150">
-            <h2 className="font-heading text-lg font-bold text-slate-900">Delete Vehicle</h2>
-            <p className="mt-2 text-xs text-slate-500">
+          <div className="w-full max-w-sm rounded-2xl bg-surface-raised p-6 shadow-xl animate-in fade-in zoom-in duration-150">
+            <h2 className="font-heading text-lg font-bold text-fg">Delete Vehicle</h2>
+            <p className="mt-2 text-xs text-fg-muted">
               Are you sure you want to permanently delete vehicle{' '}
-              <span className="font-bold text-slate-800">
+              <span className="font-bold text-fg">
                 {deletingVehicle.registrationNumber || deletingVehicle.type}
               </span>
               ? This action cannot be undone.
             </p>
 
             {deleteError && (
-              <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
+              <div role="alert" className="mt-3 rounded-lg bg-danger-soft p-2.5 text-xs text-danger-fg border border-danger/30">
                 {deleteError}
               </div>
             )}
@@ -504,7 +494,7 @@ export function FleetVehiclesPage() {
                 type="button"
                 onClick={() => setDeletingVehicle(null)}
                 disabled={deleting}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+                className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-fg-muted hover:bg-surface-sunken transition"
               >
                 Cancel
               </button>

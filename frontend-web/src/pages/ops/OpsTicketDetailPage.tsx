@@ -12,20 +12,21 @@ import {
   type TicketStatus,
 } from '../../api/support';
 import { useAuth } from '../../auth/AuthContext';
+import { notify } from '../../components/ui/notify';
 
 const STATUS_BADGES: Record<TicketStatus, string> = {
-  Open: 'bg-blue-50 text-blue-700 border-blue-200',
-  InProgress: 'bg-purple-50 text-purple-700 border-purple-200',
-  WaitingForCustomer: 'bg-amber-50 text-amber-700 border-amber-200',
-  Resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Closed: 'bg-slate-100 text-slate-600 border-slate-200',
+  Open: 'bg-info-soft text-info-fg border-info/30',
+  InProgress: 'bg-info-soft text-info-fg border-info/30',
+  WaitingForCustomer: 'bg-warning-soft text-warning-fg border-warning/30',
+  Resolved: 'bg-success-soft text-success-fg border-success/30',
+  Closed: 'bg-neutral-soft text-fg-muted border-border',
 };
 
 const PRIORITY_BADGES: Record<TicketPriority, string> = {
-  Low: 'bg-slate-100 text-slate-600',
-  Normal: 'bg-sky-50 text-sky-700',
-  High: 'bg-amber-50 text-amber-700',
-  Urgent: 'bg-red-50 text-red-700 font-semibold',
+  Low: 'bg-neutral-soft text-fg-muted',
+  Normal: 'bg-info-soft text-info-fg',
+  High: 'bg-warning-soft text-warning-fg',
+  Urgent: 'bg-danger-soft text-danger-fg font-semibold',
 };
 
 function formatDateTime(isoString: string): string {
@@ -54,7 +55,6 @@ export function OpsTicketDetailPage() {
   // Reply form state
   const [replyMessage, setReplyMessage] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
-  const [replyError, setReplyError] = useState<string | null>(null);
 
   // Status update state
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -101,13 +101,12 @@ export function OpsTicketDetailPage() {
     if (!ticketId || !replyMessage.trim()) return;
 
     setSendingReply(true);
-    setReplyError(null);
     try {
       await sendSupportReply(ticketId, replyMessage.trim());
       setReplyMessage('');
       await fetchTicket();
     } catch (err) {
-      setReplyError(extractErrorMessage(err, 'Failed to send reply.'));
+      notify.error(extractErrorMessage(err, 'Failed to send reply.'));
     } finally {
       setSendingReply(false);
     }
@@ -160,19 +159,19 @@ export function OpsTicketDetailPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="h-8 w-48 animate-pulse rounded bg-slate-200" />
-        <div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-white" />
+        <div className="h-8 w-48 animate-pulse rounded bg-neutral-soft" />
+        <div className="h-64 animate-pulse rounded-xl border border-border bg-surface-raised" />
       </div>
     );
   }
 
   if (error || !ticket) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-        <p className="font-semibold text-red-700">{error || 'Ticket not found'}</p>
+      <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-6 text-center">
+        <p className="font-semibold text-danger-fg">{error || 'Ticket not found'}</p>
         <Link
           to={backPath}
-          className="mt-4 inline-block text-sm font-semibold text-brand-600 hover:text-brand-800"
+          className="mt-4 inline-block text-sm font-semibold text-brand-text hover:text-brand-fg"
         >
           &larr; Back to support tickets
         </Link>
@@ -188,7 +187,7 @@ export function OpsTicketDetailPage() {
       <div>
         <Link
           to={backPath}
-          className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-800"
+          className="inline-flex items-center text-xs font-semibold text-fg-muted hover:text-fg"
         >
           &larr; Back to all tickets
         </Link>
@@ -196,7 +195,7 @@ export function OpsTicketDetailPage() {
         <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+              <span className="inline-flex items-center rounded-md bg-neutral-soft px-2 py-0.5 text-xs font-medium text-fg">
                 {ticket.category}
               </span>
               <span
@@ -214,12 +213,12 @@ export function OpsTicketDetailPage() {
                 {ticket.priority} Priority
               </span>
             </div>
-            <h1 className="mt-2 font-heading text-2xl font-bold text-slate-900">{ticket.subject}</h1>
+            <h1 className="mt-2 font-heading text-2xl font-bold text-fg">{ticket.subject}</h1>
           </div>
 
           <button
             onClick={fetchTicket}
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="inline-flex items-center justify-center rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-xs font-semibold text-fg shadow-sm transition hover:bg-surface-sunken"
           >
             Refresh
           </button>
@@ -231,30 +230,30 @@ export function OpsTicketDetailPage() {
         {/* Left 2 Cols: Details & Conversation */}
         <div className="space-y-6 lg:col-span-2">
           {/* Initial Ticket Details Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
               Initial Issue Description
             </h3>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-fg">
               {ticket.description}
             </p>
 
             {ticket.packageName && (
-              <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
-                <span className="font-semibold text-slate-700">Linked Booking:</span>{' '}
+              <div className="mt-4 rounded-lg border border-border bg-surface-sunken p-3 text-xs text-fg-muted">
+                <span className="font-semibold text-fg">Linked Booking:</span>{' '}
                 {ticket.packageName} ({ticket.bookingId})
               </div>
             )}
           </div>
 
           {/* Messages Thread */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+            <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-muted">
               Conversation Thread ({ticket.messages.length})
             </h3>
 
             {ticket.messages.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-400">
+              <div className="py-8 text-center text-sm text-fg-muted">
                 No replies in this thread yet.
               </div>
             ) : (
@@ -268,8 +267,8 @@ export function OpsTicketDetailPage() {
                         isStaff ? 'items-end' : 'items-start'
                       }`}
                     >
-                      <div className="flex items-center space-x-2 text-xs text-slate-500">
-                        <span className="font-semibold text-slate-800">
+                      <div className="flex items-center space-x-2 text-xs text-fg-muted">
+                        <span className="font-semibold text-fg">
                           {isStaff ? `${msg.senderDisplayName} (Staff)` : msg.senderDisplayName}
                         </span>
                         <span>·</span>
@@ -278,8 +277,8 @@ export function OpsTicketDetailPage() {
                       <div
                         className={`mt-1.5 max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                           isStaff
-                            ? 'rounded-tr-none bg-brand-600 text-white'
-                            : 'rounded-tl-none border border-slate-200 bg-slate-50 text-slate-800'
+                            ? 'rounded-tr-none bg-brand-700 text-white'
+                            : 'rounded-tl-none border border-border bg-surface-sunken text-fg'
                         }`}
                       >
                         <p className="whitespace-pre-wrap">{msg.message}</p>
@@ -291,14 +290,14 @@ export function OpsTicketDetailPage() {
             )}
 
             {/* Staff Reply Box */}
-            <div className="mt-6 border-t border-slate-200 pt-5">
+            <div className="mt-6 border-t border-border pt-5">
               {isClosed ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-600">
+                <div className="rounded-lg border border-border bg-surface-sunken p-4 text-center text-sm text-fg-muted">
                   This support ticket is closed. Reopen the ticket to send a reply.
                 </div>
               ) : (
                 <form onSubmit={handleSendReply} className="space-y-3">
-                  <label htmlFor="staff-reply" className="block text-xs font-semibold text-slate-700">
+                  <label htmlFor="staff-reply" className="block text-xs font-semibold text-fg">
                     Send Reply as Staff
                   </label>
                   <textarea
@@ -308,22 +307,18 @@ export function OpsTicketDetailPage() {
                     value={replyMessage}
                     onChange={(e) => setReplyMessage(e.target.value)}
                     disabled={sendingReply}
-                    className="block w-full rounded-lg border border-slate-300 p-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="block w-full rounded-lg border border-border p-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     required
                   />
 
-                  {replyError && (
-                    <p className="text-xs font-medium text-red-600">{replyError}</p>
-                  )}
-
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-fg-muted">
                       Replies automatically transition ticket to Waiting for Customer.
                     </span>
                     <button
                       type="submit"
                       disabled={sendingReply || !replyMessage.trim()}
-                      className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-50"
+                      className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 disabled:opacity-50"
                     >
                       {sendingReply ? 'Sending...' : 'Send Reply'}
                     </button>
@@ -337,12 +332,12 @@ export function OpsTicketDetailPage() {
         {/* Right 1 Col: Management & Status Controls */}
         <div className="space-y-6">
           {/* Status Controls Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
               Ticket Status
             </h3>
             <div className="mt-3">
-              <label htmlFor="status-select" className="text-xs text-slate-500">
+              <label htmlFor="status-select" className="text-xs text-fg-muted">
                 Change Status
               </label>
               <select
@@ -350,7 +345,7 @@ export function OpsTicketDetailPage() {
                 value={ticket.status}
                 disabled={updatingStatus}
                 onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm font-medium shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
               >
                 <option value="Open">Open</option>
                 <option value="InProgress">In Progress</option>
@@ -366,7 +361,7 @@ export function OpsTicketDetailPage() {
                   type="button"
                   onClick={() => handleStatusChange('InProgress')}
                   disabled={updatingStatus}
-                  className="w-full rounded-lg border border-slate-300 bg-white py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="w-full rounded-lg border border-border bg-surface-raised py-1.5 text-xs font-semibold text-fg hover:bg-surface-sunken disabled:opacity-50"
                 >
                   Reopen Ticket
                 </button>
@@ -374,24 +369,24 @@ export function OpsTicketDetailPage() {
             )}
 
             {ticket.resolvedAt && (
-              <div className="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-500">
+              <div className="mt-3 border-t border-border pt-2 text-xs text-fg-muted">
                 Resolved: {formatDateTime(ticket.resolvedAt)}
               </div>
             )}
             {ticket.closedAt && (
-              <div className="mt-1 text-xs text-slate-500">
+              <div className="mt-1 text-xs text-fg-muted">
                 Closed: {formatDateTime(ticket.closedAt)}
               </div>
             )}
           </div>
 
           {/* Priority Controls Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
               Priority
             </h3>
             <div className="mt-3">
-              <label htmlFor="priority-select" className="text-xs text-slate-500">
+              <label htmlFor="priority-select" className="text-xs text-fg-muted">
                 Change Priority
               </label>
               <select
@@ -399,7 +394,7 @@ export function OpsTicketDetailPage() {
                 value={ticket.priority}
                 disabled={updatingPriority}
                 onChange={(e) => handlePriorityChange(e.target.value as TicketPriority)}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                className="mt-1 block w-full rounded-lg border border-border px-3 py-2 text-sm font-medium shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
               >
                 <option value="Low">Low</option>
                 <option value="Normal">Normal</option>
@@ -410,16 +405,16 @@ export function OpsTicketDetailPage() {
           </div>
 
           {/* Assignment Controls Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
               Staff Assignment
             </h3>
             <div className="mt-3">
-              <div className="text-sm font-semibold text-slate-800">
+              <div className="text-sm font-semibold text-fg">
                 {ticket.assignedToName || 'Unassigned'}
               </div>
               {ticket.assignedToId && (
-                <div className="text-xs text-slate-400">ID: {ticket.assignedToId}</div>
+                <div className="text-xs text-fg-muted">ID: {ticket.assignedToId}</div>
               )}
             </div>
 
@@ -429,7 +424,7 @@ export function OpsTicketDetailPage() {
                   type="button"
                   onClick={() => handleAssignment(user.id)}
                   disabled={updatingAssignment}
-                  className="rounded-lg bg-slate-800 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-900 disabled:opacity-50"
+                  className="rounded-lg bg-fg py-1.5 text-xs font-semibold text-surface shadow-sm transition hover:bg-fg/90 disabled:opacity-50"
                 >
                   Assign to Me
                 </button>
@@ -440,7 +435,7 @@ export function OpsTicketDetailPage() {
                   type="button"
                   onClick={() => handleAssignment(null)}
                   disabled={updatingAssignment}
-                  className="rounded-lg border border-slate-300 bg-white py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-border bg-surface-raised py-1.5 text-xs font-semibold text-fg shadow-sm transition hover:bg-surface-sunken disabled:opacity-50"
                 >
                   Unassign
                 </button>
@@ -450,13 +445,13 @@ export function OpsTicketDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowCustomAssign(true)}
-                  className="text-xs font-semibold text-brand-600 hover:text-brand-800"
+                  className="text-xs font-semibold text-brand-text hover:text-brand-fg"
                 >
                   Assign to specific Staff ID...
                 </button>
               ) : (
-                <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                  <label htmlFor="custom-assign-id" className="block text-xs font-semibold text-slate-700">
+                <div className="mt-2 space-y-2 rounded-lg border border-border bg-surface-sunken p-2.5">
+                  <label htmlFor="custom-assign-id" className="block text-xs font-semibold text-fg">
                     Staff User GUID
                   </label>
                   <input
@@ -465,14 +460,14 @@ export function OpsTicketDetailPage() {
                     placeholder="Enter staff GUID..."
                     value={customAssignId}
                     onChange={(e) => setCustomAssignId(e.target.value)}
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
+                    className="w-full rounded border border-border px-2 py-1 text-xs"
                   />
                   <div className="flex space-x-2">
                     <button
                       type="button"
                       onClick={() => handleAssignment(customAssignId.trim() || null)}
                       disabled={updatingAssignment || !customAssignId.trim()}
-                      className="rounded bg-brand-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                      className="rounded bg-brand-700 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
                     >
                       Assign
                     </button>
@@ -482,7 +477,7 @@ export function OpsTicketDetailPage() {
                         setShowCustomAssign(false);
                         setCustomAssignId('');
                       }}
-                      className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
+                      className="rounded border border-border bg-surface-raised px-2 py-1 text-xs font-semibold text-fg"
                     >
                       Cancel
                     </button>
@@ -493,25 +488,25 @@ export function OpsTicketDetailPage() {
           </div>
 
           {/* Traveler & Audit Info Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-xs shadow-sm">
-            <h3 className="font-semibold uppercase tracking-wider text-slate-500">
+          <div className="rounded-xl border border-border bg-surface-raised p-5 text-xs shadow-sm">
+            <h3 className="font-semibold uppercase tracking-wider text-fg-muted">
               Ticket Details
             </h3>
-            <div className="mt-3 space-y-2 text-slate-600">
+            <div className="mt-3 space-y-2 text-fg-muted">
               <div>
-                <span className="font-semibold text-slate-700">Traveler:</span>{' '}
+                <span className="font-semibold text-fg">Traveler:</span>{' '}
                 {ticket.travelerDisplayName}
               </div>
               <div>
-                <span className="font-semibold text-slate-700">Traveler ID:</span>{' '}
+                <span className="font-semibold text-fg">Traveler ID:</span>{' '}
                 <span className="font-mono">{ticket.travelerId}</span>
               </div>
               <div>
-                <span className="font-semibold text-slate-700">Created:</span>{' '}
+                <span className="font-semibold text-fg">Created:</span>{' '}
                 {formatDateTime(ticket.createdAt)}
               </div>
               <div>
-                <span className="font-semibold text-slate-700">Last Updated:</span>{' '}
+                <span className="font-semibold text-fg">Last Updated:</span>{' '}
                 {formatDateTime(ticket.updatedAt)}
               </div>
             </div>

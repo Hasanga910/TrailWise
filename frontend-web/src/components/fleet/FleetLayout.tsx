@@ -1,14 +1,15 @@
 import {
   CalendarIcon,
+  DashboardIcon,
   IdCardIcon,
   ProfileIcon,
   TruckIcon,
   UsersIcon,
 } from '../admin/icons';
-import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
+import { AppShell, type SidebarNavItem } from '../layout/AppShell';
 
 const NAV_ITEMS: SidebarNavItem[] = [
-  { to: '/fleet', label: 'Overview & Allocation', icon: TruckIcon, end: true },
+  { to: '/fleet', label: 'Overview & Allocation', icon: DashboardIcon, end: true },
   { to: '/fleet/vehicles', label: 'Vehicles', icon: TruckIcon },
   { to: '/fleet/drivers', label: 'Drivers', icon: IdCardIcon },
   { to: '/fleet/assignments', label: 'Vehicle Assignments', icon: CalendarIcon },
@@ -17,6 +18,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
 ];
 
 const PAGE_TITLES: Record<string, string> = {
+  '/guides/availability': 'Guide Availability',
   '/fleet': 'Fleet & Transport Workspace',
   '/fleet/vehicles': 'Vehicle Management & Fleet Roster',
   '/fleet/drivers': 'Driver Roster & Management',
@@ -26,6 +28,6 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export function FleetLayout() {
-  return <SidebarLayout navItems={NAV_ITEMS} pageTitles={PAGE_TITLES} />;
+  return <AppShell navItems={NAV_ITEMS} pageTitles={PAGE_TITLES} portalLabel="Fleet Portal" />;
 }
 

@@ -7,8 +7,8 @@ import {
   type AssignedTourDto,
 } from '../../api/assignedTours';
 import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
-import { useAuth } from '../../auth/AuthContext';
 import { ItineraryList } from '../../components/itinerary/ItineraryList';
+import { notify } from '../../components/ui/notify';
 
 function formatDateTime(dtStr?: string | null) {
   if (!dtStr) return '';
@@ -18,7 +18,6 @@ function formatDateTime(dtStr?: string | null) {
 
 export function TourDetailPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
-  const { user, logout } = useAuth();
 
   const [tour, setTour] = useState<AssignedTourDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -26,8 +25,6 @@ export function TourDetailPage() {
   const [attended, setAttended] = useState(false);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const [itinerarySteps, setItinerarySteps] = useState<ItineraryStepDto[] | null>(null);
   const [itineraryError, setItineraryError] = useState<string | null>(null);
@@ -58,17 +55,15 @@ export function TourDetailPage() {
   async function handleSave() {
     if (!bookingId) return;
     setSaving(true);
-    setSaveError(null);
-    setSaveSuccess(false);
     try {
       const updated = await updateGuideTour(bookingId, {
         attended,
         notes: notes.trim() ? notes.trim() : null,
       });
       setTour(updated);
-      setSaveSuccess(true);
+      notify.success('Tour updates saved.');
     } catch (err) {
-      setSaveError(extractErrorMessage(err, 'Could not save tour updates.'));
+      notify.error(extractErrorMessage(err, 'Could not save tour updates.'));
     } finally {
       setSaving(false);
     }
@@ -76,9 +71,9 @@ export function TourDetailPage() {
 
   if (loadError) {
     return (
-      <div className="min-h-svh bg-slate-50 px-6 py-10">
-        <div className="mx-auto max-w-2xl rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{loadError}</div>
-        <Link to="/guides/my-tours" className="mt-4 inline-block text-sm font-semibold text-brand-700">
+      <div className="min-h-svh bg-surface-sunken px-6 py-10">
+        <div role="alert" className="mx-auto max-w-2xl rounded-xl border border-danger/30 bg-danger-soft p-4 text-danger-fg">{loadError}</div>
+        <Link to="/guides/my-tours" className="mt-4 inline-block text-sm font-semibold text-brand-text">
           &larr; Back to my tours
         </Link>
       </div>
@@ -86,118 +81,81 @@ export function TourDetailPage() {
   }
 
   return (
-    <div className="min-h-svh bg-slate-50">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-brand-500 before:via-accent-500 before:to-brand-500">
-        <div className="flex items-center gap-4">
-          <Link to="/guides/my-tours" className="text-sm font-semibold text-slate-600 hover:text-slate-900">
-            &larr; My Tours
-          </Link>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/guides/profile"
-            className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 sm:inline-block"
-          >
-            Profile
-          </Link>
-          <div className="hidden text-right sm:block">
-            <p className="text-sm font-semibold text-slate-700">{user?.name}</p>
-            <p className="text-xs text-slate-500">{user?.role}</p>
-          </div>
-          <button
-            onClick={logout}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            Log out
-          </button>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-3xl space-y-6">
         {!tour && (
           <div className="space-y-3">
             {[0, 1].map((i) => (
-              <div key={i} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white" />
+              <div key={i} className="h-24 animate-pulse rounded-xl border border-border bg-surface-raised" />
             ))}
           </div>
         )}
 
         {tour && (
           <>
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="font-heading text-xl font-bold text-slate-900">{tour.tourPackageName}</h2>
-              <p className="mt-1 text-sm text-slate-500">
+            <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+              <h2 className="font-heading text-xl font-bold text-fg">{tour.tourPackageName}</h2>
+              <p className="mt-1 text-sm text-fg-muted">
                 {tour.theme} · {tour.startDate} to {tour.endDate} · {tour.groupSize} traveler
                 {tour.groupSize === 1 ? '' : 's'}
               </p>
               {tour.locations.length > 0 && (
-                <p className="mt-2 text-sm text-slate-600">Locations: {tour.locations.join(', ')}</p>
+                <p className="mt-2 text-sm text-fg-muted">Locations: {tour.locations.join(', ')}</p>
               )}
               {tour.specialRequests && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <div className="mt-3 rounded-lg border border-warning/30 bg-warning-soft p-3 text-sm text-warning-fg">
                   Special requests: {tour.specialRequests}
                 </div>
               )}
             </div>
 
             {/* Tour Lifecycle Card */}
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="font-heading text-base font-bold text-slate-900">Tour Lifecycle</h3>
+            <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+              <h3 className="font-heading text-base font-bold text-fg">Tour Lifecycle</h3>
 
               <div className="mt-4">
                 {tour.tourEndedAt ? (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                    <p className="font-semibold text-emerald-900">Completed</p>
+                  <div className="rounded-lg border border-success/30 bg-success-soft p-4">
+                    <p className="font-semibold text-success-fg">Completed</p>
                     {tour.tourStartedAt && (
-                      <p className="mt-1 text-xs text-emerald-800">
+                      <p className="mt-1 text-xs text-success-fg">
                         Started at: {formatDateTime(tour.tourStartedAt)}
                       </p>
                     )}
-                    <p className="mt-0.5 text-xs text-emerald-800">
+                    <p className="mt-0.5 text-xs text-success-fg">
                       Ended at: {formatDateTime(tour.tourEndedAt)}
                     </p>
                   </div>
                 ) : tour.tourStartedAt ? (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                    <p className="font-semibold text-amber-900">In Progress</p>
-                    <p className="mt-1 text-xs text-amber-800">
+                  <div className="rounded-lg border border-warning/30 bg-warning-soft p-4">
+                    <p className="font-semibold text-warning-fg">In Progress</p>
+                    <p className="mt-1 text-xs text-warning-fg">
                       Started at: {formatDateTime(tour.tourStartedAt)}
                     </p>
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <p className="font-semibold text-slate-700">Not Started</p>
+                  <div className="rounded-lg border border-border bg-surface-sunken p-4">
+                    <p className="font-semibold text-fg">Not Started</p>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="font-heading text-base font-bold text-slate-900">Tour Management</h3>
+            <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+              <h3 className="font-heading text-base font-bold text-fg">Tour Management</h3>
 
-              {saveError && (
-                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {saveError}
-                </p>
-              )}
-              {saveSuccess && !saveError && (
-                <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                  Tour updates saved.
-                </p>
-              )}
 
               <div className="mt-4 space-y-3">
-                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <label className="flex items-center gap-2 text-sm font-medium text-fg">
                   <input
                     type="checkbox"
                     checked={attended}
                     onChange={(e) => setAttended(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300"
+                    className="h-4 w-4 rounded border-border"
                   />
                   Attended
                 </label>
                 <div>
-                  <label htmlFor="guide-notes" className="text-xs font-semibold text-slate-500">
+                  <label htmlFor="guide-notes" className="text-xs font-semibold text-fg-muted">
                     Guide Notes
                   </label>
                   <textarea
@@ -205,35 +163,35 @@ export function TourDetailPage() {
                     rows={4}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="font-heading text-base font-bold text-slate-900">Itinerary</h3>
+            <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+              <h3 className="font-heading text-base font-bold text-fg">Itinerary</h3>
 
               {tour.status !== 'Confirmed' && (
-                <p className="mt-3 text-sm text-slate-500">Available once this booking is confirmed.</p>
+                <p className="mt-3 text-sm text-fg-muted">Available once this booking is confirmed.</p>
               )}
 
               {tour.status === 'Confirmed' && itineraryError && (
-                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <p role="alert" className="mt-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger-fg">
                   {itineraryError}
                 </p>
               )}
 
               {tour.status === 'Confirmed' && !itineraryError && itinerarySteps === null && (
-                <div className="mt-3 h-16 animate-pulse rounded-lg bg-slate-100" />
+                <div className="mt-3 h-16 animate-pulse rounded-lg bg-neutral-soft" />
               )}
 
               {tour.status === 'Confirmed' && itinerarySteps !== null && (
@@ -244,7 +202,6 @@ export function TourDetailPage() {
             </div>
           </>
         )}
-      </main>
-    </div>
+      </div>
   );
 }

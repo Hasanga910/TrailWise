@@ -1,16 +1,16 @@
 import { BookingsIcon, CalendarIcon, DashboardIcon, PackagesIcon, PaymentIcon, ProfileIcon, ReportsIcon, SupportIcon, TagIcon } from '../admin/icons';
-import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
+import { AppShell, type SidebarNavItem } from '../layout/AppShell';
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/ops', label: 'Dashboard', icon: DashboardIcon, end: true },
-  { to: '/ops/packages', label: 'Packages', icon: PackagesIcon },
+  { to: '/ops/packages', label: 'Packages', icon: PackagesIcon, section: 'Catalogue' },
   { to: '/ops/discounts', label: 'Discounts', icon: TagIcon },
   { to: '/ops/payments', label: 'Payment Verification', icon: PaymentIcon },
-  { to: '/ops/bookings', label: 'Bookings', icon: BookingsIcon },
+  { to: '/ops/bookings', label: 'Bookings', icon: BookingsIcon, section: 'Operations' },
   { to: '/ops/support', label: 'Support Tickets', icon: SupportIcon },
-  { to: '/ops/reports', label: 'Reports', icon: ReportsIcon },
+  { to: '/ops/reports', label: 'Reports', icon: ReportsIcon, section: 'Insights' },
   { to: '/guides/availability', label: 'Guide Availability', icon: CalendarIcon },
-  { to: '/ops/profile', label: 'Profile', icon: ProfileIcon },
+  { to: '/ops/profile', label: 'Profile', icon: ProfileIcon, section: 'Account' },
 ];
 
 const WORKFLOW_ROUTE_PATTERN = /^\/ops\/bookings\/[^/]+\/workflow$/;
@@ -54,5 +54,5 @@ function resolveTitle(pathname: string): string {
 }
 
 export function OpsLayout() {
-  return <SidebarLayout navItems={NAV_ITEMS} pageTitles={resolveTitle} />;
+  return <AppShell navItems={NAV_ITEMS} pageTitles={resolveTitle} portalLabel="Operations Portal" />;
 }

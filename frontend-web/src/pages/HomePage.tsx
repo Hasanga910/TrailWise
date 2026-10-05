@@ -12,7 +12,7 @@ export function HomePage() {
   const isAuthenticated = status === 'authenticated';
 
   return (
-    <div className="min-h-svh bg-white">
+    <div className="min-h-svh bg-surface-raised">
       <HomeNav />
 
       <section className="relative flex h-[80vh] min-h-[560px] max-h-[900px] items-center justify-center overflow-hidden">

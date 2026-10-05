@@ -4,6 +4,7 @@ import axios from 'axios';
 import { extractErrorMessage } from '../../api/apiClient';
 import { getAgentWorkflow, type AgentWorkflowDto } from '../../api/agentWorkflows';
 import { decideBooking, getBookingById, type BookingDto } from '../../api/bookings';
+import { notify } from '../../components/ui/notify';
 
 function formatDuration(durationMs: number): string {
   return durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`;
@@ -21,7 +22,6 @@ export function AgentWorkflowPage() {
   const [showRejectPrompt, setShowRejectPrompt] = useState(false);
   const [rejectNotes, setRejectNotes] = useState('');
   const [deciding, setDeciding] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!bookingId) {
@@ -52,12 +52,11 @@ export function AgentWorkflowPage() {
   async function handleApprove() {
     if (!bookingId) return;
     setDeciding(true);
-    setActionError(null);
     try {
       await decideBooking(bookingId, { decision: 'Approve' });
       load();
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Could not approve this booking.'));
+      notify.error(extractErrorMessage(err, 'Could not approve this booking.'));
     } finally {
       setDeciding(false);
     }
@@ -67,14 +66,13 @@ export function AgentWorkflowPage() {
     e.preventDefault();
     if (!bookingId) return;
     setDeciding(true);
-    setActionError(null);
     try {
       await decideBooking(bookingId, { decision: 'Reject', notes: rejectNotes || undefined });
       setShowRejectPrompt(false);
       setRejectNotes('');
       load();
     } catch (err) {
-      setActionError(extractErrorMessage(err, 'Could not reject this booking.'));
+      notify.error(extractErrorMessage(err, 'Could not reject this booking.'));
     } finally {
       setDeciding(false);
     }
@@ -91,11 +89,11 @@ export function AgentWorkflowPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link to="/ops/bookings" className="text-sm font-semibold text-brand-600 hover:text-brand-700">
+        <Link to="/ops/bookings" className="text-sm font-semibold text-brand-text hover:text-brand-text">
           &larr; Back to bookings
         </Link>
-        <h2 className="mt-2 font-heading text-xl font-bold text-slate-900">Agent Workflow</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <h2 className="mt-2 font-heading text-xl font-bold text-fg">Agent Workflow</h2>
+        <p className="mt-1 text-sm text-fg-muted">
           How the coordinator agent processed this booking.
         </p>
       </div>
@@ -103,24 +101,24 @@ export function AgentWorkflowPage() {
       {loading && (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
+            <div key={i} className="h-16 animate-pulse rounded-xl border border-border bg-surface-raised" />
           ))}
         </div>
       )}
 
       {!loading && notFound && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-          <p className="font-medium text-slate-600">No agent activity recorded for this booking yet.</p>
+        <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-16 text-center">
+          <p className="font-medium text-fg-muted">No agent activity recorded for this booking yet.</p>
         </div>
       )}
 
       {!loading && error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-          <p className="text-sm font-medium text-red-700">{error}</p>
+        <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-4 py-3">
+          <p className="text-sm font-medium text-danger-fg">{error}</p>
           <button
             type="button"
             onClick={load}
-            className="mt-3 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+            className="mt-3 rounded-lg border border-danger/30 px-3 py-1.5 text-sm font-semibold text-danger-fg transition hover:bg-danger-soft"
           >
             Retry
           </button>
@@ -129,26 +127,21 @@ export function AgentWorkflowPage() {
 
       {!loading && !notFound && !error && workflow && (
         <div className="space-y-6">
-          {actionError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {actionError}
-            </p>
-          )}
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="font-heading text-base font-bold text-slate-900">Summary</h3>
-              <span className="whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+              <h3 className="font-heading text-base font-bold text-fg">Summary</h3>
+              <span className="whitespace-nowrap rounded-full bg-neutral-soft px-2.5 py-0.5 text-xs font-semibold text-fg-muted">
                 {workflow.status}
               </span>
             </div>
             {workflow.summaryText ? (
-              <p className="text-sm text-slate-700">{workflow.summaryText}</p>
+              <p className="text-sm text-fg">{workflow.summaryText}</p>
             ) : (
-              <p className="text-sm italic text-slate-400">Summary not available yet.</p>
+              <p className="text-sm italic text-fg-muted">Summary not available yet.</p>
             )}
             {workflow.advisoryFlags.length > 0 && (
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-fg-muted">
                 {workflow.advisoryFlags.map((flag) => (
                   <li key={flag}>{flag}</li>
                 ))}
@@ -156,13 +149,13 @@ export function AgentWorkflowPage() {
             )}
 
             {(canApprove || canReject) && (
-              <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+              <div className="mt-4 flex gap-2 border-t border-border pt-4">
                 {canApprove && (
                   <button
                     type="button"
                     disabled={deciding}
                     onClick={handleApprove}
-                    className="rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                    className="rounded-lg border border-success/30 px-3 py-1.5 text-sm font-semibold text-success-fg transition hover:bg-success-soft disabled:opacity-50"
                   >
                     Approve
                   </button>
@@ -172,7 +165,7 @@ export function AgentWorkflowPage() {
                     type="button"
                     disabled={deciding}
                     onClick={() => setShowRejectPrompt(true)}
-                    className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                    className="rounded-lg border border-danger/30 px-3 py-1.5 text-sm font-semibold text-danger-fg transition hover:bg-danger-soft disabled:opacity-50"
                   >
                     Reject
                   </button>
@@ -182,19 +175,19 @@ export function AgentWorkflowPage() {
           </section>
 
           <section>
-            <h3 className="mb-3 font-heading text-base font-bold text-slate-900">Step timeline</h3>
+            <h3 className="mb-3 font-heading text-base font-bold text-fg">Step timeline</h3>
             <div className="space-y-3">
               {workflow.steps.map((step, index) => (
-                <div key={`${step.agentName}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div key={`${step.agentName}-${index}`} className="rounded-xl border border-border bg-surface-raised p-4">
                   <div className="flex items-center justify-between">
-                    <p className="font-semibold text-slate-900">{step.agentName}</p>
-                    <span className="text-xs text-slate-400">{formatDuration(step.durationMs)}</span>
+                    <p className="font-semibold text-fg">{step.agentName}</p>
+                    <span className="text-xs text-fg-muted">{formatDuration(step.durationMs)}</span>
                   </div>
                   <details className="mt-2">
-                    <summary className="cursor-pointer text-xs font-semibold text-brand-600 hover:text-brand-700">
+                    <summary className="cursor-pointer text-xs font-semibold text-brand-text hover:text-brand-text">
                       View output
                     </summary>
-                    <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
+                    <pre className="mt-2 overflow-x-auto rounded-lg bg-surface-sunken p-3 text-xs text-fg">
                       {JSON.stringify(step.output, null, 2)}
                     </pre>
                   </details>
@@ -207,11 +200,11 @@ export function AgentWorkflowPage() {
 
       {showRejectPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-            <h3 className="font-heading text-base font-bold text-slate-900">Reject booking</h3>
+          <div className="w-full max-w-md rounded-xl bg-surface-raised p-6 shadow-lg">
+            <h3 className="font-heading text-base font-bold text-fg">Reject booking</h3>
             <form onSubmit={handleRejectSubmit} className="mt-4 space-y-4">
               <div>
-                <label htmlFor="workflow-reject-notes" className="mb-1 block text-sm font-medium text-slate-700">
+                <label htmlFor="workflow-reject-notes" className="mb-1 block text-sm font-medium text-fg">
                   Notes (optional)
                 </label>
                 <textarea
@@ -219,14 +212,14 @@ export function AgentWorkflowPage() {
                   value={rejectNotes}
                   onChange={(e) => setRejectNotes(e.target.value)}
                   rows={3}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowRejectPrompt(false)}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
                 >
                   Back
                 </button>

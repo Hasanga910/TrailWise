@@ -19,13 +19,13 @@ export function AboutSection() {
   const { ref, inView } = useInView<HTMLDivElement>();
 
   return (
-    <section className="bg-slate-50 py-20">
+    <section className="bg-surface-sunken py-20">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl">
+          <h2 className="font-heading text-2xl font-bold text-fg sm:text-3xl">
             Built to be simple, not just powerful
           </h2>
-          <p className="mt-3 text-slate-500">
+          <p className="mt-3 text-fg-muted">
             TrailWise handles the coordination in the background so travelers and operators can focus on the trip,
             not the process.
           </p>
@@ -38,9 +38,9 @@ export function AboutSection() {
           }`}
         >
           {points.map((point) => (
-            <div key={point.title} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-heading text-lg font-bold text-slate-900">{point.title}</h3>
-              <p className="mt-1.5 text-sm text-slate-500">{point.description}</p>
+            <div key={point.title} className="rounded-xl border border-border bg-surface-raised p-6 shadow-sm">
+              <h3 className="font-heading text-lg font-bold text-fg">{point.title}</h3>
+              <p className="mt-1.5 text-sm text-fg-muted">{point.description}</p>
             </div>
           ))}
         </div>

@@ -10,6 +10,7 @@ import {
 import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
 import { getAssignmentByBookingId, type VehicleAssignmentDetailDto } from '../../api/vehicles';
 import { ItineraryList } from '../../components/itinerary/ItineraryList';
+import { notify } from '../../components/ui/notify';
 
 const PAGE_SIZE = 10;
 
@@ -36,18 +37,18 @@ const STATUS_OPTIONS = [
 type StatusFilterOption = (typeof STATUS_OPTIONS)[number];
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
-  Requested: 'bg-slate-100 text-slate-600',
-  PlanProposed: 'bg-accent-500/15 text-accent-700',
-  PendingApproval: 'bg-amber-50 text-amber-700',
-  Confirmed: 'bg-brand-50 text-brand-700',
-  Completed: 'bg-emerald-50 text-emerald-700',
-  Cancelled: 'bg-red-50 text-red-700',
-  NeedsManualReview: 'bg-red-50 text-red-700',
+  Requested: 'bg-neutral-soft text-fg-muted',
+  PlanProposed: 'bg-accent-500/15 text-warning-fg',
+  PendingApproval: 'bg-warning-soft text-warning-fg',
+  Confirmed: 'bg-brand-soft text-brand-text',
+  Completed: 'bg-success-soft text-success-fg',
+  Cancelled: 'bg-danger-soft text-danger-fg',
+  NeedsManualReview: 'bg-danger-soft text-danger-fg',
 };
 
 const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'text-xs font-semibold text-slate-600';
+  'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+const labelClass = 'text-xs font-semibold text-fg-muted';
 
 export function MyBookingsPage() {
   const [status, setStatus] = useState<StatusFilterOption | ''>('');
@@ -61,7 +62,6 @@ export function MyBookingsPage() {
 
   const [cancelPrompt, setCancelPrompt] = useState<{ bookingId: string; reason: string } | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
   const [itineraryCache, setItineraryCache] = useState<Record<string, ItineraryStepDto[]>>({});
@@ -140,7 +140,6 @@ export function MyBookingsPage() {
     e.preventDefault();
     if (!cancelPrompt) return;
     setCancelling(true);
-    setCancelError(null);
     try {
       const updated = await cancelBooking(cancelPrompt.bookingId, cancelPrompt.reason || undefined);
       setResult((prev) =>
@@ -153,7 +152,7 @@ export function MyBookingsPage() {
       );
       setCancelPrompt(null);
     } catch (err) {
-      setCancelError(extractErrorMessage(err, 'Could not cancel this booking.'));
+      notify.error(extractErrorMessage(err, 'Could not cancel this booking.'));
     } finally {
       setCancelling(false);
     }
@@ -166,11 +165,11 @@ export function MyBookingsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-slate-900">My Bookings</h2>
-        <p className="mt-1 text-sm text-slate-500">Track the status of your booking requests.</p>
+        <h2 className="font-heading text-xl font-bold text-fg">My Bookings</h2>
+        <p className="mt-1 text-sm text-fg-muted">Track the status of your booking requests.</p>
       </div>
 
-      <div className="mb-6 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
+      <div className="mb-6 grid gap-4 rounded-xl border border-border bg-surface-raised p-4 sm:grid-cols-3">
         <div>
           <label htmlFor="statusFilter" className={labelClass}>
             Status
@@ -215,14 +214,8 @@ export function MyBookingsPage() {
         </div>
       </div>
 
-      {cancelError && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {cancelError}
-        </p>
-      )}
-
       {error && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
           {error}
         </p>
       )}
@@ -230,17 +223,17 @@ export function MyBookingsPage() {
       {!error && loading && (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="animate-pulse rounded-xl border border-slate-200 bg-white p-4">
-              <div className="h-4 w-1/3 rounded bg-slate-200" />
-              <div className="mt-2 h-4 w-1/2 rounded bg-slate-200" />
+            <div key={i} className="animate-pulse rounded-xl border border-border bg-surface-raised p-4">
+              <div className="h-4 w-1/3 rounded bg-neutral-soft" />
+              <div className="mt-2 h-4 w-1/2 rounded bg-neutral-soft" />
             </div>
           ))}
         </div>
       )}
 
       {!error && !loading && result && result.items.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-          <p className="font-medium text-slate-600">No bookings match your filters.</p>
+        <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-16 text-center">
+          <p className="font-medium text-fg-muted">No bookings match your filters.</p>
         </div>
       )}
 
@@ -248,20 +241,20 @@ export function MyBookingsPage() {
         <>
           <div className="space-y-3">
             {result.items.map((booking) => (
-              <div key={booking.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div key={booking.id} className="rounded-xl border border-border bg-surface-raised p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-semibold text-slate-900">
+                    <p className="font-semibold text-fg">
                       {booking.tourPackageName} — {booking.packageTier.classType}
                     </p>
-                    <p className="mt-0.5 text-sm text-slate-500">
+                    <p className="mt-0.5 text-sm text-fg-muted">
                       {booking.startDate} to {booking.endDate} · {booking.groupSize} traveler
                       {booking.groupSize === 1 ? '' : 's'} · ${booking.budgetPerPerson.toFixed(2)}/person budget
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {booking.isLargeGroup && (
-                      <span className="whitespace-nowrap rounded-full bg-accent-500/15 px-2.5 py-0.5 text-xs font-semibold text-accent-700">
+                      <span className="whitespace-nowrap rounded-full bg-accent-500/15 px-2.5 py-0.5 text-xs font-semibold text-warning-fg">
                         Large group
                       </span>
                     )}
@@ -274,7 +267,7 @@ export function MyBookingsPage() {
                       <button
                         type="button"
                         onClick={() => toggleItinerary(booking.id)}
-                        className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
                       >
                         {expandedBookingId === booking.id ? 'Hide Itinerary' : 'View Itinerary'}
                       </button>
@@ -283,7 +276,7 @@ export function MyBookingsPage() {
                       <button
                         type="button"
                         onClick={() => setCancelPrompt({ bookingId: booking.id, reason: '' })}
-                        className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
                       >
                         Cancel Booking
                       </button>
@@ -293,37 +286,37 @@ export function MyBookingsPage() {
 
                 {booking.status !== 'Cancelled' && (
                   booking.assignedGuide ? (
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                    <div className="mt-3 rounded-lg border border-border bg-surface-sunken/70 p-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                          <span className="text-xs font-bold uppercase tracking-wider text-fg-muted">
                             Assigned Tour Guide
                           </span>
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success-fg">
                             Assigned
                           </span>
                         </div>
                       </div>
                       <div className="mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
                         <div>
-                          <span className="block text-xs font-medium text-slate-500">Name</span>
-                          <span className="font-semibold text-slate-900">{booking.assignedGuide.name}</span>
+                          <span className="block text-xs font-medium text-fg-muted">Name</span>
+                          <span className="font-semibold text-fg">{booking.assignedGuide.name}</span>
                         </div>
                         <div>
-                          <span className="block text-xs font-medium text-slate-500">Contact Number</span>
-                          <span className="text-slate-700">{booking.assignedGuide.contactInfo || 'Not provided'}</span>
+                          <span className="block text-xs font-medium text-fg-muted">Contact Number</span>
+                          <span className="text-fg">{booking.assignedGuide.contactInfo || 'Not provided'}</span>
                         </div>
                         <div>
-                          <span className="block text-xs font-medium text-slate-500">Languages</span>
-                          <span className="text-slate-700">
+                          <span className="block text-xs font-medium text-fg-muted">Languages</span>
+                          <span className="text-fg">
                             {booking.assignedGuide.languages.length > 0
                               ? booking.assignedGuide.languages.join(' • ')
                               : 'None specified'}
                           </span>
                         </div>
                         <div>
-                          <span className="block text-xs font-medium text-slate-500">Specializations</span>
-                          <span className="text-slate-700">
+                          <span className="block text-xs font-medium text-fg-muted">Specializations</span>
+                          <span className="text-fg">
                             {booking.assignedGuide.specializations.length > 0
                               ? booking.assignedGuide.specializations.join(', ')
                               : 'General'}
@@ -332,7 +325,7 @@ export function MyBookingsPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                    <div className="mt-3 flex items-center gap-2 text-xs text-fg-muted">
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
                       <span>Tour Guide not assigned yet</span>
                     </div>
@@ -340,19 +333,19 @@ export function MyBookingsPage() {
                 )}
 
                 {expandedBookingId === booking.id && (
-                  <div className="mt-4 border-t border-slate-100 pt-4 space-y-4">
+                  <div className="mt-4 border-t border-border pt-4 space-y-4">
                     {assignmentCache[booking.id] && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+                      <div className="rounded-lg border border-border bg-surface-sunken p-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-fg-muted mb-3">
                           Assigned Transport & Crew
                         </h4>
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           <div>
-                            <p className="text-xs font-medium text-slate-500">Vehicle</p>
-                            <p className="text-sm font-semibold text-slate-800">
+                            <p className="text-xs font-medium text-fg-muted">Vehicle</p>
+                            <p className="text-sm font-semibold text-fg">
                               {assignmentCache[booking.id]?.vehicleName || 'Assigned Vehicle'}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-fg-muted">
                               {assignmentCache[booking.id]?.registrationNumber && (
                                 <span className="font-mono font-medium">{assignmentCache[booking.id]?.registrationNumber} · </span>
                               )}
@@ -361,21 +354,21 @@ export function MyBookingsPage() {
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs font-medium text-slate-500">Driver</p>
-                            <p className="text-sm font-semibold text-slate-800">
+                            <p className="text-xs font-medium text-fg-muted">Driver</p>
+                            <p className="text-sm font-semibold text-fg">
                               {assignmentCache[booking.id]?.driverName || 'Driver'}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-fg-muted">
                               {assignmentCache[booking.id]?.driverContact || 'Contact pending'}
                             </p>
                           </div>
                           {assignmentCache[booking.id]?.guideName && (
                             <div>
-                              <p className="text-xs font-medium text-slate-500">Tour Guide</p>
-                              <p className="text-sm font-semibold text-slate-800">
+                              <p className="text-xs font-medium text-fg-muted">Tour Guide</p>
+                              <p className="text-sm font-semibold text-fg">
                                 {assignmentCache[booking.id]?.guideName}
                               </p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-fg-muted">
                                 {assignmentCache[booking.id]?.guideContact || 'Contact pending'}
                               </p>
                             </div>
@@ -385,10 +378,10 @@ export function MyBookingsPage() {
                     )}
 
                     {itineraryLoadingId === booking.id && (
-                      <div className="h-12 animate-pulse rounded-lg bg-slate-100" />
+                      <div className="h-12 animate-pulse rounded-lg bg-neutral-soft" />
                     )}
                     {itineraryErrors[booking.id] && (
-                      <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      <p role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger-fg">
                         {itineraryErrors[booking.id]}
                       </p>
                     )}
@@ -404,18 +397,18 @@ export function MyBookingsPage() {
               type="button"
               disabled={isFirstPage}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-fg hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-fg-muted">
               Page {page} of {totalPages}
             </span>
             <button
               type="button"
               disabled={isLastPage}
               onClick={() => setPage((p) => p + 1)}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-fg hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next
             </button>
@@ -425,12 +418,12 @@ export function MyBookingsPage() {
 
       {cancelPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-            <h3 className="font-heading text-base font-bold text-slate-900">Cancel booking</h3>
-            <p className="mt-1 text-sm text-slate-500">Are you sure you want to cancel this booking?</p>
+          <div className="w-full max-w-md rounded-xl bg-surface-raised p-6 shadow-lg">
+            <h3 className="font-heading text-base font-bold text-fg">Cancel booking</h3>
+            <p className="mt-1 text-sm text-fg-muted">Are you sure you want to cancel this booking?</p>
             <form onSubmit={handleCancelSubmit} className="mt-4 space-y-4">
               <div>
-                <label htmlFor="cancel-reason" className="mb-1 block text-sm font-medium text-slate-700">
+                <label htmlFor="cancel-reason" className="mb-1 block text-sm font-medium text-fg">
                   Reason (optional)
                 </label>
                 <textarea
@@ -445,7 +438,7 @@ export function MyBookingsPage() {
                 <button
                   type="button"
                   onClick={() => setCancelPrompt(null)}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
                 >
                   Back
                 </button>

@@ -179,8 +179,7 @@ function renderAppWithAuthRoute(initialPath: string, role: UserRole) {
               </RequireRole>
             }
           />
-          <Route path="/portal" element={<div>Access Denied / Fallback</div>} />
-          <Route path="/fleet" element={<div>Fleet Coordinator Portal</div>} />
+          <Route path="/no-access" element={<div>Access Denied</div>} />
         </Routes>
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -362,17 +361,17 @@ describe('OpsSupportPage & OpsTicketDetailPage', () => {
       expect(await screen.findByText('Support Tickets')).toBeInTheDocument();
     });
 
-    it('redirects unauthorized roles (e.g. TourGuide) away from ops support page', async () => {
+    it('sends unauthorized roles (e.g. TourGuide) to /no-access for ops support', async () => {
       renderAppWithAuthRoute('/ops/support', 'TourGuide');
 
       expect(await screen.findByText(/access denied/i)).toBeInTheDocument();
       expect(screen.queryByText('Support Tickets')).not.toBeInTheDocument();
     });
 
-    it('redirects FleetCoordinator away from ops support page', async () => {
+    it('sends FleetCoordinator to /no-access for ops support', async () => {
       renderAppWithAuthRoute('/ops/support', 'FleetCoordinator');
 
-      expect(await screen.findByText(/fleet coordinator portal/i)).toBeInTheDocument();
+      expect(await screen.findByText(/access denied/i)).toBeInTheDocument();
       expect(screen.queryByText('Support Tickets')).not.toBeInTheDocument();
     });
   });

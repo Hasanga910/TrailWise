@@ -58,10 +58,10 @@ export function FeatureHighlights() {
   return (
     <section id="features" className="mx-auto max-w-6xl px-6 py-20 scroll-mt-20">
       <div className="mx-auto max-w-2xl text-center">
-        <h2 className="font-heading text-2xl font-bold text-slate-900 sm:text-3xl">
+        <h2 className="font-heading text-2xl font-bold text-fg sm:text-3xl">
           Everything your tour operation needs
         </h2>
-        <p className="mt-3 text-slate-500">
+        <p className="mt-3 text-fg-muted">
           One console for packages, bookings, and the whole team behind every trip.
         </p>
       </div>
@@ -75,13 +75,13 @@ export function FeatureHighlights() {
         {features.map((feature) => (
           <div
             key={feature.title}
-            className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            className="rounded-xl border border-border bg-surface-raised p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-soft text-brand-text">
               {feature.icon}
             </div>
-            <h3 className="mt-4 font-heading text-lg font-bold text-slate-900">{feature.title}</h3>
-            <p className="mt-1.5 text-sm text-slate-500">{feature.description}</p>
+            <h3 className="mt-4 font-heading text-lg font-bold text-fg">{feature.title}</h3>
+            <p className="mt-1.5 text-sm text-fg-muted">{feature.description}</p>
           </div>
         ))}
       </div>
