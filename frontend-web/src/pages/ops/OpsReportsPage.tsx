@@ -9,6 +9,7 @@ import {
   type PackageOccupancyDto,
   type RevenueReportResponse,
 } from '../../api/reports';
+import { Button, Card, EmptyState, Input, PageHeader, Select, Skeleton } from '../../components/ui';
 import { notify } from '../../components/ui/notify';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -115,63 +116,32 @@ export function OpsReportsPage() {
 
   return (
     <div className="space-y-8">
-      {/* A. Page Header */}
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-fg">Operations Reports</h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Monitor revenue, package occupancy, guide utilization, and export audit data.
-        </p>
-      </div>
+      <PageHeader
+        as="h1"
+        title="Operations Reports"
+        description="Monitor revenue, package occupancy, guide utilization, and export audit data."
+        className="mb-0"
+      />
 
-      {/* B. Date Filter Card */}
-      <section className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+      <Card>
         <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
-          <div>
-            <label htmlFor="fromDate" className="block text-xs font-semibold text-fg-muted">
-              From date
-            </label>
-            <input
-              id="fromDate"
-              type="date"
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="toDate" className="block text-xs font-semibold text-fg-muted">
-              To date
-            </label>
-            <input
-              id="toDate"
-              type="date"
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </div>
-          <div>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={loading}
-              className="w-full rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
-            >
-              {loading ? 'Refreshing…' : 'Refresh Data'}
-            </button>
-          </div>
+          <Input id="fromDate" type="date" label="From date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <Input id="toDate" type="date" label="To date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <Button onClick={handleRefresh} disabled={loading} className="w-full">
+            {loading ? 'Refreshing…' : 'Refresh Data'}
+          </Button>
         </div>
 
         {validationError && (
-          <p role="alert" className="mt-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+          <p role="alert" className="mt-4 rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
             {validationError}
           </p>
         )}
-      </section>
+      </Card>
 
       {/* Top-level Error State */}
       {error && (
-        <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+        <div role="alert" className="rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
           {error}
         </div>
       )}
@@ -181,11 +151,11 @@ export function OpsReportsPage() {
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-28 animate-pulse rounded-xl border border-border bg-surface-raised p-5" />
+              <Skeleton key={i} className="h-28 rounded-card border border-border bg-surface-raised" />
             ))}
           </div>
-          <div className="h-48 animate-pulse rounded-xl border border-border bg-surface-raised" />
-          <div className="h-48 animate-pulse rounded-xl border border-border bg-surface-raised" />
+          <Skeleton className="h-48 rounded-card border border-border bg-surface-raised" />
+          <Skeleton className="h-48 rounded-card border border-border bg-surface-raised" />
         </div>
       )}
 
@@ -196,16 +166,16 @@ export function OpsReportsPage() {
             <h2 className="font-heading text-lg font-bold text-fg">Revenue Overview</h2>
 
             {/* Total Revenue Stat Card */}
-            <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+            <Card>
               <p className="text-sm font-medium text-fg-muted">Total Revenue</p>
               <p className="mt-1 font-heading text-3xl font-bold text-fg">
                 {currencyFormatter.format(revenue?.totalRevenue ?? 0)}
               </p>
-            </div>
+            </Card>
 
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Revenue by Package */}
-              <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+              <Card>
                 <h3 className="font-heading text-sm font-bold text-fg">Revenue by Package</h3>
                 {revenue?.byPackage && revenue.byPackage.length > 0 ? (
                   <div className="mt-4 space-y-4">
@@ -234,10 +204,10 @@ export function OpsReportsPage() {
                     No package revenue recorded for this period.
                   </div>
                 )}
-              </div>
+              </Card>
 
               {/* Revenue by Month */}
-              <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+              <Card>
                 <h3 className="font-heading text-sm font-bold text-fg">Revenue by Month</h3>
                 {revenue?.byMonth && revenue.byMonth.length > 0 ? (
                   <div className="mt-4 space-y-4">
@@ -266,7 +236,7 @@ export function OpsReportsPage() {
                     No monthly revenue recorded for this period.
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
           </section>
 
@@ -274,7 +244,7 @@ export function OpsReportsPage() {
           <section className="space-y-4">
             <h2 className="font-heading text-lg font-bold text-fg">Package Occupancy</h2>
             {occupancy && occupancy.length > 0 ? (
-              <div className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-sm">
+              <Card padded={false}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
@@ -316,11 +286,11 @@ export function OpsReportsPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </Card>
             ) : (
-              <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-12 text-center">
-                <p className="font-medium text-fg-muted">No package occupancy records found for this date range.</p>
-              </div>
+              <Card padded={false} className="border-dashed">
+                <EmptyState title="No package occupancy records found for this date range." />
+              </Card>
             )}
           </section>
 
@@ -328,7 +298,7 @@ export function OpsReportsPage() {
           <section className="space-y-4">
             <h2 className="font-heading text-lg font-bold text-fg">Guide Utilization</h2>
             {guides && guides.length > 0 ? (
-              <div className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-sm">
+              <Card padded={false}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
@@ -368,55 +338,42 @@ export function OpsReportsPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </Card>
             ) : (
-              <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-12 text-center">
-                <p className="font-medium text-fg-muted">
-                  No guide availability records are available for this date range.
-                </p>
-                <p className="mt-1 text-xs text-fg-muted">
-                  Guide schedules will appear once reservations and availability slots are booked.
-                </p>
-              </div>
+              <Card padded={false} className="border-dashed">
+                <EmptyState
+                  title="No guide availability records are available for this date range."
+                  description="Guide schedules will appear once reservations and availability slots are booked."
+                />
+              </Card>
             )}
           </section>
 
           {/* F. Audit CSV Export */}
-          <section className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
+          <Card>
             <h2 className="font-heading text-lg font-bold text-fg">Audit Trail Export</h2>
             <p className="mt-1 text-sm text-fg-muted">
               Download the complete system audit log in CSV format for compliance and reporting.
             </p>
 
             <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
-              <div className="sm:w-64">
-                <label htmlFor="exportEntityType" className="block text-xs font-semibold text-fg-muted">
-                  Entity type
-                </label>
-                <select
-                  id="exportEntityType"
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                  value={exportEntityType}
-                  onChange={(e) => setExportEntityType(e.target.value)}
-                >
-                  <option value="All">All</option>
-                  <option value="Payment">Payment</option>
-                  <option value="Review">Review</option>
-                </select>
-              </div>
+              <Select
+                id="exportEntityType"
+                label="Entity type"
+                wrapperClassName="sm:w-64"
+                value={exportEntityType}
+                onChange={(e) => setExportEntityType(e.target.value)}
+              >
+                <option value="All">All</option>
+                <option value="Payment">Payment</option>
+                <option value="Review">Review</option>
+              </Select>
 
-              <div>
-                <button
-                  type="button"
-                  onClick={handleExportCsv}
-                  disabled={exporting}
-                  className="rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
-                >
-                  {exporting ? 'Exporting…' : 'Export Audit CSV'}
-                </button>
-              </div>
+              <Button onClick={handleExportCsv} disabled={exporting}>
+                {exporting ? 'Exporting…' : 'Export Audit CSV'}
+              </Button>
             </div>
-          </section>
+          </Card>
         </>
       )}
     </div>

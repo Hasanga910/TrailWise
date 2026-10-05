@@ -12,17 +12,8 @@ import {
 import { getItinerary, type ItineraryStepDto } from '../../api/itineraries';
 import { ItineraryEditor } from '../../components/itinerary/ItineraryEditor';
 import { ItineraryList } from '../../components/itinerary/ItineraryList';
+import { Button, buttonClasses, Card, EmptyState, Modal, PageHeader, Skeleton, StatusBadge, Textarea } from '../../components/ui';
 import { notify } from '../../components/ui/notify';
-
-const STATUS_STYLES: Record<BookingStatus, string> = {
-  Requested: 'bg-neutral-soft text-fg-muted',
-  PlanProposed: 'bg-accent-500/15 text-warning-fg',
-  PendingApproval: 'bg-warning-soft text-warning-fg',
-  Confirmed: 'bg-brand-soft text-brand-text',
-  Completed: 'bg-success-soft text-success-fg',
-  Cancelled: 'bg-danger-soft text-danger-fg',
-  NeedsManualReview: 'bg-danger-soft text-danger-fg',
-};
 
 const CANCELLABLE_STATUSES: BookingStatus[] = [
   'Requested',
@@ -140,38 +131,33 @@ export function OpsBookingsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-fg">Bookings</h2>
-        <p className="mt-1 text-sm text-fg-muted">All traveler booking requests.</p>
-      </div>
+      <PageHeader title="Bookings" description="All traveler booking requests." />
 
       {error && (
-        <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+        <p role="alert" className="mb-4 rounded-card border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
           {error}
         </p>
       )}
 
-
-
       {!error && bookings === null && (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl border border-border bg-surface-raised" />
+            <Skeleton key={i} className="h-14 rounded-card border border-border bg-surface-raised" />
           ))}
         </div>
       )}
 
       {!error && bookings !== null && bookings.length === 0 && (
-        <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-16 text-center">
-          <p className="font-medium text-fg-muted">No bookings yet.</p>
-        </div>
+        <Card padded={false} className="border-dashed">
+          <EmptyState title="No bookings yet." />
+        </Card>
       )}
 
       {bookings && bookings.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-sm">
-          <table className="w-full text-sm">
+        <Card padded={false} className="overflow-x-auto">
+          <table className="w-full text-body">
             <thead>
-              <tr className="border-b border-border bg-surface-sunken text-left text-xs font-semibold uppercase tracking-wide text-fg-muted">
+              <tr className="border-b border-border bg-surface-sunken text-left text-caption font-semibold uppercase tracking-wide text-fg-muted">
                 <th className="px-4 py-3">Traveler</th>
                 <th className="px-4 py-3">Package</th>
                 <th className="px-4 py-3">Status</th>
@@ -202,11 +188,7 @@ export function OpsBookingsPage() {
                       <td className="px-4 py-3 font-medium text-fg">{booking.travelerName}</td>
                       <td className="px-4 py-3 text-fg-muted">{booking.packageName}</td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[booking.status]}`}
-                        >
-                          {booking.status}
-                        </span>
+                        <StatusBadge status={booking.status} label={booking.status} className="whitespace-nowrap" />
                       </td>
                       <td className="px-4 py-3 text-fg-muted">{booking.createdAt}</td>
                       <td className="px-4 py-3 text-fg-muted">{booking.startDate}</td>
@@ -214,59 +196,43 @@ export function OpsBookingsPage() {
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           {canApprove && (
-                            <button
-                              type="button"
-                              disabled={isActioning}
-                              onClick={() => handleApprove(booking.id)}
-                              className="rounded-lg border border-success/30 px-3 py-1.5 text-sm font-semibold text-success-fg transition hover:bg-success-soft disabled:opacity-50"
-                            >
+                            <Button size="sm" disabled={isActioning} onClick={() => handleApprove(booking.id)}>
                               Approve
-                            </button>
+                            </Button>
                           )}
                           {canReject && (
-                            <button
-                              type="button"
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="border-danger/30 text-danger-fg"
                               disabled={isActioning}
                               onClick={() => setPrompt({ kind: 'reject', bookingId: booking.id, text: '' })}
-                              className="rounded-lg border border-danger/30 px-3 py-1.5 text-sm font-semibold text-danger-fg transition hover:bg-danger-soft disabled:opacity-50"
                             >
                               Reject
-                            </button>
+                            </Button>
                           )}
                           {canComplete && (
-                            <button
-                              type="button"
-                              disabled={isActioning}
-                              onClick={() => handleComplete(booking.id)}
-                              className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken disabled:opacity-50"
-                            >
+                            <Button size="sm" variant="secondary" disabled={isActioning} onClick={() => handleComplete(booking.id)}>
                               Mark Completed
-                            </button>
+                            </Button>
                           )}
                           {canCancel && (
-                            <button
-                              type="button"
+                            <Button
+                              size="sm"
+                              variant="secondary"
                               disabled={isActioning}
                               onClick={() => setPrompt({ kind: 'cancel', bookingId: booking.id, text: '' })}
-                              className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken disabled:opacity-50"
                             >
                               Cancel
-                            </button>
+                            </Button>
                           )}
                           {booking.status === 'Confirmed' && (
-                            <button
-                              type="button"
-                              onClick={() => toggleItinerary(booking.id)}
-                              className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
-                            >
+                            <Button size="sm" variant="secondary" onClick={() => toggleItinerary(booking.id)}>
                               {isExpanded ? 'Hide Itinerary' : 'Itinerary'}
-                            </button>
+                            </Button>
                           )}
 
-                          <Link
-                            to={`/ops/bookings/${booking.id}/workflow`}
-                            className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
-                          >
+                          <Link to={`/ops/bookings/${booking.id}/workflow`} className={buttonClasses('secondary', 'sm')}>
                             View agent workflow
                           </Link>
                         </div>
@@ -275,24 +241,18 @@ export function OpsBookingsPage() {
                     {isExpanded && (
                       <tr key={`${booking.id}-itinerary`}>
                         <td colSpan={7} className="border-t border-border bg-surface-sunken px-4 py-4">
-                          {itineraryLoadingId === booking.id && (
-                            <div className="h-12 animate-pulse rounded-lg bg-surface-raised" />
-                          )}
+                          {itineraryLoadingId === booking.id && <Skeleton className="h-12 bg-surface-raised" />}
                           {itineraryErrors[booking.id] && (
-                            <p role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger-fg">
+                            <p role="alert" className="rounded-input border border-danger/30 bg-danger-soft px-3 py-2 text-body text-danger-fg">
                               {itineraryErrors[booking.id]}
                             </p>
                           )}
                           {itineraryCache[booking.id] && editingItineraryId !== booking.id && (
                             <div className="space-y-3">
                               <ItineraryList steps={itineraryCache[booking.id]} />
-                              <button
-                                type="button"
-                                onClick={() => setEditingItineraryId(booking.id)}
-                                className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg hover:bg-surface-raised"
-                              >
+                              <Button size="sm" variant="secondary" onClick={() => setEditingItineraryId(booking.id)}>
                                 {itineraryCache[booking.id].length > 0 ? 'Edit Itinerary' : 'Set Itinerary'}
-                              </button>
+                              </Button>
                             </div>
                           )}
                           {itineraryCache[booking.id] && editingItineraryId === booking.id && (
@@ -314,50 +274,39 @@ export function OpsBookingsPage() {
               })}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
 
-      {prompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-md rounded-xl bg-surface-raised p-6 shadow-lg">
-            <h3 className="font-heading text-base font-bold text-fg">
-              {prompt.kind === 'reject' ? 'Reject booking' : 'Cancel booking'}
-            </h3>
-            <form onSubmit={handlePromptSubmit} className="mt-4 space-y-4">
-              <div>
-                <label htmlFor="booking-prompt-text" className="mb-1 block text-sm font-medium text-fg">
-                  {prompt.kind === 'reject' ? 'Notes (optional)' : 'Reason (optional)'}
-                </label>
-                <textarea
-                  id="booking-prompt-text"
-                  value={prompt.text}
-                  onChange={(e) => setPrompt({ ...prompt, text: e.target.value })}
-                  rows={3}
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPrompt(null)}
-                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-fg transition hover:bg-surface-sunken"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={actioningId === prompt.bookingId}
-                  className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
-                >
-                  {prompt.kind === 'reject' ? 'Reject' : 'Confirm cancellation'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-
+      <Modal
+        open={prompt !== null}
+        onClose={() => setPrompt(null)}
+        size="sm"
+        title={prompt?.kind === 'reject' ? 'Reject booking' : 'Cancel booking'}
+        footer={
+          prompt && (
+            <>
+              <Button variant="secondary" onClick={() => setPrompt(null)}>
+                Back
+              </Button>
+              <Button type="submit" form="booking-prompt-form" variant="danger" loading={actioningId === prompt.bookingId}>
+                {prompt.kind === 'reject' ? 'Reject' : 'Confirm cancellation'}
+              </Button>
+            </>
+          )
+        }
+      >
+        {prompt && (
+          <form id="booking-prompt-form" onSubmit={handlePromptSubmit}>
+            <Textarea
+              id="booking-prompt-text"
+              label={prompt.kind === 'reject' ? 'Notes (optional)' : 'Reason (optional)'}
+              value={prompt.text}
+              onChange={(e) => setPrompt({ ...prompt, text: e.target.value })}
+              rows={3}
+            />
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }
