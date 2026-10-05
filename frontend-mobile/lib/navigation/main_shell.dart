@@ -10,6 +10,7 @@ import '../guides/guide_profile_screen.dart';
 import '../home/home_screen.dart';
 import '../packages/packages_screen.dart';
 import '../support/support_tickets_screen.dart';
+import '../theme/app_theme.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -27,30 +28,32 @@ class _MainShellState extends State<MainShell> {
     final isTourGuide = user?.role == 'TourGuide';
     final isDriver = user?.role == 'Driver';
 
+    void selectTab(int i) => setState(() => _selectedIndex = i);
+
     final tabs = isTourGuide
-        ? const <Widget>[
-            HomeScreen(),
-            AssignedToursScreen(),
-            GuideProfileScreen(),
+        ? <Widget>[
+            HomeScreen(onSelectTab: selectTab),
+            const AssignedToursScreen(),
+            const GuideProfileScreen(),
           ]
         : isDriver
-            ? const <Widget>[
-                HomeScreen(),
-                DriverTasksScreen(),
-                DriverProfileScreen(),
+            ? <Widget>[
+                HomeScreen(onSelectTab: selectTab),
+                const DriverTasksScreen(),
+                const DriverProfileScreen(),
               ]
-            : const <Widget>[
-                HomeScreen(),
-                PackagesScreen(),
-                MyBookingsScreen(),
-                SupportTicketsScreen(),
+            : <Widget>[
+                HomeScreen(onSelectTab: selectTab),
+                const PackagesScreen(),
+                const MyBookingsScreen(),
+                const SupportTicketsScreen(),
               ];
 
     final destinations = isTourGuide
         ? const <NavigationDestination>[
             NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard),
+              icon: Icon(Icons.space_dashboard_outlined),
+              selectedIcon: Icon(Icons.space_dashboard),
               label: 'Dashboard',
             ),
             NavigationDestination(
@@ -67,8 +70,8 @@ class _MainShellState extends State<MainShell> {
         : isDriver
             ? const <NavigationDestination>[
                 NavigationDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  selectedIcon: Icon(Icons.dashboard),
+                  icon: Icon(Icons.space_dashboard_outlined),
+                  selectedIcon: Icon(Icons.space_dashboard),
                   label: 'Dashboard',
                 ),
                 NavigationDestination(
@@ -84,13 +87,13 @@ class _MainShellState extends State<MainShell> {
               ]
             : const <NavigationDestination>[
                 NavigationDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  selectedIcon: Icon(Icons.dashboard),
+                  icon: Icon(Icons.space_dashboard_outlined),
+                  selectedIcon: Icon(Icons.space_dashboard),
                   label: 'Dashboard',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.card_travel_outlined),
-                  selectedIcon: Icon(Icons.card_travel),
+                  icon: Icon(Icons.inventory_2_outlined),
+                  selectedIcon: Icon(Icons.inventory_2),
                   label: 'Packages',
                 ),
                 NavigationDestination(
@@ -99,8 +102,8 @@ class _MainShellState extends State<MainShell> {
                   label: 'My Bookings',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.support_agent_outlined),
-                  selectedIcon: Icon(Icons.support_agent),
+                  icon: Icon(Icons.support_outlined),
+                  selectedIcon: Icon(Icons.support),
                   label: 'Support',
                 ),
               ];
@@ -109,10 +112,15 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       body: IndexedStack(index: selectedIndex, children: tabs),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        destinations: destinations,
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.of(context).border)),
+        ),
+        child: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+          destinations: destinations,
+        ),
       ),
     );
   }

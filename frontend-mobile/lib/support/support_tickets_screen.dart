@@ -6,6 +6,8 @@ import '../models/paged_result.dart';
 import '../models/support_ticket.dart';
 import 'create_support_ticket_screen.dart';
 import 'support_ticket_detail_screen.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class SupportTicketsScreen extends StatefulWidget {
   final ApiClient? apiClient;
@@ -111,6 +113,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Help & Support'),
@@ -149,13 +152,13 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
           // Content
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const LoadingView()
                 : _error != null
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(_error!, style: const TextStyle(color: Colors.red)),
+                            Text(_error!, style: TextStyle(color: colors.danger)),
                             const SizedBox(height: 12),
                             ElevatedButton(onPressed: _loadTickets, child: const Text('Retry')),
                           ],
@@ -166,7 +169,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                         : RefreshIndicator(
                             onRefresh: _loadTickets,
                             child: ListView.builder(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 88),
                               itemCount: _tickets.length,
                               itemBuilder: (context, index) {
                                 final ticket = _tickets[index];
@@ -181,43 +184,27 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.support_agent_outlined, size: 72, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            const Text(
-              'No support tickets yet',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'If you need help with a booking, payment, trip, or the app, create a support ticket.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600, height: 1.4),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              icon: const Icon(Icons.add),
-              label: const Text('Create Support Ticket'),
-              onPressed: () => _openCreateTicket(),
-            ),
-          ],
-        ),
+    return EmptyState(
+      icon: Icons.support_agent_outlined,
+      title: 'No support tickets yet',
+      message:
+          'If you need help with a booking, payment, trip, or the app, create a support ticket.',
+      action: FilledButton.icon(
+        icon: const Icon(Icons.add),
+        label: const Text('Create Support Ticket'),
+        onPressed: () => _openCreateTicket(),
       ),
     );
   }
 
   Widget _buildTicketCard(SupportTicket ticket) {
+    final colors = AppColors.of(context);
     final statusColor = TicketStatusHelper.color(ticket.status);
     final statusLabel = TicketStatusHelper.displayName(ticket.status);
     final priorityColor = TicketPriorityHelper.color(ticket.priority);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
       child: ListTile(
         onTap: () => _openTicketDetail(ticket),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -233,6 +220,14 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
               spacing: 6,
               runSpacing: 4,
               children: [
+                Chip(
+                  label: Text(
+                    statusLabel,
+                    style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: statusColor.withValues(alpha: 0.12),
+                  visualDensity: VisualDensity.compact,
+                ),
                 Chip(
                   label: Text(ticket.category, style: const TextStyle(fontSize: 11)),
                   visualDensity: VisualDensity.compact,
@@ -255,20 +250,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
             const SizedBox(height: 6),
             Text(
               'Updated: ${ticket.updatedAt.toLocal().toString().split('.')[0]}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Chip(
-              label: Text(
-                statusLabel,
-                style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
-              backgroundColor: statusColor.withValues(alpha: 0.12),
-              visualDensity: VisualDensity.compact,
+              style: TextStyle(fontSize: 12, color: colors.fgMuted),
             ),
           ],
         ),

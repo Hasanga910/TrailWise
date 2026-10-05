@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../auth/current_user.dart';
+import '../theme/app_theme.dart';
+import '../theme/theme_toggle_button.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key, this.apiClient});
@@ -180,6 +182,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
   }
 
   void _showDeleteConfirmDialog() {
+    final colors = AppColors.of(context);
     showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
@@ -194,10 +197,10 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 style: TextStyle(fontSize: 14),
               ),
               if (_deleteError != null) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Text(
                   _deleteError!,
-                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                  style: TextStyle(color: colors.danger, fontSize: 13),
                 ),
               ],
             ],
@@ -219,7 +222,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                         setDialogState(() {});
                       }
                     },
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(backgroundColor: colors.danger),
               child: _deletingAccount
                   ? const SizedBox(
                       width: 18,
@@ -236,22 +239,24 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     final user = context.watch<AuthProvider>().user;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Driver Profile & Settings'),
+        actions: const [ThemeToggleButton()],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: AppSpacing.page,
         children: [
           // Header Card
           Card(
             elevation: 0,
-            color: Colors.teal.shade50,
+            color: colors.brandSoft,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.teal.shade200),
+              side: BorderSide(color: colors.border),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -259,7 +264,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: Colors.teal.shade700,
+                    backgroundColor: colors.brandText,
                     child: Text(
                       (user?.name.isNotEmpty ?? false) ? user!.name[0].toUpperCase() : 'D',
                       style: const TextStyle(
@@ -281,21 +286,21 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                         const SizedBox(height: 2),
                         Text(
                           user?.email ?? '',
-                          style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                          style: TextStyle(color: colors.fgMuted, fontSize: 13),
                         ),
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.teal.shade100,
+                            color: colors.brandSoft,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Professional Driver',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.teal,
+                              color: colors.brandText,
                             ),
                           ),
                         ),
@@ -351,12 +356,12 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   ),
                 ),
                 if (_profileError != null) ...[
-                  const SizedBox(height: 10),
-                  Text(_profileError!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  SizedBox(height: 10),
+                  Text(_profileError!, style: TextStyle(color: colors.danger, fontSize: 13)),
                 ],
                 if (_profileSuccess != null) ...[
-                  const SizedBox(height: 10),
-                  Text(_profileSuccess!, style: const TextStyle(color: Colors.teal, fontSize: 13, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 10),
+                  Text(_profileSuccess!, style: TextStyle(color: colors.brandText, fontSize: 13, fontWeight: FontWeight.bold)),
                 ],
                 const SizedBox(height: 12),
                 SizedBox(
@@ -426,12 +431,12 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   validator: (v) => v == null || v.isEmpty ? 'Please confirm new password' : null,
                 ),
                 if (_passwordError != null) ...[
-                  const SizedBox(height: 10),
-                  Text(_passwordError!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  SizedBox(height: 10),
+                  Text(_passwordError!, style: TextStyle(color: colors.danger, fontSize: 13)),
                 ],
                 if (_passwordSuccess != null) ...[
-                  const SizedBox(height: 10),
-                  Text(_passwordSuccess!, style: const TextStyle(color: Colors.teal, fontSize: 13, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 10),
+                  Text(_passwordSuccess!, style: TextStyle(color: colors.brandText, fontSize: 13, fontWeight: FontWeight.bold)),
                 ],
                 const SizedBox(height: 12),
                 SizedBox(
@@ -455,10 +460,10 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           // Danger Zone Card
           Card(
             elevation: 0,
-            color: Colors.red.shade50,
+            color: colors.dangerSoft,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.red.shade200),
+              side: BorderSide(color: colors.border),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -470,13 +475,13 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.red.shade900,
+                      color: colors.dangerFg,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Deleting your driver account will immediately deactivate your login credentials and sign you out.',
-                    style: TextStyle(fontSize: 13, color: Colors.red.shade800),
+                    style: TextStyle(fontSize: 13, color: colors.dangerFg),
                   ),
                   const SizedBox(height: 12),
                   FilledButton.icon(
@@ -484,7 +489,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     label: const Text('Delete Driver Account'),
                     onPressed: _showDeleteConfirmDialog,
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
+                      backgroundColor: colors.danger,
                     ),
                   ),
                 ],

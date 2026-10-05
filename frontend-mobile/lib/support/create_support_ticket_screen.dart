@@ -4,6 +4,7 @@ import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../models/booking.dart';
 import '../models/paged_result.dart';
+import '../theme/app_theme.dart';
 
 class CreateSupportTicketScreen extends StatefulWidget {
   final ApiClient? apiClient;
@@ -115,6 +116,7 @@ class _CreateSupportTicketScreenState extends State<CreateSupportTicketScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Support Ticket'),
@@ -131,13 +133,13 @@ class _CreateSupportTicketScreenState extends State<CreateSupportTicketScreen> {
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: colors.dangerSoft,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Text(
                     _submitError!,
-                    style: TextStyle(color: Colors.red.shade800),
+                    style: TextStyle(color: colors.dangerFg),
                   ),
                 ),
 

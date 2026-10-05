@@ -9,6 +9,8 @@ import '../models/vehicle_assignment.dart';
 import 'booking_status.dart';
 import 'guide_info_card.dart';
 import 'transport_info_card.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class ItineraryScreen extends StatefulWidget {
   const ItineraryScreen({
@@ -137,8 +139,8 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     final booking = _booking;
-    final statusColor = BookingStatus.color(booking.status);
 
     return Scaffold(
       appBar: AppBar(
@@ -154,12 +156,10 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
       body: RefreshIndicator(
         onRefresh: _refreshAll,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.page,
           children: [
             // Tour summary card
             Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(18),
                 child: Column(
@@ -174,10 +174,10 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                             children: [
                               Text(
                                 booking.tourPackageName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: colors.fg,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -185,38 +185,30 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                                 'Tier: ${booking.packageTier.classType} · ${booking.groupSize} ${booking.groupSize == 1 ? 'traveler' : 'travelers'}',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.grey.shade700,
+                                  color: colors.fgMuted,
                                 ),
                               ),
+                              const SizedBox(height: AppSpacing.sm),
+                              StatusBadge(status: booking.status),
                             ],
                           ),
-                        ),
-                        Chip(
-                          label: Text(
-                            booking.status,
-                            style: TextStyle(
-                              color: statusColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          backgroundColor: statusColor.withValues(alpha: 0.12),
-                          visualDensity: VisualDensity.compact,
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
                     const Divider(height: 1),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.date_range, size: 16, color: Colors.teal),
+                        Icon(Icons.date_range, size: 16, color: colors.brandText),
                         const SizedBox(width: 8),
-                        Text(
-                          '${booking.startDate}  →  ${booking.endDate}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            '${booking.startDate}  →  ${booking.endDate}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -241,13 +233,13 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
             const SizedBox(height: 20),
 
             // Daily Itinerary Section
-            const Text(
+            Text(
               'TOUR SCHEDULE & STOPS',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.8,
-                color: Colors.teal,
+                color: colors.brandText,
               ),
             ),
             const SizedBox(height: 8),
@@ -260,6 +252,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
   }
 
   Widget _buildStepsSection() {
+    final colors = AppColors.of(context);
     if (_loadingSteps) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
@@ -269,12 +262,11 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
 
     if (_stepsErrorMessage != null) {
       return Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              Icon(Icons.error_outline, size: 36, color: Colors.red.shade400),
+              Icon(Icons.error_outline, size: 36, color: colors.danger),
               const SizedBox(height: 10),
               Text(
                 _stepsErrorMessage!,
@@ -294,14 +286,12 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
 
     if (_steps.isEmpty) {
       return Card(
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.map_outlined, size: 40, color: Colors.teal.shade300),
+              Icon(Icons.map_outlined, size: 40, color: colors.brandText),
               const SizedBox(height: 12),
               const Text(
                 'Itinerary Details',
@@ -311,7 +301,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
               const SizedBox(height: 6),
               Text(
                 'No schedule steps have been created for this tour yet. Detailed milestones will appear here as tour dates approach.',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.3),
+                style: TextStyle(fontSize: 13, color: colors.fgMuted, height: 1.3),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -328,8 +318,6 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
         for (final day in days) ...[
           Card(
             margin: const EdgeInsets.only(bottom: 16),
-            elevation: 1.5,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -363,15 +351,15 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                               const SizedBox(height: 2),
                               Row(
                                 children: [
-                                  const Icon(Icons.location_on_outlined,
-                                      size: 14, color: Colors.grey),
+                                  Icon(Icons.location_on_outlined,
+                                      size: 14, color: colors.fgMuted),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       step.location,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 13,
-                                        color: Colors.grey,
+                                        color: colors.fgMuted,
                                       ),
                                     ),
                                   ),

@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'auth/auth_provider.dart';
 import 'auth/login_screen.dart';
 import 'navigation/main_shell.dart';
+import 'theme/app_theme.dart';
+import 'theme/theme_provider.dart';
 
 void main() {
   runApp(const TrailWiseApp());
@@ -14,12 +16,19 @@ class TrailWiseApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthProvider()..restoreSession(),
-      child: MaterialApp(
-        title: 'TrailWise',
-        theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal)),
-        home: const AuthGate(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..restoreSession()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()..load()),
+      ],
+      child: Consumer<ThemeProvider>(
+        builder: (context, theme, _) => MaterialApp(
+          title: 'TrailWise',
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: theme.mode,
+          home: const AuthGate(),
+        ),
       ),
     );
   }
