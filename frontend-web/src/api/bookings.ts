@@ -10,6 +10,8 @@ export type BookingStatus =
   | 'Cancelled'
   | 'NeedsManualReview';
 
+export type ApprovalType = 'LargeGroupOrCustomItinerary' | 'BudgetOverride' | 'RefundException';
+
 export interface CreateBookingInput {
   packageTierId: string;
   groupSize: number;
@@ -50,6 +52,11 @@ export interface BookingDto {
   tourStartedAt?: string | null;
   tourEndedAt?: string | null;
   createdAt?: string;
+  /** Note from the Operations Manager when a revision was requested. */
+  revisionNote?: string | null;
+  /** True while the booking waits for an Operations Manager decision. */
+  approvalPending?: boolean;
+  pendingApprovalType?: ApprovalType | null;
 }
 
 export interface PagedResult<T> {
