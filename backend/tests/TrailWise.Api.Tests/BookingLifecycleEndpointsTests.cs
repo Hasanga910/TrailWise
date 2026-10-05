@@ -10,7 +10,9 @@ using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
+using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 using Xunit;
 
 namespace TrailWise.Api.Tests;
@@ -641,6 +643,82 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = await response.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
         Assert.Equal("Cancelled", updated!.Status.ToString());
+    }
+
+    [Fact]
+    public async Task Cancel_StoresTrimmedReasonOnBooking()
+    {
+        var (client, bookingId, _) = await SetupBookingAsync(BookingStatus.Requested);
+
+        var response = await client.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { Reason = "  Change of plans  " });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.Equal("Change of plans", booking!.CancellationReason);
+    }
+
+    [Fact]
+    public async Task Cancel_WithoutReason_LeavesCancellationReasonNull()
+    {
+        var (client, bookingId, _) = await SetupBookingAsync(BookingStatus.Requested);
+
+        var response = await client.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { Reason = "   " });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        Assert.Null((await db.Bookings.FindAsync(bookingId))!.CancellationReason);
+    }
+
+    [Theory]
+    [InlineData(false)] // traveler cancels
+    [InlineData(true)] // staff cancels
+    public async Task Cancel_ReleasesGuideAvailability_SoTheGuideCanBeMatchedAgain(bool cancelAsManager)
+    {
+        var theme = $"Theme-{Guid.NewGuid():N}";
+        var (travelerClient, bookingId, _) = await SetupBookingAsync(BookingStatus.Confirmed, theme: theme);
+        var guideId = await SeedGuideAsync("Released Guide", theme, "English");
+
+        // Another booking holds the same guide, so its availability rows must survive.
+        var (_, otherBookingId, _) = await SetupBookingAsync(BookingStatus.Confirmed, startDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(90)));
+
+        Guid[] bookingIds = { bookingId, otherBookingId };
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var assignment = scope.ServiceProvider.GetRequiredService<IGuideAssignmentService>();
+            foreach (var id in bookingIds)
+            {
+                Assert.True(await assignment.AssignGuideAsync(id, guideId));
+            }
+
+            // Prove the guide is blocked for the cancelled booking's dates before cancelling.
+            var booking = await db.Bookings.FindAsync(bookingId);
+            var availability = scope.ServiceProvider.GetRequiredService<IGuideAvailabilityService>();
+            Assert.False(await availability.IsGuideAvailableAsync(guideId, booking!.StartDate, booking.EndDate));
+        }
+
+        var client = cancelAsManager ? await AuthenticatedOperationsManagerAsync() : travelerClient;
+        var response = await client.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { Reason = "Cancelled" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var cancelled = await verifyDb.Bookings.FindAsync(bookingId);
+        var freshAvailability = verifyScope.ServiceProvider.GetRequiredService<IGuideAvailabilityService>();
+
+        Assert.False(await verifyDb.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == bookingId));
+        Assert.True(await freshAvailability.IsGuideAvailableAsync(guideId, cancelled!.StartDate, cancelled.EndDate));
+        // The guide's other booking is untouched.
+        Assert.True(await verifyDb.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == otherBookingId));
+
+        var matchedAgain = await verifyScope.ServiceProvider.GetRequiredService<IGuideMatchingAgent>().MatchAsync(bookingId);
+        Assert.Equal(guideId, matchedAgain.GuideId);
+
+        var audit = await verifyDb.AuditLogs.SingleAsync(a => a.EntityId == bookingId && a.Action.StartsWith("BookingCancelledBy"));
+        Assert.Contains("releasedGuideDays", audit.Details, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

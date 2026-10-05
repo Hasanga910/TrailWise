@@ -424,6 +424,8 @@ public class CoordinatorAgentServiceTests
             LastGuideId = guideId;
             return Task.FromResult(ReturnValue);
         }
+
+        public Task<int> ReleaseGuideAsync(Guid bookingId, CancellationToken ct = default) => Task.FromResult(0);
     }
 
     private class CustomGuideMatchingAgent : IGuideMatchingAgent

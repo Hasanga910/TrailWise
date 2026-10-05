@@ -864,6 +864,7 @@ public class BookingsController : ControllerBase
         }
 
         booking.Status = BookingStatus.Cancelled;
+        booking.CancellationReason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
 
         await using var transaction = _db.Database.IsRelational()
             ? await _db.Database.BeginTransactionAsync(ct)
@@ -871,6 +872,8 @@ public class BookingsController : ControllerBase
 
         try
         {
+            var releasedGuideDays = await _guideAssignmentService.ReleaseGuideAsync(booking.Id, ct);
+
             var assignments = await _db.VehicleAssignments
                 .Where(a => a.BookingId == booking.Id)
                 .ToListAsync(ct);
@@ -888,7 +891,7 @@ public class BookingsController : ControllerBase
                 entityId: booking.Id,
                 action: isManager ? "BookingCancelledByStaff" : "BookingCancelledByTraveler",
                 performedBy: callerId,
-                details: new { request.Reason, ReleasedVehicleAssignments = assignments.Count },
+                details: new { request.Reason, ReleasedVehicleAssignments = assignments.Count, ReleasedGuideDays = releasedGuideDays },
                 ct: ct);
 
             if (transaction is not null)
