@@ -112,6 +112,37 @@ Keep the Session 1 design system: teal `brand` + amber `accent`, semantic tokens
 
 ---
 
+### Session 5b: Restyle remaining web pages with the design system (React, looks only)
+
+**Why:** Session 1 gave every page the new tokens, dark mode, toasts and shell, but many pages still use hand-made buttons, inputs, tables and modals. This session makes the whole web app visually consistent for the demo.
+
+**Pages:**
+- Admin: overview, user management, staff role pages, profile.
+- All profile/settings pages: Ops, Fleet, Guide, Driver, Traveler.
+- Support: `OpsSupportPage`, `OpsTicketDetailPage`.
+- Discounts: `DiscountManager`.
+- Guide pages not rebuilt in Session 5: dashboard, assigned tours, tour detail, profile.
+- Driver dashboard.
+- Traveler web pages: dashboard, packages, my bookings, booking request.
+- Any remaining page still using hand-made controls.
+- `OpsPaymentsPage` only if its owner (Person 4) agrees; otherwise skip it.
+
+**Rules:**
+- **Looks only:** replace hand-made buttons, inputs, selects, tables, modals, badges and empty/loading states with `components/ui` primitives and tokens.
+- **No behaviour changes:** no API, route, validation or business-logic changes; keep all `data-testid`s and visible texts that tests rely on.
+- **Big files:** split files over ~500 lines while touching them.
+- **One commit per role area:** admin, profiles, support and discounts, guide, driver, traveler.
+
+**Definition of done:**
+- no page uses hand-made versions of components that exist in `components/ui`,
+- all tests, lint and build pass,
+- light and dark mode checked at 360px and 1440px.
+
+**Kickoff prompt:**
+> Read `docs/UI_OVERHAUL_PLAN.md` (sections 1–3 and Session 5b). Plan the restyle of the listed pages onto `components/ui`, looks only, no behaviour changes. Do not run git commit: stage each step and give me a commit message. Wait for my approval before coding.
+
+---
+
 ### Session 6: Flutter design system and traveler app
 
 **Why:** doc §7 traveler features.
@@ -205,6 +236,7 @@ Claude Code: append one entry per session.
 | 3 | 2026-10-05 | In progress | Decision recorded: in-person-only payments were considered and rejected by the team; no new payment work in this project and the existing payment code (bank slips, deadlines, expiry job, Ops verification, Flutter pay screen) is kept exactly as is. Session 8 (payment gateway) removed: payment gateway out of scope for this campus project; existing bank-slip flow kept as is. Steps done so far: baseline test fixes, guide auto-assign rules on approval, guide release and cancellation reason on cancel, approvals queue API (`ApprovalRequest`, pending list with evidence, decide), Drivers model/migration alignment, driver-assignments privacy fix. The final summary is added when the session is complete. | Cancellation / refund exception, workflow monitor and dashboard endpoints, React approval queue, workflow monitor and Ops dashboard, state management ADR. |
 | 4 | | Not started | | |
 | 5 | | Not started | | |
+| 5b | | Not started | | |
 | 6 | | Not started | | |
 | 7 | | Not started | | |
 | 8 | | Not started | | |
