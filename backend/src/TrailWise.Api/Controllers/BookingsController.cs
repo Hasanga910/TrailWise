@@ -357,6 +357,8 @@ public class BookingsController : ControllerBase
             isManagerOrAdmin: false,
             ct);
 
+        var pendingApprovals = await GetPendingApprovalTypesAsync(bookings.Select(b => b.Id), ct);
+
         var dtos = bookings.Select(b =>
         {
             statusMap.TryGetValue(b.Id, out var ps);
@@ -365,7 +367,8 @@ public class BookingsController : ControllerBase
                 paymentStatus: ps?.Succeeded == true ? ps.Status : null,
                 remainingAmount: ps?.Succeeded == true ? ps.RemainingAmount : null,
                 isFullyPaid: ps?.Succeeded == true && ps.Status == "FullyPaid",
-                hasPendingPayment: ps?.Succeeded == true && ps.HasPendingVerification);
+                hasPendingPayment: ps?.Succeeded == true && ps.HasPendingVerification)
+                .WithPendingApproval(pendingApprovals.TryGetValue(b.Id, out var type) ? type : null);
         }).ToList();
 
         return Ok(new PagedResult<BookingDto>(
@@ -414,7 +417,18 @@ public class BookingsController : ControllerBase
             isFullyPaid: paymentStatus?.Succeeded == true && paymentStatus.Status == "FullyPaid",
             hasPendingPayment: paymentStatus?.Succeeded == true && paymentStatus.HasPendingVerification);
 
-        return Ok(dto);
+        var pendingApprovals = await GetPendingApprovalTypesAsync(new[] { booking.Id }, ct);
+        return Ok(dto.WithPendingApproval(pendingApprovals.TryGetValue(booking.Id, out var pendingType) ? pendingType : null));
+    }
+
+    /// <summary>The type of the open approval request (if any) for each booking.</summary>
+    private async Task<Dictionary<Guid, ApprovalType>> GetPendingApprovalTypesAsync(IEnumerable<Guid> bookingIds, CancellationToken ct)
+    {
+        var ids = bookingIds.ToList();
+        return await _db.ApprovalRequests
+            .AsNoTracking()
+            .Where(a => ids.Contains(a.BookingId) && a.Status == ApprovalStatus.Pending)
+            .ToDictionaryAsync(a => a.BookingId, a => a.Type, ct);
     }
 
     [HttpPatch("{id:guid}/decision")]
@@ -622,7 +636,7 @@ public class BookingsController : ControllerBase
             {
                 return approval.Outcome switch
                 {
-                    ApprovalOutcome.Success => Ok(BookingDto.FromEntity(booking) with { ApprovalPending = true }),
+                    ApprovalOutcome.Success => Ok(BookingDto.FromEntity(booking).WithPendingApproval(ApprovalType.RefundException)),
                     ApprovalOutcome.NotFound => NotFound(),
                     _ => Problem(statusCode: StatusCodes.Status409Conflict, title: approval.Error, detail: approval.Error)
                 };

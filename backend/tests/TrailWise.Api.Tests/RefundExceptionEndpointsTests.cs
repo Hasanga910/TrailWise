@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Approvals;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Bookings;
+using TrailWise.Api.Contracts.Common;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;
@@ -54,6 +55,7 @@ public class RefundExceptionEndpointsTests : IClassFixture<TrailWiseWebApplicati
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
         Assert.True(body!.ApprovalPending);
+        Assert.Equal(ApprovalType.RefundException, body.PendingApprovalType);
         Assert.Equal(BookingStatus.PendingApproval, body.Status);
 
         using var scope = _factory.Services.CreateScope();
@@ -212,6 +214,130 @@ public class RefundExceptionEndpointsTests : IClassFixture<TrailWiseWebApplicati
         Assert.Equal(ApprovalStatus.Superseded, (await verifyDb.ApprovalRequests.SingleAsync(a => a.BookingId == seeded.BookingId)).Status);
         var pending = await GetPendingAsync(await StaffClientAsync("OperationsManager"));
         Assert.DoesNotContain(pending.Items, i => i.BookingId == seeded.BookingId);
+    }
+
+    // ---------------------------------------------------------------- booking DTO (additive fields)
+
+    [Fact]
+    public async Task BookingEndpoints_ReportThePendingRefundException_OnMineAndById()
+    {
+        var seeded = await SeedAsync(3, (100m, PaymentStatus.FullyPaid));
+        await seeded.Traveler.PatchAsJsonAsync($"/api/bookings/{seeded.BookingId}/cancel", new { Reason = "x" });
+
+        var mine = await seeded.Traveler.GetFromJsonAsync<PagedResult<BookingDto>>("/api/bookings/mine", JsonOptions);
+        var byId = await seeded.Traveler.GetFromJsonAsync<BookingDto>($"/api/bookings/{seeded.BookingId}", JsonOptions);
+
+        var listed = Assert.Single(mine!.Items, b => b.Id == seeded.BookingId);
+        foreach (var dto in new[] { listed, byId! })
+        {
+            Assert.True(dto.ApprovalPending);
+            Assert.Equal(ApprovalType.RefundException, dto.PendingApprovalType);
+            Assert.Equal(BookingStatus.PendingApproval, dto.Status);
+        }
+    }
+
+    [Fact]
+    public async Task BookingEndpoints_SerialiseTheNewFieldsAsAdditiveCamelCaseJson()
+    {
+        var seeded = await SeedAsync(3, (100m, PaymentStatus.FullyPaid));
+        await seeded.Traveler.PatchAsJsonAsync($"/api/bookings/{seeded.BookingId}/cancel", new { Reason = "x" });
+
+        using var json = JsonDocument.Parse(await seeded.Traveler.GetStringAsync($"/api/bookings/{seeded.BookingId}"));
+        var root = json.RootElement;
+
+        Assert.True(root.GetProperty("approvalPending").GetBoolean());
+        Assert.Equal("RefundException", root.GetProperty("pendingApprovalType").GetString());
+        // Existing fields are untouched.
+        Assert.Equal("PendingApproval", root.GetProperty("status").GetString());
+        Assert.True(root.TryGetProperty("tourPackageName", out _));
+        Assert.True(root.TryGetProperty("groupSize", out _));
+    }
+
+    [Fact]
+    public async Task BookingEndpoints_ShowNoPendingApproval_ForOrdinaryBookings()
+    {
+        var seeded = await SeedAsync(30, (100m, PaymentStatus.FullyPaid));
+
+        var mine = await seeded.Traveler.GetFromJsonAsync<PagedResult<BookingDto>>("/api/bookings/mine", JsonOptions);
+        var byId = await seeded.Traveler.GetFromJsonAsync<BookingDto>($"/api/bookings/{seeded.BookingId}", JsonOptions);
+
+        foreach (var dto in new[] { Assert.Single(mine!.Items, b => b.Id == seeded.BookingId), byId! })
+        {
+            Assert.False(dto.ApprovalPending);
+            Assert.Null(dto.PendingApprovalType);
+        }
+    }
+
+    [Fact]
+    public async Task BookingEndpoints_ClearTheFlag_OnceTheApprovalIsDecided()
+    {
+        var seeded = await SeedAsync(3, (100m, PaymentStatus.FullyPaid));
+        await seeded.Traveler.PatchAsJsonAsync($"/api/bookings/{seeded.BookingId}/cancel", new { Reason = "x" });
+        var approvalId = await ApprovalIdAsync(seeded.BookingId);
+        var ops = await StaffClientAsync("OperationsManager");
+
+        (await ops.PostAsJsonAsync($"/api/approvals/{approvalId}/decide", new { Decision = "RequestRevision", Note = "More info please." }))
+            .EnsureSuccessStatusCode();
+
+        var byId = await seeded.Traveler.GetFromJsonAsync<BookingDto>($"/api/bookings/{seeded.BookingId}", JsonOptions);
+        Assert.False(byId!.ApprovalPending);
+        Assert.Null(byId.PendingApprovalType);
+        Assert.Equal("More info please.", byId.RevisionNote);
+    }
+
+    [Theory]
+    [InlineData(ApprovalType.LargeGroupOrCustomItinerary)]
+    [InlineData(ApprovalType.BudgetOverride)]
+    public async Task BookingEndpoints_ReportThePendingTypeOfOtherApprovalsToo(ApprovalType type)
+    {
+        var seeded = await SeedAsync(30);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            (await db.Bookings.SingleAsync(b => b.Id == seeded.BookingId)).Status = BookingStatus.PendingApproval;
+            db.ApprovalRequests.Add(new ApprovalRequest { BookingId = seeded.BookingId, Type = type, Status = ApprovalStatus.Pending });
+            await db.SaveChangesAsync();
+        }
+
+        var byId = await seeded.Traveler.GetFromJsonAsync<BookingDto>($"/api/bookings/{seeded.BookingId}", JsonOptions);
+
+        Assert.True(byId!.ApprovalPending);
+        Assert.Equal(type, byId.PendingApprovalType);
+    }
+
+    [Fact]
+    public async Task BookingMine_ReportsTheFlagPerBooking_NotForTheWholePage()
+    {
+        // One traveler with two bookings: only one has a pending approval.
+        var first = await SeedAsync(3, (100m, PaymentStatus.FullyPaid));
+        await first.Traveler.PatchAsJsonAsync($"/api/bookings/{first.BookingId}/cancel", new { Reason = "x" });
+        Guid second;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var original = await db.Bookings.AsNoTracking().SingleAsync(b => b.Id == first.BookingId);
+            var other = new Booking
+            {
+                TravelerId = original.TravelerId,
+                TourPackageId = original.TourPackageId,
+                PackageTierId = original.PackageTierId,
+                GroupSize = 2,
+                StartDate = original.StartDate.AddDays(60),
+                EndDate = original.StartDate.AddDays(63),
+                BudgetPerPerson = 200m,
+                Status = BookingStatus.Confirmed
+            };
+            db.Bookings.Add(other);
+            await db.SaveChangesAsync();
+            second = other.Id;
+        }
+
+        var mine = await first.Traveler.GetFromJsonAsync<PagedResult<BookingDto>>("/api/bookings/mine", JsonOptions);
+
+        Assert.True(Assert.Single(mine!.Items, b => b.Id == first.BookingId).ApprovalPending);
+        var untouched = Assert.Single(mine.Items, b => b.Id == second);
+        Assert.False(untouched.ApprovalPending);
+        Assert.Null(untouched.PendingApprovalType);
     }
 
     // ---------------------------------------------------------------- queue evidence
