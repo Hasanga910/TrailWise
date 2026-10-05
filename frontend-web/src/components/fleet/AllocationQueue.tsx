@@ -3,21 +3,18 @@ import { BookingsIcon } from '../admin/icons';
 import { Card, EmptyState, Skeleton, Tabs, cn } from '../ui';
 import { BookingStatusBadge } from './fleetBadges';
 
-export type QueueTab = 'NeedsManualReview' | 'PlanProposed' | 'PendingApproval' | 'Requested' | 'All';
+export type QueueTab = 'NeedsManualReview';
 
 interface AllocationQueueProps {
   bookings: BookingDto[];
   loading: boolean;
-  tab: QueueTab;
-  onTabChange: (tab: QueueTab) => void;
   selectedId?: string;
   onSelect: (booking: BookingDto) => void;
 }
 
-/** Left column of the fleet workspace: bookings waiting on transport, filtered by status. */
-export function AllocationQueue({ bookings, loading, tab, onTabChange, selectedId, onSelect }: AllocationQueueProps) {
-  const count = (status: string) => bookings.filter((b) => b.status === status).length;
-  const queueBookings = bookings.filter((b) => tab === 'All' || b.status === tab);
+/** Left column of the fleet workspace: bookings waiting on transport that need manual review. */
+export function AllocationQueue({ bookings, loading, selectedId, onSelect }: AllocationQueueProps) {
+  const needsReviewBookings = bookings.filter((b) => b.status === 'NeedsManualReview');
 
   return (
     <Card className="space-y-4">
@@ -26,19 +23,14 @@ export function AllocationQueue({ bookings, loading, tab, onTabChange, selectedI
           <BookingsIcon className="h-5 w-5 text-brand-text" />
           <h2 className="font-heading text-h4 text-fg">Allocation Queue</h2>
         </div>
-        <span className="text-caption font-semibold text-fg-muted">{bookings.length} Bookings</span>
+        <span className="rounded-full bg-rose-500/10 px-2.5 py-0.5 text-caption font-bold text-rose-600 dark:text-rose-400">
+          {needsReviewBookings.length} Needs Review
+        </span>
       </div>
 
-      <Tabs
-        value={tab}
-        onChange={(id) => onTabChange(id as QueueTab)}
-        items={[
-          { id: 'NeedsManualReview', label: `Needs Review (${count('NeedsManualReview')})` },
-          { id: 'PlanProposed', label: `Proposed (${count('PlanProposed')})` },
-          { id: 'PendingApproval', label: `Pending (${count('PendingApproval')})` },
-          { id: 'Requested', label: `Requested (${count('Requested')})` },
-        ]}
-      />
+      <div className="rounded-card border border-rose-500/20 bg-rose-500/5 p-2.5 text-caption text-rose-700 dark:text-rose-300">
+        <span className="font-semibold">⚠️ Action Required:</span> Bookings where AI resource matching encountered conflicts or shortages.
+      </div>
 
       {loading ? (
         <div className="space-y-2" role="status" aria-label="Loading queue">
@@ -47,19 +39,15 @@ export function AllocationQueue({ bookings, loading, tab, onTabChange, selectedI
           ))}
           <span className="sr-only">Loading queue...</span>
         </div>
-      ) : queueBookings.length === 0 ? (
+      ) : needsReviewBookings.length === 0 ? (
         <EmptyState
-          title="No bookings in this state"
-          description={
-            tab === 'NeedsManualReview'
-              ? 'Awesome! No failed AI allocations require intervention.'
-              : `No bookings currently tagged as ${tab}.`
-          }
+          title="No bookings require manual review"
+          description="Awesome! All bookings were automatically matched by AI agents or are already resolved."
           className="rounded-card border border-dashed border-border py-8"
         />
       ) : (
         <div className="max-h-[560px] space-y-2.5 overflow-y-auto pr-1">
-          {queueBookings.map((b) => {
+          {needsReviewBookings.map((b) => {
             const isSelected = selectedId === b.id;
             return (
               <div

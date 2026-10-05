@@ -26,8 +26,9 @@ import { Card, EmptyState, PageHeader, buttonClasses } from '../ui';
 import { notify } from '../ui/notify';
 import { AgentPlanReview } from './AgentPlanReview';
 import { AllocationModal } from './AllocationModal';
-import { AllocationQueue, type QueueTab } from './AllocationQueue';
+import { AllocationQueue } from './AllocationQueue';
 import { BookingInspector } from './BookingInspector';
+import { ReassignResourcesModal } from './ReassignResourcesModal';
 import { VehicleMatchList } from './VehicleMatchList';
 
 // Badge helpers live in fleetBadges; re-exported so existing imports keep working.
@@ -40,8 +41,6 @@ export function FleetManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Active queue tab filter: NeedsManualReview (main priority), PlanProposed, PendingApproval, Requested, All
-  const [queueTab, setQueueTab] = useState<QueueTab>('NeedsManualReview');
 
   // Currently selected booking for smart allocation or review
   const [selectedBooking, setSelectedBooking] = useState<BookingDto | null>(null);
@@ -69,6 +68,7 @@ export function FleetManager() {
 
   // Allocation modal state
   const [allocatingVehicle, setAllocatingVehicle] = useState<VehicleDto | null>(null);
+  const [reassigningAssignment, setReassigningAssignment] = useState<VehicleAssignmentDetailDto | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState('');
   const [selectedGuideId, setSelectedGuideId] = useState('');
   const [availableGuides, setAvailableGuides] = useState<AvailableGuideDto[]>([]);
@@ -103,11 +103,7 @@ export function FleetManager() {
 
         // Keep or auto-select first priority booking if none selected
         if (!selectedBooking && bItems.length > 0) {
-          const priority = bItems.find((b: BookingDto) => b.status === 'NeedsManualReview') ||
-            bItems.find((b: BookingDto) => b.status === 'PlanProposed') ||
-            bItems.find((b: BookingDto) => b.status === 'PendingApproval') ||
-            bItems.find((b: BookingDto) => b.status === 'Requested') ||
-            bItems[0];
+          const priority = bItems.find((b: BookingDto) => b.status === 'NeedsManualReview') || bItems[0];
           setSelectedBooking(priority);
         } else if (selectedBooking) {
           const updated = bItems.find((b: BookingDto) => b.id === selectedBooking.id);
@@ -315,8 +311,6 @@ export function FleetManager() {
           <AllocationQueue
             bookings={bookings}
             loading={loading}
-            tab={queueTab}
-            onTabChange={setQueueTab}
             selectedId={selectedBooking?.id}
             onSelect={setSelectedBooking}
           />
@@ -334,7 +328,13 @@ export function FleetManager() {
             </Card>
           ) : (
             <>
-              <BookingInspector booking={selectedBooking} assignment={currentAssignment} />
+              <BookingInspector
+                booking={selectedBooking}
+                assignment={currentAssignment}
+                onReassign={() => {
+                  if (currentAssignment) setReassigningAssignment(currentAssignment);
+                }}
+              />
 
               {selectedBooking.status === 'PlanProposed' && (
                 <AgentPlanReview
@@ -389,6 +389,17 @@ export function FleetManager() {
           allocating={allocating}
           onClose={() => setAllocatingVehicle(null)}
           onSubmit={handleConfirmAllocation}
+        />
+      )}
+
+      {reassigningAssignment && (
+        <ReassignResourcesModal
+          assignment={reassigningAssignment}
+          onClose={() => setReassigningAssignment(null)}
+          onSuccess={() => {
+            setReassigningAssignment(null);
+            loadData();
+          }}
         />
       )}
     </div>

@@ -7,9 +7,11 @@ import { BookingStatusBadge } from './fleetBadges';
 export function BookingInspector({
   booking,
   assignment,
+  onReassign,
 }: {
   booking: BookingDto;
   assignment: VehicleAssignmentDetailDto | null;
+  onReassign?: () => void;
 }) {
   return (
     <Card className="space-y-4">
@@ -24,11 +26,23 @@ export function BookingInspector({
           </p>
         </div>
 
-        <div className="rounded-input border border-border bg-surface-sunken px-3 py-1.5 text-right text-caption">
-          <span className="block text-overline uppercase text-fg-muted">Service Window</span>
-          <span className="font-bold text-fg">
-            {booking.startDate} &rarr; {booking.endDate}
-          </span>
+        <div className="flex items-center gap-2">
+          {booking.status === 'Confirmed' && assignment && onReassign && (
+            <button
+              type="button"
+              onClick={onReassign}
+              className="rounded-input border border-warning/40 bg-warning-soft px-3 py-1.5 text-caption font-semibold text-warning-fg hover:bg-warning-soft/80 transition"
+            >
+              🔄 Reassign Resources
+            </button>
+          )}
+
+          <div className="rounded-input border border-border bg-surface-sunken px-3 py-1.5 text-right text-caption">
+            <span className="block text-overline uppercase text-fg-muted">Service Window</span>
+            <span className="font-bold text-fg">
+              {booking.startDate} &rarr; {booking.endDate}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -88,9 +102,20 @@ export function BookingInspector({
               )}
             </div>
           </div>
-          <span className="self-start rounded-input border border-success/30 bg-surface-raised px-2.5 py-1 font-medium sm:self-auto">
-            Confirmed Dispatch
-          </span>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {booking.status === 'Confirmed' && onReassign && (
+              <button
+                type="button"
+                onClick={onReassign}
+                className="rounded-input border border-border bg-surface-raised px-2.5 py-1 font-semibold text-fg hover:bg-surface-sunken transition"
+              >
+                Swap / Reassign
+              </button>
+            )}
+            <span className="rounded-input border border-success/30 bg-surface-raised px-2.5 py-1 font-medium">
+              Confirmed Dispatch
+            </span>
+          </div>
         </div>
       )}
     </Card>

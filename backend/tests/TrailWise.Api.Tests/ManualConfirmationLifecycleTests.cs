@@ -194,7 +194,8 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
         var vehicle = await vanResponse.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
 
         // 2. Create a driver
-        var driverResponse = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        var coordClient = await CoordinatorClientAsync();
+        var driverResponse = await coordClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
         {
             Name = "Fleet Driver",
             LicenseNumber = $"DL-{Guid.NewGuid():N}"[..10],
@@ -236,6 +237,7 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
     public async Task Test03B_UnifiedFleetAndGuideAllocation_AssignsAllThreeResources_AndConfirms()
     {
         var adminClient = await AdminClientAsync();
+        var coordClient = await CoordinatorClientAsync();
 
         // 1. Create a vehicle
         var vanResponse = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
@@ -251,7 +253,7 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
         var vehicle = await vanResponse.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
 
         // 2. Create a driver
-        var driverResponse = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        var driverResponse = await coordClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
         {
             Name = "Unified Driver",
             LicenseNumber = $"DL-{Guid.NewGuid():N}"[..10],
@@ -534,6 +536,26 @@ public class ManualConfirmationLifecycleTests : IClassFixture<TrailWiseWebApplic
             Password = password
         });
         loginResponse.EnsureSuccessStatusCode();
+        var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
+        return client;
+    }
+
+    private async Task<HttpClient> CoordinatorClientAsync()
+    {
+        var admin = await AdminClientAsync();
+        var email = $"coord-{Guid.NewGuid():N}@example.com";
+        await admin.PostAsJsonAsync("/api/auth/admin/users", new
+        {
+            Name = "Fleet Coord",
+            Email = email,
+            Password = "P@ssword123",
+            ContactNumber = "+14155550198",
+            Role = UserRole.FleetCoordinator.ToString()
+        });
+
+        var client = _factory.CreateClient();
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "P@ssword123" });
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
         return client;

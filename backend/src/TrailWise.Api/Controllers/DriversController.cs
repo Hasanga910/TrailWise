@@ -94,7 +94,7 @@ public class DriversController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = FleetCoordinatorOrAdmin)]
+    [Authorize(Roles = "FleetCoordinator")]
     public async Task<ActionResult<DriverDto>> Create(CreateDriverRequest request, CancellationToken ct)
     {
         var name = request.Name?.Trim() ?? string.Empty;

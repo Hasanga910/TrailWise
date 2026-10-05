@@ -70,23 +70,23 @@ public class BookingNotificationService : IBookingNotificationService
                 ? guideAvailability.Guide.ContactInfo
                 : guideAvailability?.Guide?.User?.ContactNumber ?? "N/A";
 
-            // Send SMS ONLY to the Traveler (single page, <= 160 characters)
+            // Send SMS ONLY to the Traveler (strictly under 150 characters for single SMS credit budget)
             if (!string.IsNullOrWhiteSpace(travelerPhone))
             {
-                var vehicleInfo = vehicleRegNumber != "Pending" ? $" {vehicleRegNumber}" : "";
-                var driverInfo = driverName != "Pending Driver" ? $" Driver:{driverName}" : "";
-                
-                // Keep concise to guarantee 1 SMS credit (< 160 chars):
-                // e.g.: "TrailWise: Booking confirmed for Cultural Triangle (2026-10-11 to 2026-10-12). Veh: WP-REG-1234. Driver: Sunil. Have a safe tour!"
-                var travelerMessage = $"TrailWise: Booking confirmed for {packageName} ({tourDates})." +
-                    (!string.IsNullOrEmpty(vehicleInfo) ? $" Veh:{vehicleInfo}." : "") +
-                    (!string.IsNullOrEmpty(driverInfo) ? $"{driverInfo}." : "") +
-                    " Have a safe tour!";
+                var vInfo = vehicleRegNumber != "Pending" ? $"{vehicleType} ({vehicleRegNumber})" : vehicleType;
+                var dInfo = driverName != "Pending Driver" ? $"{driverName} ({driverPhone})" : "Pending";
 
-                // Ensure it never exceeds standard 160-character single-part SMS limit
-                if (travelerMessage.Length > 160)
+                var travelerMessage = $"TrailWise: Tour '{packageName}' confirmed! Dates: {tourDates}. Vehicle: {vInfo}. Driver: {dInfo}. Have a wonderful trip!";
+
+                // Ensure it strictly never exceeds 150 characters
+                if (travelerMessage.Length > 150)
                 {
-                    travelerMessage = travelerMessage.Substring(0, 157) + "...";
+                    // Concise format preserving package name and dates
+                    travelerMessage = $"TrailWise: '{packageName}' confirmed! Dates: {tourDates}. Veh: {vehicleRegNumber}. Driver: {driverName}. Safe trip!";
+                    if (travelerMessage.Length > 150)
+                    {
+                        travelerMessage = travelerMessage.Substring(0, 147) + "...";
+                    }
                 }
 
                 await _smsService.SendSmsAsync(travelerPhone, travelerMessage);

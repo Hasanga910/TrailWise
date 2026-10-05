@@ -872,6 +872,49 @@ public class BookingsController : ControllerBase
         return Ok(sorted);
     }
 
+    [HttpPut("{id:guid}/reassign-resources")]
+    [Authorize(Roles = FleetCoordinatorOrAdmin)]
+    public async Task<ActionResult<BookingDto>> ReassignResources(
+        Guid id,
+        ReassignResourcesRequest request,
+        CancellationToken ct)
+    {
+        var performedBy = GetUserId() ?? Guid.Empty;
+
+        var result = await _fleetReservationService.ReassignResourcesAsync(
+            id,
+            request.VehicleId,
+            request.DriverId,
+            request.GuideId,
+            request.Reason,
+            performedBy,
+            ct);
+
+        if (!result.Succeeded)
+        {
+            return Conflict(new { error = result.Error });
+        }
+
+        var updatedBooking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .Include(b => b.Traveler)
+            .Include(b => b.VehicleAssignments)
+                .ThenInclude(va => va.Vehicle)
+            .Include(b => b.VehicleAssignments)
+                .ThenInclude(va => va.Driver)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (updatedBooking is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(BookingDto.FromEntity(updatedBooking));
+    }
+
     [HttpPatch("{id:guid}/guide-notes")]
     [Authorize(Roles = "TourGuide")]
     public async Task<ActionResult<AssignedTourDto>> UpdateGuideNotes(

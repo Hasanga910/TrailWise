@@ -42,6 +42,8 @@ export interface AppShellProps {
   portalLabel?: string;
   /** Optional page content; defaults to the router outlet. */
   children?: ReactNode;
+  /** Optional custom class for the main content container (defaults to 'max-w-6xl'). */
+  contentClassName?: string;
 }
 
 const COLLAPSE_STORAGE_KEY = 'trailwise_sidebar_collapsed';
@@ -70,7 +72,7 @@ function badgeLabel(item: SidebarNavItem): string {
   return item.badge ? `${item.label}, ${item.badge} waiting` : item.label;
 }
 
-export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShellProps) {
+export function AppShell({ navItems, pageTitles, portalLabel, children, contentClassName }: AppShellProps) {
   const { user, logout } = useAuth();
   const { preference, setPreference } = useTheme();
   const location = useLocation();
@@ -297,7 +299,7 @@ export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShe
             />
           </div>
         </header>
-        <main key={location.pathname} className="animate-page-in mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <main key={location.pathname} className={cn('animate-page-in mx-auto px-4 py-8 sm:px-6 sm:py-10', contentClassName ?? 'max-w-6xl')}>
           <Suspense fallback={<PageSkeleton />}>{children ?? <Outlet />}</Suspense>
         </main>
       </div>

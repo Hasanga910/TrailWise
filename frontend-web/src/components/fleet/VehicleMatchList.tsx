@@ -100,7 +100,7 @@ export function VehicleMatchList({
           className="rounded-card border border-dashed border-border bg-surface-sunken py-8"
         />
       ) : (
-        <div className="space-y-3">
+        <div className="max-h-[580px] space-y-3 overflow-y-auto pr-1.5">
           {filteredVehicles.map((veh) => {
             const { isFree, hasCapacity, isMaintenanceBlocked, canAssign } = assess(veh);
             return (

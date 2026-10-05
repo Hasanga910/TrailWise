@@ -166,3 +166,15 @@ export async function assignGuide(bookingId: string, guideId: string): Promise<A
   return response.data;
 }
 
+export interface ReassignResourcesInput {
+  vehicleId?: string;
+  driverId?: string;
+  guideId?: string;
+  reason?: string;
+}
+
+export async function reassignResources(bookingId: string, input: ReassignResourcesInput): Promise<BookingDto> {
+  const response = await apiClient.put<BookingDto>(`/api/bookings/${bookingId}/reassign-resources`, input);
+  return response.data;
+}
+
