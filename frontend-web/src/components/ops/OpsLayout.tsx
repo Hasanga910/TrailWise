@@ -1,12 +1,15 @@
-import { BookingsIcon, CalendarIcon, DashboardIcon, PackagesIcon, PaymentIcon, ProfileIcon, ReportsIcon, SupportIcon, TagIcon } from '../admin/icons';
+import { useEffect } from 'react';
+import { useApprovalsStore, selectPendingTotal } from '../../stores/approvalsStore';
+import { ApprovalsIcon, BookingsIcon, CalendarIcon, DashboardIcon, PackagesIcon, PaymentIcon, ProfileIcon, ReportsIcon, SupportIcon, TagIcon } from '../admin/icons';
 import { AppShell, type SidebarNavItem } from '../layout/AppShell';
 
-const NAV_ITEMS: SidebarNavItem[] = [
+const BASE_NAV_ITEMS: SidebarNavItem[] = [
   { to: '/ops', label: 'Dashboard', icon: DashboardIcon, end: true },
   { to: '/ops/packages', label: 'Packages', icon: PackagesIcon, section: 'Catalogue' },
   { to: '/ops/discounts', label: 'Discounts', icon: TagIcon },
   { to: '/ops/payments', label: 'Payment Verification', icon: PaymentIcon },
-  { to: '/ops/bookings', label: 'Bookings', icon: BookingsIcon, section: 'Operations' },
+  { to: '/ops/approvals', label: 'Approvals', icon: ApprovalsIcon, section: 'Operations' },
+  { to: '/ops/bookings', label: 'Bookings', icon: BookingsIcon },
   { to: '/ops/support', label: 'Support Tickets', icon: SupportIcon },
   { to: '/ops/reports', label: 'Reports', icon: ReportsIcon, section: 'Insights' },
   { to: '/guides/availability', label: 'Guide Availability', icon: CalendarIcon },
@@ -28,6 +31,9 @@ function resolveTitle(pathname: string): string {
   }
   if (pathname === '/ops/payments') {
     return 'Payment Verification';
+  }
+  if (pathname === '/ops/approvals') {
+    return 'Approval Queue';
   }
   if (pathname === '/ops/bookings') {
     return 'Bookings';
@@ -54,5 +60,19 @@ function resolveTitle(pathname: string): string {
 }
 
 export function OpsLayout() {
-  return <AppShell navItems={NAV_ITEMS} pageTitles={resolveTitle} portalLabel="Operations Portal" />;
+  const pending = useApprovalsStore(selectPendingTotal);
+  const fetchPending = useApprovalsStore((s) => s.fetchPending);
+  const loaded = useApprovalsStore((s) => s.loaded);
+  const reset = useApprovalsStore((s) => s.reset);
+
+  // The navigation badge needs the count on every Ops page, not only on the queue.
+  useEffect(() => {
+    if (!loaded && !useApprovalsStore.getState().loading) void fetchPending();
+  }, [loaded, fetchPending]);
+
+  // Leaving the Ops area clears the queue so another account never sees it.
+  useEffect(() => reset, [reset]);
+
+  const navItems = BASE_NAV_ITEMS.map((item) => (item.to === '/ops/approvals' ? { ...item, badge: pending } : item));
+  return <AppShell navItems={navItems} pageTitles={resolveTitle} portalLabel="Operations Portal" />;
 }

@@ -17,7 +17,7 @@ const auth: AuthContextValue = {
   updateUser: vi.fn(),
 };
 
-function renderShell(path = '/x/profile') {
+function renderShell(path = '/x/profile', badge?: number | null) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <ThemeProvider>
@@ -31,7 +31,7 @@ function renderShell(path = '/x/profile') {
                   pageTitles={{ '/x': 'Home', '/x/profile': 'Profile Settings' }}
                   navItems={[
                     { to: '/x', label: 'Home', icon: DashboardIcon, end: true },
-                    { to: '/x/profile', label: 'Profile', icon: ProfileIcon, section: 'Account' },
+                    { to: '/x/profile', label: 'Profile', icon: ProfileIcon, section: 'Account', badge },
                   ]}
                 />
               }
@@ -79,5 +79,27 @@ describe('AppShell', () => {
     await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
     expect(localStorage.getItem('trailwise_sidebar_collapsed')).toBe('true');
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument();
+  });
+
+  it('shows a count next to a nav item and announces it', () => {
+    localStorage.clear();
+    renderShell('/x/profile', 4);
+    const link = screen.getByRole('link', { name: /Profile/ });
+    expect(link).toHaveTextContent('4');
+    expect(screen.getByLabelText('4 waiting')).toBeInTheDocument();
+  });
+
+  it.each([[null], [0], [undefined]])('shows no count when the badge is %s', (badge) => {
+    localStorage.clear();
+    renderShell('/x/profile', badge);
+    expect(screen.queryByLabelText(/waiting/)).not.toBeInTheDocument();
+  });
+
+  it('marks a collapsed nav item with a dot and names the count for screen readers', async () => {
+    const user = userEvent.setup();
+    localStorage.clear();
+    renderShell('/x/profile', 2);
+    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(screen.getByRole('link', { name: 'Profile, 2 waiting' })).toBeInTheDocument();
   });
 });

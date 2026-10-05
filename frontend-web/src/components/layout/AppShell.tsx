@@ -29,6 +29,8 @@ export interface SidebarNavItem {
   end?: boolean;
   /** Items sharing a `section` are grouped under a small heading. */
   section?: string;
+  /** A count shown next to the label (for example waiting approvals). Hidden when null, undefined or 0. */
+  badge?: number | null;
   children?: { to: string; label: string; end?: boolean }[];
 }
 
@@ -62,6 +64,10 @@ function writeStoredCollapsed(value: boolean) {
 const linkBase = 'flex items-center gap-3 rounded-input px-3 py-2 text-body font-semibold transition duration-150';
 const linkIdle = 'text-fg-muted hover:bg-surface-sunken hover:text-fg';
 const linkActive = 'bg-brand-soft text-brand-fg';
+
+function badgeLabel(item: SidebarNavItem): string {
+  return item.badge ? `${item.label}, ${item.badge} waiting` : item.label;
+}
 
 export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShellProps) {
   const { user, logout } = useAuth();
@@ -108,13 +114,16 @@ export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShe
             to={item.to}
             end={item.end}
             title={item.label}
-            aria-label={item.label}
+            aria-label={badgeLabel(item)}
             onClick={onNavigate}
             className={({ isActive }) =>
-              cn('flex items-center justify-center rounded-input p-2.5 transition', isActive ? linkActive : linkIdle)
+              cn('relative flex items-center justify-center rounded-input p-2.5 transition', isActive ? linkActive : linkIdle)
             }
           >
             <Icon className="h-5 w-5 shrink-0" />
+            {item.badge ? (
+              <span aria-hidden className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-warning ring-2 ring-surface-raised" />
+            ) : null}
           </NavLink>
         );
       } else if (item.children) {
@@ -150,7 +159,15 @@ export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShe
             className={({ isActive }) => cn(linkBase, isActive ? linkActive : linkIdle)}
           >
             <Icon className="h-5 w-5 shrink-0" />
-            {item.label}
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {item.badge ? (
+              <span
+                aria-label={`${item.badge} waiting`}
+                className="rounded-full bg-warning-soft px-2 py-0.5 text-caption font-bold text-warning-fg"
+              >
+                {item.badge}
+              </span>
+            ) : null}
           </NavLink>
         );
       }

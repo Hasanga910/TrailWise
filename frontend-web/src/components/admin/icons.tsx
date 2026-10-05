@@ -26,6 +26,7 @@ import {
   UsersRound,
   X,
   type LucideIcon,
+  ClipboardCheck,
 } from 'lucide-react';
 
 /**
@@ -70,3 +71,4 @@ export const ReportsIcon = wrap(BarChart3);
 export const PaymentIcon = wrap(CreditCard);
 export const SupportIcon = wrap(LifeBuoy);
 export const PhoneIcon = wrap(Phone);
+export const ApprovalsIcon = wrap(ClipboardCheck);
