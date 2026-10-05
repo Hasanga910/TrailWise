@@ -69,7 +69,7 @@ describe('FleetGuideAssignmentsPage', () => {
     expect(screen.getByText('2026-12-01 → 2026-12-05')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('German')).toBeInTheDocument();
-    expect(screen.getByText('NeedsManualReview')).toBeInTheDocument();
+    expect(screen.getByText('Needs Manual Review')).toBeInTheDocument();
 
     // Pending count
     expect(screen.getByText('1')).toBeInTheDocument();
@@ -270,7 +270,7 @@ describe('FleetGuideAssignmentsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
     // Booking still exists with NeedsManualReview and no guide, so button remains
     expect(screen.getByText('Sarah Connor')).toBeInTheDocument();
-    expect(screen.getByText('NeedsManualReview')).toBeInTheDocument();
+    expect(screen.getByText('Needs Manual Review')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /assign tour guide/i })).toBeInTheDocument();
   });
 });

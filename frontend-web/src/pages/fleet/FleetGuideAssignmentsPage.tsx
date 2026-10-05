@@ -8,7 +8,7 @@ import {
   type BookingSummaryDto,
 } from '../../api/bookings';
 import { UsersIcon } from '../../components/admin/icons';
-import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Skeleton, cn } from '../../components/ui';
+import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Skeleton, StatusBadge, cn } from '../../components/ui';
 import { notify } from '../../components/ui/notify';
 
 export function FleetGuideAssignmentsPage() {
@@ -125,7 +125,7 @@ export function FleetGuideAssignmentsPage() {
     <div className="space-y-6">
       <Card className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-card bg-info-soft text-info-fg">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-info-soft text-info-fg">
             <UsersIcon className="h-6 w-6" />
           </div>
           <PageHeader
@@ -198,43 +198,40 @@ export function FleetGuideAssignmentsPage() {
             <table className="w-full text-left text-body text-fg-muted">
               <thead className="border-b border-border bg-surface-sunken text-caption font-semibold uppercase tracking-wider text-fg-muted">
                 <tr>
-                  <th className="px-6 py-4">Booking ID</th>
-                  <th className="px-6 py-4">Traveler</th>
-                  <th className="px-6 py-4">Tour Package</th>
-                  <th className="px-6 py-4">Schedule</th>
-                  <th className="px-6 py-4">Group Size</th>
-                  <th className="px-6 py-4">Language Pref</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Action</th>
+                  <th className="px-3 py-4">Booking ID</th>
+                  <th className="px-3 py-4">Traveler</th>
+                  <th className="px-3 py-4">Tour Package</th>
+                  <th className="px-3 py-4">Schedule</th>
+                  <th className="px-3 py-4">Group Size</th>
+                  <th className="px-3 py-4">Language Pref</th>
+                  <th className="px-3 py-4">Status</th>
+                  <th className="px-3 py-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredBookings.map((b) => (
                   <tr key={b.id} className="transition-colors hover:bg-surface-sunken/80">
-                    <td className="px-6 py-4 font-mono text-caption font-medium text-fg-muted">{b.id.slice(0, 8)}...</td>
-                    <td className="px-6 py-4 font-semibold text-fg">{b.travelerName}</td>
-                    <td className="px-6 py-4 text-fg">{b.packageName}</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-fg-muted">
+                    <td className="px-3 py-4 font-mono text-caption font-medium text-fg-muted">{b.id.slice(0, 8)}...</td>
+                    <td className="px-3 py-4 font-semibold text-fg">{b.travelerName}</td>
+                    <td className="px-3 py-4 text-fg">{b.packageName}</td>
+                    <td className="whitespace-nowrap px-3 py-4 text-fg-muted">
                       {b.startDate}
                       {b.endDate ? ` → ${b.endDate}` : ''}
                     </td>
-                    <td className="px-6 py-4 text-fg">
+                    <td className="px-3 py-4 text-fg">
                       <span className="font-semibold text-fg">{b.groupSize}</span> guests
                     </td>
-                    <td className="px-6 py-4 text-fg-muted">
+                    <td className="px-3 py-4 text-fg-muted">
                       {b.languagePreference ? (
                         <Badge tone="info">{b.languagePreference}</Badge>
                       ) : (
                         <span className="text-caption text-fg-muted">None specified</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      <Badge tone="warning" className="gap-1.5">
-                        <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
-                        {b.status}
-                      </Badge>
+                    <td className="px-3 py-4">
+                      <StatusBadge status={b.status} className="whitespace-nowrap" />
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                    <td className="whitespace-nowrap px-3 py-4 text-right">
                       {b.status === 'NeedsManualReview' && !b.assignedGuide ? (
                         <Button size="sm" leftIcon={<UsersIcon className="h-3.5 w-3.5" />} onClick={() => handleOpenAssignModal(b)}>
                           Assign Tour Guide

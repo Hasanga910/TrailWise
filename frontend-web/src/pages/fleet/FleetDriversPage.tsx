@@ -167,7 +167,7 @@ export function FleetDriversPage() {
     <div className="space-y-6">
       <Card className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-card bg-brand-soft text-brand-text">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-brand-soft text-brand-text">
             <IdCardIcon className="h-6 w-6" />
           </div>
           <PageHeader
