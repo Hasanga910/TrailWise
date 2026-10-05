@@ -10,11 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 
 class ReviewScreen extends StatefulWidget {
-  const ReviewScreen({
-    super.key,
-    required this.booking,
-    this.apiClient,
-  });
+  const ReviewScreen({super.key, required this.booking, this.apiClient});
 
   final Booking booking;
   final ApiClient? apiClient;
@@ -125,29 +121,37 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Text(
+                        booking.tourPackageName,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: StatusBadge(status: booking.status),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Divider(height: 1, color: colors.border),
+                      const SizedBox(height: AppSpacing.md),
+                      IconLine(
+                        icon: Icons.calendar_today_outlined,
+                        label: '${booking.startDate} to ${booking.endDate}',
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Wrap(
+                        spacing: AppSpacing.lg,
+                        runSpacing: AppSpacing.xs,
                         children: [
-                          Expanded(
-                            child: Text(
-                              booking.tourPackageName,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
+                          IconLine(
+                            icon: Icons.workspace_premium_outlined,
+                            label: '${booking.packageTier.classType} Class',
                           ),
-                          const SizedBox(width: 8),
-                          StatusBadge(status: booking.status),
+                          IconLine(
+                            icon: Icons.groups_outlined,
+                            label:
+                                '${booking.groupSize} ${booking.groupSize == 1 ? 'traveler' : 'travelers'}',
+                          ),
                         ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${booking.packageTier.classType} Class · ${booking.startDate} to ${booking.endDate}',
-                        style: TextStyle(color: colors.fgMuted, fontSize: 14),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${booking.groupSize} ${booking.groupSize == 1 ? 'traveler' : 'travelers'}',
-                        style: TextStyle(color: colors.fgMuted, fontSize: 13),
                       ),
                     ],
                   ),
@@ -225,7 +229,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         Expanded(
                           child: Text(
                             'Review submitted successfully.',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.success),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: colors.success,
+                            ),
                           ),
                         ),
                       ],
@@ -242,7 +250,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       children: [
                         const Text(
                           'Rate your experience',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -253,7 +264,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
                                 key: Key('star_$i'),
                                 icon: Icon(
                                   i <= _rating ? Icons.star : Icons.star_border,
-                                  color: i <= _rating ? colors.warning : colors.fgMuted,
+                                  color: i <= _rating
+                                      ? colors.warning
+                                      : colors.fgMuted,
                                   size: 32,
                                 ),
                                 tooltip: '$i star${i == 1 ? '' : 's'}',
@@ -270,7 +283,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 '$_rating / 5',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
                             ],
                           ],
@@ -280,7 +296,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             padding: EdgeInsets.only(top: 4, left: 4),
                             child: Text(
                               _ratingError!,
-                              style: TextStyle(color: colors.danger, fontSize: 12),
+                              style: TextStyle(
+                                color: colors.danger,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         const SizedBox(height: 16),
@@ -309,7 +328,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
                               ? const SizedBox(
                                   height: 20,
                                   width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : const Text('Submit Review'),
                         ),

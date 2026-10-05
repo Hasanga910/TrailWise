@@ -601,24 +601,27 @@ class _BookingCard extends StatelessWidget {
 
     final shouldShowReview = isCompleted && booking.isFullyPaid;
 
+    final text = Theme.of(context).textTheme;
+    final guide = booking.assignedGuide;
+    final travelers =
+        '${booking.groupSize} ${booking.groupSize == 1 ? 'traveler' : 'travelers'}';
+
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          children: [
-            ListTile(
-              onTap: onTap,
-              title: Text(
-                '${booking.tourPackageName} — ${booking.packageTier.classType}',
-              ),
-              subtitle: Column(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${booking.startDate} to ${booking.endDate} · ${booking.groupSize} '
-                    '${booking.groupSize == 1 ? 'traveler' : 'travelers'} · '
-                    '\$${booking.budgetPerPerson.toStringAsFixed(2)}/person',
+                    '${booking.tourPackageName} — ${booking.packageTier.classType}',
+                    style: text.titleMedium,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Wrap(
@@ -634,32 +637,65 @@ class _BookingCard extends StatelessWidget {
                         ),
                     ],
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  IconLine(
+                    icon: Icons.calendar_today_outlined,
+                    label: '${booking.startDate} to ${booking.endDate}',
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Wrap(
+                    spacing: AppSpacing.lg,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      IconLine(icon: Icons.groups_outlined, label: travelers),
+                      IconLine(
+                        icon: Icons.payments_outlined,
+                        label:
+                            '\$${booking.budgetPerPerson.toStringAsFixed(2)}/person',
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            if (booking.status != BookingStatus.cancelled)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+          ),
+          Divider(height: 1, color: colors.border),
+          if (booking.status != BookingStatus.cancelled)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                0,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.surfaceSunken,
+                  borderRadius: BorderRadius.circular(AppRadius.input),
+                  border: Border.all(color: colors.border),
+                ),
                 child: Row(
                   children: [
                     Icon(
-                      booking.assignedGuide != null
+                      guide != null
                           ? Icons.person_pin_circle
                           : Icons.person_search,
                       size: 16,
-                      color: booking.assignedGuide != null
-                          ? colors.brandText
-                          : colors.warning,
+                      color: guide != null ? colors.brandText : colors.warning,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        booking.assignedGuide != null
-                            ? 'Tour Guide: ${booking.assignedGuide!.name}'
+                        guide != null
+                            ? 'Tour Guide: ${guide.name}'
                             : 'Tour Guide not assigned yet',
                         style: TextStyle(
                           fontSize: 12,
-                          color: booking.assignedGuide != null
+                          color: guide != null
                               ? colors.brandText
                               : colors.warning,
                           fontWeight: FontWeight.w500,
@@ -669,60 +705,54 @@ class _BookingCard extends StatelessWidget {
                   ],
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-              child: SizedBox(
-                width: double.infinity,
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (onSupportTap != null)
-                      TextButton.icon(
-                        icon: const Icon(Icons.help_outline, size: 16),
-                        label: const Text('Get Support'),
-                        onPressed: onSupportTap,
-                      ),
-                    if (shouldShowPayment && onPaymentTap != null)
+            ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (onSupportTap != null)
+                    TextButton.icon(
+                      icon: const Icon(Icons.help_outline, size: 16),
+                      label: const Text('Get Support'),
+                      onPressed: onSupportTap,
+                    ),
+                  if (shouldShowPayment && onPaymentTap != null)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.payment, size: 16),
+                      label: Text(paymentLabel),
+                      onPressed: onPaymentTap,
+                    ),
+                  if (shouldShowReview) ...[
+                    if (booking.hasReview)
                       OutlinedButton.icon(
-                        icon: const Icon(Icons.payment, size: 16),
-                        label: Text(paymentLabel),
-                        onPressed: onPaymentTap,
-                      ),
-                    if (shouldShowReview) ...[
-                      if (booking.hasReview)
-                        OutlinedButton.icon(
-                          icon: const Icon(
-                            Icons.check_circle_outline,
-                            size: 16,
-                          ),
-                          label: const Text('Reviewed'),
-                          onPressed: null,
-                        )
-                      else if (onReviewTap != null)
-                        OutlinedButton.icon(
-                          icon: const Icon(
-                            Icons.rate_review_outlined,
-                            size: 16,
-                          ),
-                          label: const Text('Review'),
-                          onPressed: onReviewTap,
-                        ),
-                    ],
-                    if (onCancelTap != null)
+                        icon: const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text('Reviewed'),
+                        onPressed: null,
+                      )
+                    else if (onReviewTap != null)
                       OutlinedButton.icon(
-                        icon: const Icon(Icons.cancel_outlined, size: 16),
-                        label: const Text('Cancel Booking'),
-                        onPressed: onCancelTap,
+                        icon: const Icon(Icons.rate_review_outlined, size: 16),
+                        label: const Text('Review'),
+                        onPressed: onReviewTap,
                       ),
                   ],
-                ),
+                  if (onCancelTap != null)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.cancel_outlined, size: 16),
+                      label: const Text('Cancel Booking'),
+                      onPressed: onCancelTap,
+                    ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
