@@ -8,6 +8,7 @@ import {
   type BookingSummaryDto,
 } from '../../api/bookings';
 import { UsersIcon } from '../../components/admin/icons';
+import { Badge, Button, Card, EmptyState, Input, Modal, PageHeader, Skeleton, cn } from '../../components/ui';
 import { notify } from '../../components/ui/notify';
 
 export function FleetGuideAssignmentsPage() {
@@ -118,91 +119,84 @@ export function FleetGuideAssignmentsPage() {
     );
   });
 
+  const selectedGuideName = availableGuides?.find((g) => g.guideId === selectedGuideId)?.name;
+
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-surface-raised p-6 shadow-sm">
+      <Card className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-info-soft text-info">
+          <div className="flex h-12 w-12 items-center justify-center rounded-card bg-info-soft text-info-fg">
             <UsersIcon className="h-6 w-6" />
           </div>
-          <div>
-            <h1 className="font-heading text-xl font-bold text-fg">Guide Assignment Fallback</h1>
-            <p className="text-sm text-fg-muted">
-              Manage manual tour guide assignments for bookings where automatic matching required manual review.
-            </p>
-          </div>
+          <PageHeader
+            as="h1"
+            title="Guide Assignment Fallback"
+            description="Manage manual tour guide assignments for bookings where automatic matching required manual review."
+            className="mb-0"
+          />
         </div>
-      </div>
+      </Card>
 
-      {/* Metrics Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Pending Guide Review</p>
-          <p className="mt-2 text-2xl font-bold text-warning">{pendingBookings.length}</p>
-          <p className="mt-1 text-xs text-fg-muted">Needs manual guide assignment</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Total Bookings Loaded</p>
-          <p className="mt-2 text-2xl font-bold text-fg">{bookings?.length ?? 0}</p>
-          <p className="mt-1 text-xs text-fg-muted">System bookings</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Role Responsibility</p>
-          <p className="mt-2 text-base font-bold text-fg">Fleet Coordinator</p>
-          <p className="mt-1 text-xs text-fg-muted">Vehicles, drivers &amp; guide fallbacks</p>
-        </div>
+        <Card>
+          <p className="text-overline text-fg-muted">Pending Guide Review</p>
+          <p className="mt-2 font-heading text-h2 text-warning-fg">{pendingBookings.length}</p>
+          <p className="mt-1 text-caption text-fg-muted">Needs manual guide assignment</p>
+        </Card>
+        <Card>
+          <p className="text-overline text-fg-muted">Total Bookings Loaded</p>
+          <p className="mt-2 font-heading text-h2 text-fg">{bookings?.length ?? 0}</p>
+          <p className="mt-1 text-caption text-fg-muted">System bookings</p>
+        </Card>
+        <Card>
+          <p className="text-overline text-fg-muted">Role Responsibility</p>
+          <p className="mt-2 font-heading text-h4 text-fg">Fleet Coordinator</p>
+          <p className="mt-1 text-caption text-fg-muted">Vehicles, drivers &amp; guide fallbacks</p>
+        </Card>
       </div>
-
-      {/* Notifications */}
 
       {error && (
-        <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+        <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
           {error}
         </div>
       )}
 
-      {/* Filter / Search Bar */}
-      <div className="rounded-2xl border border-border bg-surface-raised p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="relative w-full sm:max-w-md">
-            <input
-              type="text"
-              placeholder="Search by traveler, tour package, or ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
-          <span className="text-xs font-medium text-fg-muted">
-            Showing {filteredBookings.length} of {pendingBookings.length} pending assignments
-          </span>
-        </div>
-      </div>
+      <Card className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+        <Input
+          wrapperClassName="w-full sm:max-w-md"
+          type="text"
+          aria-label="Search pending assignments"
+          placeholder="Search by traveler, tour package, or ID..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        <span className="text-caption font-medium text-fg-muted">
+          Showing {filteredBookings.length} of {pendingBookings.length} pending assignments
+        </span>
+      </Card>
 
-      {/* Main Table / Content */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-sm">
+      <Card padded={false} className="overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-fg-muted">
-            <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-r-transparent mb-2" />
-            <p>Loading bookings needing review...</p>
+          <div className="space-y-3 p-6" role="status" aria-label="Loading bookings">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
+            <span className="sr-only">Loading bookings needing review...</span>
           </div>
         ) : filteredBookings.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success mb-3">
-              <UsersIcon className="h-6 w-6" />
-            </div>
-            <h3 className="font-heading text-base font-semibold text-fg">No Pending Guide Assignments</h3>
-            <p className="mt-1 text-sm text-fg-muted">
-              {searchQuery
+          <EmptyState
+            icon={<UsersIcon className="h-8 w-8" />}
+            title="No Pending Guide Assignments"
+            description={
+              searchQuery
                 ? 'No review bookings matched your search query.'
-                : 'All bookings currently have assigned guides or are processed.'}
-            </p>
-          </div>
+                : 'All bookings currently have assigned guides or are processed.'
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-fg-muted">
-              <thead className="border-b border-border bg-surface-sunken text-xs font-semibold uppercase tracking-wider text-fg-muted">
+            <table className="w-full text-left text-body text-fg-muted">
+              <thead className="border-b border-border bg-surface-sunken text-caption font-semibold uppercase tracking-wider text-fg-muted">
                 <tr>
                   <th className="px-6 py-4">Booking ID</th>
                   <th className="px-6 py-4">Traveler</th>
@@ -216,13 +210,11 @@ export function FleetGuideAssignmentsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredBookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-surface-sunken/80 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs font-medium text-fg-muted">
-                      {b.id.slice(0, 8)}...
-                    </td>
+                  <tr key={b.id} className="transition-colors hover:bg-surface-sunken/80">
+                    <td className="px-6 py-4 font-mono text-caption font-medium text-fg-muted">{b.id.slice(0, 8)}...</td>
                     <td className="px-6 py-4 font-semibold text-fg">{b.travelerName}</td>
                     <td className="px-6 py-4 text-fg">{b.packageName}</td>
-                    <td className="px-6 py-4 text-fg-muted whitespace-nowrap">
+                    <td className="whitespace-nowrap px-6 py-4 text-fg-muted">
                       {b.startDate}
                       {b.endDate ? ` → ${b.endDate}` : ''}
                     </td>
@@ -231,33 +223,24 @@ export function FleetGuideAssignmentsPage() {
                     </td>
                     <td className="px-6 py-4 text-fg-muted">
                       {b.languagePreference ? (
-                        <span className="inline-flex items-center rounded-md bg-info-soft px-2 py-1 text-xs font-medium text-info-fg ring-1 ring-inset ring-info/10">
-                          {b.languagePreference}
-                        </span>
+                        <Badge tone="info">{b.languagePreference}</Badge>
                       ) : (
-                        <span className="text-xs text-fg-muted">None specified</span>
+                        <span className="text-caption text-fg-muted">None specified</span>
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-semibold text-warning-fg ring-1 ring-inset ring-warning/20">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                      <Badge tone="warning" className="gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
                         {b.status}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                    <td className="whitespace-nowrap px-6 py-4 text-right">
                       {b.status === 'NeedsManualReview' && !b.assignedGuide ? (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenAssignModal(b)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-800 transition focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        >
-                          <UsersIcon className="h-3.5 w-3.5" />
+                        <Button size="sm" leftIcon={<UsersIcon className="h-3.5 w-3.5" />} onClick={() => handleOpenAssignModal(b)}>
                           Assign Tour Guide
-                        </button>
+                        </Button>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-success-soft px-2.5 py-1 text-xs font-semibold text-success-fg ring-1 ring-inset ring-success/20">
-                          Guide Assigned
-                        </span>
+                        <Badge tone="success">Guide Assigned</Badge>
                       )}
                     </td>
                   </tr>
@@ -266,227 +249,169 @@ export function FleetGuideAssignmentsPage() {
             </table>
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Guide Assignment Modal */}
-      {selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-surface-raised shadow-2xl overflow-hidden animate-fadeIn">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-border bg-surface-sunken/50 px-6 py-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-soft text-brand-text">
-                  <UsersIcon className="h-5 w-5" />
+      <Modal
+        open={selectedBooking !== null}
+        onClose={handleCloseModal}
+        size="lg"
+        title="Assign Tour Guide"
+        description="Select an available guide to resolve this manual review."
+        footer={
+          isConfirming ? (
+            <div className="w-full rounded-card border border-warning/30 bg-warning-soft p-4">
+              <p className="text-body font-medium text-warning-fg">
+                Assign <strong>{selectedGuideName}</strong> to this booking?
+              </p>
+              <p className="mt-1 text-caption text-warning-fg">
+                This will reserve the guide across the tour dates and confirm the booking if vehicles are allocated.
+              </p>
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="secondary" size="sm" disabled={isAssigning} onClick={() => setIsConfirming(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" disabled={isAssigning} onClick={handleConfirmAssignment}>
+                  {isAssigning ? 'Assigning...' : 'Confirm Assignment'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={handleCloseModal}>
+                Cancel
+              </Button>
+              <Button disabled={!selectedGuideId || loadingGuides} onClick={() => setIsConfirming(true)}>
+                Assign Guide
+              </Button>
+            </>
+          )
+        }
+      >
+        {selectedBooking && (
+          <div className="space-y-5">
+            <div className="rounded-card border border-border bg-surface-sunken p-4 text-body">
+              <h4 className="mb-2 font-semibold text-fg">Booking Details</h4>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-caption text-fg-muted sm:text-body">
+                <div>
+                  <span className="font-medium text-fg">Traveler: </span>
+                  <span className="font-semibold text-fg">{selectedBooking.travelerName}</span>
                 </div>
                 <div>
-                  <h3 className="font-heading text-lg font-bold text-fg">Assign Tour Guide</h3>
-                  <p className="text-xs text-fg-muted">Select an available guide to resolve this manual review.</p>
+                  <span className="font-medium text-fg">Tour Package: </span>
+                  <span className="font-semibold text-fg">{selectedBooking.packageName}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-fg">Dates: </span>
+                  {selectedBooking.startDate}
+                  {selectedBooking.endDate ? ` to ${selectedBooking.endDate}` : ''}
+                </div>
+                <div>
+                  <span className="font-medium text-fg">Group Size: </span>
+                  {selectedBooking.groupSize} guests
+                </div>
+                <div className="col-span-2">
+                  <span className="font-medium text-fg">Language Preference: </span>
+                  {selectedBooking.languagePreference || 'None specified'}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="rounded-lg p-1.5 text-fg-muted hover:bg-neutral-soft hover:text-fg-muted"
-                aria-label="Close"
-              >
-                ✕
-              </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-              {/* Booking Summary Box */}
-              <div className="rounded-xl border border-border bg-surface-sunken/80 p-4 text-sm">
-                <h4 className="font-semibold text-fg mb-2">Booking Details</h4>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:text-sm text-fg-muted">
-                  <div>
-                    <span className="font-medium text-fg">Traveler: </span>
-                    <span className="font-semibold text-fg">{selectedBooking.travelerName}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-fg">Tour Package: </span>
-                    <span className="font-semibold text-fg">{selectedBooking.packageName}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-fg">Dates: </span>
-                    {selectedBooking.startDate}
-                    {selectedBooking.endDate ? ` to ${selectedBooking.endDate}` : ''}
-                  </div>
-                  <div>
-                    <span className="font-medium text-fg">Group Size: </span>
-                    {selectedBooking.groupSize} guests
-                  </div>
-                  <div className="col-span-2">
-                    <span className="font-medium text-fg">Language Preference: </span>
-                    {selectedBooking.languagePreference || 'None specified'}
-                  </div>
-                </div>
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="font-semibold text-fg">Available Tour Guides</h4>
+                {availableGuides && (
+                  <span className="text-caption text-fg-muted">
+                    {availableGuides.length} guide{availableGuides.length === 1 ? '' : 's'} available
+                  </span>
+                )}
               </div>
 
-              {/* Conflict or Assignment Error Banner */}
-
-              {/* Available Guides Section */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-fg">Available Tour Guides</h4>
-                  {availableGuides && (
-                    <span className="text-xs text-fg-muted">
-                      {availableGuides.length} guide{availableGuides.length === 1 ? '' : 's'} available
-                    </span>
-                  )}
+              {loadingGuides && (
+                <div className="space-y-3 py-4">
+                  <Skeleton className="h-16" />
+                  <Skeleton className="h-16" />
                 </div>
+              )}
 
-                {loadingGuides && (
-                  <div className="space-y-3 py-4">
-                    <div className="h-16 animate-pulse rounded-xl bg-neutral-soft" />
-                    <div className="h-16 animate-pulse rounded-xl bg-neutral-soft" />
-                  </div>
-                )}
+              {guidesError && (
+                <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-body text-danger-fg">
+                  <p>{guidesError}</p>
+                  <Button variant="secondary" size="sm" className="mt-2" onClick={() => fetchAvailableGuides(selectedBooking.id)}>
+                    Retry Loading Guides
+                  </Button>
+                </div>
+              )}
 
-                {guidesError && (
-                  <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm text-danger-fg">
-                    <p>{guidesError}</p>
-                    <button
-                      type="button"
-                      onClick={() => fetchAvailableGuides(selectedBooking.id)}
-                      className="mt-2 text-xs font-semibold text-brand-text underline hover:text-brand-text"
-                    >
-                      Retry Loading Guides
-                    </button>
-                  </div>
-                )}
+              {!loadingGuides && !guidesError && availableGuides !== null && availableGuides.length === 0 && (
+                <EmptyState
+                  title="No available guides found for these dates."
+                  description="All registered guides are busy or have conflicts."
+                  className="rounded-card border border-dashed border-border py-8"
+                />
+              )}
 
-                {!loadingGuides && !guidesError && availableGuides !== null && availableGuides.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-fg-muted">
-                    <p className="font-medium text-fg">No available guides found for these dates.</p>
-                    <p className="mt-1 text-xs text-fg-muted">All registered guides are busy or have conflicts.</p>
-                  </div>
-                )}
-
-                {!loadingGuides && !guidesError && availableGuides && availableGuides.length > 0 && (
-                  <div className="space-y-2.5">
-                    {availableGuides.map((guide) => {
-                      const isSelected = selectedGuideId === guide.guideId;
-                      return (
-                        <div
-                          key={guide.guideId}
-                          onClick={() => {
-                            if (!isConfirming) setSelectedGuideId(guide.guideId);
-                          }}
-                          className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                            isSelected
-                              ? 'border-brand-500 bg-brand-soft/50 shadow-sm ring-1 ring-brand-500'
-                              : 'border-border hover:border-border hover:bg-surface-sunken/60'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3">
-                              <input
-                                type="radio"
-                                name="selectedGuide"
-                                checked={isSelected}
-                                onChange={() => setSelectedGuideId(guide.guideId)}
-                                className="h-4 w-4 text-brand-text focus:ring-brand-500"
-                              />
-                              <div>
-                                <span className="font-semibold text-fg">{guide.name}</span>
-                                <span className="ml-2 text-xs text-fg-muted">{guide.contactInfo}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              {guide.matchesSpecialization && (
-                                <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success-fg border border-success/30">
-                                  Theme Match
-                                </span>
-                              )}
-                              {guide.matchesLanguage && (
-                                <span className="rounded-full bg-info-soft px-2 py-0.5 text-[11px] font-medium text-info-fg border border-info/30">
-                                  Language Match
-                                </span>
-                              )}
+              {!loadingGuides && !guidesError && availableGuides && availableGuides.length > 0 && (
+                <div className="space-y-2.5">
+                  {availableGuides.map((guide) => {
+                    const isSelected = selectedGuideId === guide.guideId;
+                    return (
+                      <div
+                        key={guide.guideId}
+                        onClick={() => {
+                          if (!isConfirming) setSelectedGuideId(guide.guideId);
+                        }}
+                        className={cn(
+                          'cursor-pointer rounded-card border p-4 transition-all',
+                          isSelected
+                            ? 'border-brand-500 bg-brand-soft/50 ring-1 ring-brand-500'
+                            : 'border-border hover:bg-surface-sunken/60',
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="selectedGuide"
+                              checked={isSelected}
+                              onChange={() => setSelectedGuideId(guide.guideId)}
+                              className="h-4 w-4 accent-brand-600"
+                            />
+                            <div>
+                              <span className="font-semibold text-fg">{guide.name}</span>
+                              <span className="ml-2 text-caption text-fg-muted">{guide.contactInfo}</span>
                             </div>
                           </div>
 
-                          <div className="mt-2 space-y-1 pl-7 text-xs text-fg-muted">
-                            <div>
-                              <span className="font-medium text-fg">Languages: </span>
-                              {guide.languages.join(', ') || 'None listed'}
-                            </div>
-                            <div>
-                              <span className="font-medium text-fg">Specializations: </span>
-                              {guide.specializations.join(', ') || 'None listed'}
-                            </div>
-                            {guide.notes && (
-                              <div className="mt-1.5 font-medium text-brand-text bg-brand-soft/60 rounded px-2 py-1 border border-brand-500/30">
-                                {guide.notes}
-                              </div>
-                            )}
+                          <div className="flex items-center gap-1.5">
+                            {guide.matchesSpecialization && <Badge tone="success">Theme Match</Badge>}
+                            {guide.matchesLanguage && <Badge tone="info">Language Match</Badge>}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Modal Footer */}
-            <div className="border-t border-border bg-surface-sunken/50 px-6 py-4">
-              {isConfirming ? (
-                <div className="rounded-xl border border-warning/30 bg-warning-soft p-4">
-                  <p className="text-sm font-medium text-warning-fg">
-                    Assign{' '}
-                    <strong>
-                      {availableGuides?.find((g) => g.guideId === selectedGuideId)?.name}
-                    </strong>{' '}
-                    to this booking?
-                  </p>
-                  <p className="mt-1 text-xs text-warning-fg">
-                    This will reserve the guide across the tour dates and confirm the booking if vehicles are allocated.
-                  </p>
-                  <div className="mt-3 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      disabled={isAssigning}
-                      onClick={() => setIsConfirming(false)}
-                      className="rounded-lg border border-border bg-surface-raised px-3.5 py-1.5 text-xs font-semibold text-fg hover:bg-surface-sunken transition"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isAssigning}
-                      onClick={handleConfirmAssignment}
-                      className="rounded-lg bg-brand-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-800 transition disabled:opacity-50"
-                    >
-                      {isAssigning ? 'Assigning...' : 'Confirm Assignment'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-fg hover:bg-neutral-soft transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!selectedGuideId || loadingGuides}
-                    onClick={() => setIsConfirming(true)}
-                    className="rounded-lg bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800 transition disabled:opacity-50 shadow-sm"
-                  >
-                    Assign Guide
-                  </button>
+                        <div className="mt-2 space-y-1 pl-7 text-caption text-fg-muted">
+                          <div>
+                            <span className="font-medium text-fg">Languages: </span>
+                            {guide.languages.join(', ') || 'None listed'}
+                          </div>
+                          <div>
+                            <span className="font-medium text-fg">Specializations: </span>
+                            {guide.specializations.join(', ') || 'None listed'}
+                          </div>
+                          {guide.notes && (
+                            <div className="mt-1.5 rounded border border-brand-500/30 bg-brand-soft px-2 py-1 font-medium text-brand-text">
+                              {guide.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

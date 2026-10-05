@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { extractErrorMessage } from '../../api/apiClient';
 import { getVehicleAssignments, type VehicleAssignmentDetailDto } from '../../api/vehicles';
 import { CalendarIcon, TruckIcon } from '../../components/admin/icons';
-import { VehicleTypeBadge } from '../../components/fleet/FleetManager';
+import { VehicleTypeBadge } from '../../components/fleet/fleetBadges';
+import { Badge, Button, Card, EmptyState, Input, PageHeader, Select, Skeleton, cn } from '../../components/ui';
 
 export function FleetAssignmentsPage() {
   const [assignments, setAssignments] = useState<VehicleAssignmentDetailDto[] | null>(null);
@@ -64,164 +65,95 @@ export function FleetAssignmentsPage() {
     return true;
   });
 
-  const inputClass =
-    'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
+  const tabs: { id: typeof filterType; label: string; count: number }[] = [
+    { id: 'all', label: 'All Assignments', count: totalCount },
+    { id: 'active', label: 'Active & Upcoming', count: activeCount },
+    { id: 'completed', label: 'Completed', count: completedCount },
+    { id: 'cancelled', label: 'Cancelled', count: cancelledCount },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-surface-raised p-6 shadow-sm">
+      <Card className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-brand-text">
+          <div className="flex h-12 w-12 items-center justify-center rounded-card bg-brand-soft text-brand-text">
             <CalendarIcon className="h-6 w-6" />
           </div>
-          <div>
-            <h1 className="font-heading text-xl font-bold text-fg">Vehicle Assignments & Schedules</h1>
-            <p className="text-sm text-fg-muted">
-              Track allocated vehicles, drivers, booking schedules, and historical cancellations.
-            </p>
-          </div>
+          <PageHeader
+            as="h1"
+            title="Vehicle Assignments & Schedules"
+            description="Track allocated vehicles, drivers, booking schedules, and historical cancellations."
+            className="mb-0"
+          />
         </div>
-      </div>
+      </Card>
 
-      {/* Metrics Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Total Allocations</p>
-          <p className="mt-2 text-2xl font-bold text-fg">{totalCount}</p>
-          <p className="mt-1 text-xs text-fg-muted">All recorded assignments</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Active & Upcoming</p>
-          <p className="mt-2 text-2xl font-bold text-brand-text">{activeCount}</p>
-          <p className="mt-1 text-xs text-fg-muted">Operating or scheduled</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Completed Tours</p>
-          <p className="mt-2 text-2xl font-bold text-fg-muted">{completedCount}</p>
-          <p className="mt-1 text-xs text-fg-muted">Successfully concluded</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Cancelled / Released</p>
-          <p className="mt-2 text-2xl font-bold text-danger">{cancelledCount}</p>
-          <p className="mt-1 text-xs text-fg-muted">Released assignments</p>
-        </div>
+        {[
+          { label: 'Total Allocations', value: totalCount, hint: 'All recorded assignments', color: 'text-fg' },
+          { label: 'Active & Upcoming', value: activeCount, hint: 'Operating or scheduled', color: 'text-brand-text' },
+          { label: 'Completed Tours', value: completedCount, hint: 'Successfully concluded', color: 'text-fg-muted' },
+          { label: 'Cancelled / Released', value: cancelledCount, hint: 'Released assignments', color: 'text-danger-fg' },
+        ].map((stat) => (
+          <Card key={stat.label}>
+            <p className="text-overline text-fg-muted">{stat.label}</p>
+            <p className={`mt-2 font-heading text-h2 ${stat.color}`}>{stat.value}</p>
+            <p className="mt-1 text-caption text-fg-muted">{stat.hint}</p>
+          </Card>
+        ))}
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="rounded-2xl border border-border bg-surface-raised p-5 shadow-sm space-y-4">
-        {/* Status Tab buttons */}
+      <Card className="space-y-4">
         <div className="flex flex-wrap items-center gap-2 border-b border-border pb-4">
-          <button
-            type="button"
-            onClick={() => setFilterType('all')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
-              filterType === 'all'
-                ? 'bg-brand-700 text-white shadow-sm'
-                : 'bg-surface-raised text-fg-muted hover:bg-neutral-soft border border-border'
-            }`}
-          >
-            All Assignments ({totalCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterType('active')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
-              filterType === 'active'
-                ? 'bg-brand-700 text-white shadow-sm'
-                : 'bg-surface-raised text-fg-muted hover:bg-neutral-soft border border-border'
-            }`}
-          >
-            Active & Upcoming ({activeCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterType('completed')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
-              filterType === 'completed'
-                ? 'bg-brand-700 text-white shadow-sm'
-                : 'bg-surface-raised text-fg-muted hover:bg-neutral-soft border border-border'
-            }`}
-          >
-            Completed ({completedCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilterType('cancelled')}
-            className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
-              filterType === 'cancelled'
-                ? 'bg-rose-600 text-white shadow-sm'
-                : 'bg-surface-raised text-fg-muted hover:bg-neutral-soft border border-border'
-            }`}
-          >
-            Cancelled ({cancelledCount})
-          </button>
-        </div>
-
-        {/* Detailed Filter Inputs */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label className="block text-xs font-medium text-fg-muted mb-1">Search Keywords</label>
-            <input
-              type="text"
-              placeholder="Search driver, vehicle, traveler..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-fg-muted mb-1">Vehicle Type</label>
-            <select
-              value={filterVehicleType}
-              onChange={(e) => setFilterVehicleType(e.target.value)}
-              className={inputClass}
+          {tabs.map((tab) => (
+            <Button
+              key={tab.id}
+              size="sm"
+              variant={filterType === tab.id ? (tab.id === 'cancelled' ? 'danger' : 'primary') : 'secondary'}
+              onClick={() => setFilterType(tab.id)}
             >
-              <option value="all">All Vehicle Types</option>
-              <option value="Van">Van</option>
-              <option value="Coach">Coach</option>
-              <option value="SUV">SUV</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-fg-muted mb-1">From Date</label>
-            <input
-              type="date"
-              value={startDateFilter}
-              onChange={(e) => setStartDateFilter(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-fg-muted mb-1">To Date</label>
-            <input
-              type="date"
-              value={endDateFilter}
-              onChange={(e) => setEndDateFilter(e.target.value)}
-              className={inputClass}
-            />
-          </div>
+              {tab.label} ({tab.count})
+            </Button>
+          ))}
         </div>
-      </div>
 
-      {/* Error state */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Input
+            label="Search Keywords"
+            type="text"
+            placeholder="Search driver, vehicle, traveler..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <Select label="Vehicle Type" value={filterVehicleType} onChange={(e) => setFilterVehicleType(e.target.value)}>
+            <option value="all">All Vehicle Types</option>
+            <option value="Van">Van</option>
+            <option value="Coach">Coach</option>
+            <option value="SUV">SUV</option>
+          </Select>
+          <Input label="From Date" type="date" value={startDateFilter} onChange={(e) => setStartDateFilter(e.target.value)} />
+          <Input label="To Date" type="date" value={endDateFilter} onChange={(e) => setEndDateFilter(e.target.value)} />
+        </div>
+      </Card>
+
       {error && (
-        <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger-fg">
+        <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-body font-medium text-danger-fg">
           {error}
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-xl border border-border bg-surface-raised shadow-sm overflow-hidden">
+      <Card padded={false} className="overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center p-12 text-sm text-fg-muted">
-            <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent mr-3" />
-            Loading assignment records...
+          <div className="space-y-3 p-6" role="status" aria-label="Loading assignment records">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
+            <span className="sr-only">Loading assignment records...</span>
           </div>
         ) : filteredAssignments && filteredAssignments.length > 0 ? (
           <div className="w-full overflow-x-auto">
-            <table className="w-full text-left text-sm text-fg-muted">
-              <thead className="border-b border-border bg-surface-sunken/75 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+            <table className="w-full text-left text-body text-fg-muted">
+              <thead className="border-b border-border bg-surface-sunken text-caption font-semibold uppercase tracking-wider text-fg-muted">
                 <tr>
                   <th className="px-5 py-4">Vehicle Details</th>
                   <th className="px-5 py-4">Assigned Driver</th>
@@ -239,89 +171,70 @@ export function FleetAssignmentsPage() {
                   return (
                     <tr
                       key={item.id}
-                      className={`transition-colors ${
-                        isCancelled ? 'bg-danger-soft/30 text-fg-muted' : 'hover:bg-surface-sunken/50'
-                      }`}
+                      className={cn('transition-colors', isCancelled ? 'bg-danger-soft/30 text-fg-muted' : 'hover:bg-surface-sunken/50')}
                     >
-                      <td className="px-5 py-4 font-medium whitespace-nowrap">
+                      <td className="whitespace-nowrap px-5 py-4 font-medium">
                         <div className="flex items-center gap-2">
                           {item.vehicleType && <VehicleTypeBadge type={item.vehicleType} />}
-                          <span className={`font-semibold ${isCancelled ? 'line-through text-fg-muted' : 'text-fg'}`}>
+                          <span className={cn('font-semibold', isCancelled ? 'text-fg-muted line-through' : 'text-fg')}>
                             {item.vehicleName}
                           </span>
                         </div>
-                        <div className="mt-1 flex items-center gap-2 text-xs">
+                        <div className="mt-1 flex items-center gap-2 text-caption">
                           {item.registrationNumber ? (
-                            <span className="font-mono font-bold text-fg bg-neutral-soft px-1.5 py-0.5 rounded border border-border">
+                            <span className="rounded border border-border bg-neutral-soft px-1.5 py-0.5 font-mono font-bold text-fg">
                               {item.registrationNumber}
                             </span>
                           ) : (
                             <span className="font-mono text-fg-muted">ID: {item.vehicleId.slice(0, 8)}...</span>
                           )}
-                          {item.hasAC && (
-                            <span className="text-[11px] text-info-fg bg-info-soft px-1.5 py-0.5 rounded border border-info/30">
-                              AC
-                            </span>
-                          )}
+                          {item.hasAC && <Badge tone="info">AC</Badge>}
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <div className={`font-semibold ${isCancelled ? 'text-fg-muted' : 'text-fg'}`}>
-                          {item.driverName}
-                        </div>
-                        <div className="text-xs text-fg-muted">{item.driverContact || 'No contact provided'}</div>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <div className={cn('font-semibold', isCancelled ? 'text-fg-muted' : 'text-fg')}>{item.driverName}</div>
+                        <div className="text-caption text-fg-muted">{item.driverContact || 'No contact provided'}</div>
                       </td>
 
-                      <td className="px-5 py-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-5 py-4">
                         <div className="flex items-center gap-1.5">
-                          <span
-                            title={item.bookingId}
-                            className="font-mono text-xs font-semibold text-brand-text bg-brand-soft px-2 py-0.5 rounded border border-brand-500/30"
-                          >
+                          <Badge tone="brand" title={item.bookingId} className="font-mono">
                             {item.bookingId.length > 8 ? `${item.bookingId.slice(0, 8)}...` : item.bookingId}
-                          </span>
-                          {item.travelerName && (
-                            <span className="text-xs font-medium text-fg">({item.travelerName})</span>
-                          )}
+                          </Badge>
+                          {item.travelerName && <span className="text-caption font-medium text-fg">({item.travelerName})</span>}
                         </div>
                         {item.bookingStatus && (
-                          <div className="mt-1 text-[11px] text-fg-muted">
+                          <div className="mt-1 text-caption text-fg-muted">
                             Booking: <span className="font-semibold">{item.bookingStatus}</span>
                           </div>
                         )}
                       </td>
 
-                      <td className="px-5 py-4 text-xs whitespace-nowrap">
-                        <span className={`font-medium ${isCancelled ? 'text-fg-muted' : 'text-fg'}`}>
-                          {item.startDate}
-                        </span>
+                      <td className="whitespace-nowrap px-5 py-4 text-caption">
+                        <span className={cn('font-medium', isCancelled ? 'text-fg-muted' : 'text-fg')}>{item.startDate}</span>
                         <span className="mx-1.5 text-fg-muted">to</span>
-                        <span className={`font-medium ${isCancelled ? 'text-fg-muted' : 'text-fg'}`}>
-                          {item.endDate}
-                        </span>
+                        <span className={cn('font-medium', isCancelled ? 'text-fg-muted' : 'text-fg')}>{item.endDate}</span>
                       </td>
 
-                      <td className="px-5 py-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-5 py-4">
                         {isCancelled ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2.5 py-1 text-xs font-semibold text-danger-fg ring-1 ring-inset ring-danger/20">
-                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                          <Badge tone="danger" className="gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-danger" aria-hidden />
                             Cancelled (Released)
-                          </span>
+                          </Badge>
                         ) : isCurrent ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success-fg ring-1 ring-inset ring-success/20">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <Badge tone="success" className="gap-1.5">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" aria-hidden />
                             On Tour Today
-                          </span>
+                          </Badge>
                         ) : isPast ? (
-                          <span className="inline-flex items-center rounded-full bg-neutral-soft px-2.5 py-1 text-xs font-medium text-fg-muted">
-                            Completed
-                          </span>
+                          <Badge>Completed</Badge>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-info-soft px-2.5 py-1 text-xs font-semibold text-info-fg ring-1 ring-inset ring-info/20">
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                          <Badge tone="info" className="gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-info" aria-hidden />
                             Scheduled
-                          </span>
+                          </Badge>
                         )}
                       </td>
                     </tr>
@@ -331,15 +244,13 @@ export function FleetAssignmentsPage() {
             </table>
           </div>
         ) : (
-          <div className="p-12 text-center">
-            <TruckIcon className="mx-auto h-10 w-10 text-fg-muted" />
-            <p className="mt-3 text-sm font-semibold text-fg">No vehicle assignments found.</p>
-            <p className="mt-1 text-xs text-fg-muted">
-              No assignments match your selected status, vehicle type, or date criteria.
-            </p>
-          </div>
+          <EmptyState
+            icon={<TruckIcon className="h-8 w-8" />}
+            title="No vehicle assignments found."
+            description="No assignments match your selected status, vehicle type, or date criteria."
+          />
         )}
-      </div>
+      </Card>
     </div>
   );
 }
