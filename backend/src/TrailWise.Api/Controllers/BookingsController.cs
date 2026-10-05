@@ -587,32 +587,20 @@ public class BookingsController : ControllerBase
                         }
                     }
 
-                    // Check guide availability or re-match if necessary
-                    bool isGuideAvail = guideId != Guid.Empty && await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
+                    // Only auto-assign a guide who passes the Guide Matching rules (specialization,
+                    // language, availability): design doc 8.4 requires these deterministic checks
+                    // before approval. A proposed guide (manager-supplied or from the workflow run)
+                    // that no longer qualifies is dropped and the matcher is asked again.
+                    bool isGuideAvail = guideId != Guid.Empty
+                        && _guideMatchingAgent != null
+                        && await _guideMatchingAgent.IsQualifiedAsync(booking.Id, guideId, ct);
 
                     if (!isGuideAvail && _guideMatchingAgent != null)
                     {
                         var rematchGuide = await _guideMatchingAgent.MatchAsync(booking.Id, ct);
-                        if (rematchGuide.GuideId != Guid.Empty)
-                        {
-                            guideId = rematchGuide.GuideId;
-                            isGuideAvail = await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
-                        }
-                    }
-
-                    // Fallback to any available guide in the system for these dates if still not matched
-                    if (!isGuideAvail || guideId == Guid.Empty)
-                    {
-                        var allGuides = await _db.Guides.Select(g => g.Id).ToListAsync(ct);
-                        foreach (var gId in allGuides)
-                        {
-                            if (await _guideAvailabilityService.IsGuideAvailableAsync(gId, booking.StartDate, booking.EndDate, ct))
-                            {
-                                guideId = gId;
-                                isGuideAvail = true;
-                                break;
-                            }
-                        }
+                        guideId = rematchGuide.GuideId;
+                        isGuideAvail = guideId != Guid.Empty
+                            && await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
                     }
 
                     if (isGuideAvail && guideId != Guid.Empty)
@@ -622,7 +610,7 @@ public class BookingsController : ControllerBase
                     }
                     else
                     {
-                        _logger.LogWarning("No available tour guide could be auto-assigned to booking {BookingId} upon approval", booking.Id);
+                        _logger.LogWarning("No guide passing the matching rules could be auto-assigned to booking {BookingId} upon approval", booking.Id);
                     }
                 }
 
