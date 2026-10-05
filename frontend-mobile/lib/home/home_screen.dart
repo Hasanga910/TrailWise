@@ -33,11 +33,15 @@ class HomeScreen extends StatelessWidget {
           children: [
             LogoMark(height: 26),
             SizedBox(width: AppSpacing.sm),
-            Text('TrailWise'),
+            Flexible(child: Text('TrailWise', overflow: TextOverflow.ellipsis)),
           ],
         ),
         actions: [
           const ThemeToggleButton(),
+          if (user != null) ...[
+            UserAvatar(name: user.name),
+            const SizedBox(width: AppSpacing.xs),
+          ],
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => auth.logout(),
@@ -61,7 +65,9 @@ class HomeScreen extends StatelessWidget {
                     children: [
                       Text(
                         'Discover Sri Lanka, your way.',
-                        style: text.labelMedium?.copyWith(color: Brand.accent400),
+                        style: text.labelMedium?.copyWith(
+                          color: Brand.accent400,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
@@ -75,14 +81,19 @@ class HomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(AppRadius.badge),
                         ),
                         child: Text(
                           user.role,
-                          style: text.labelMedium?.copyWith(color: Colors.white),
+                          style: text.labelMedium?.copyWith(
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
@@ -99,42 +110,54 @@ class HomeScreen extends StatelessWidget {
                           icon: Icons.assignment_outlined,
                           title: 'My Assigned Tours',
                           description: 'See the tours assigned to you.',
-                          onTap: () => _push(context, const AssignedToursScreen()),
+                          onTap: () =>
+                              _push(context, const AssignedToursScreen()),
                         )
                       else if (user.role == 'Driver') ...[
                         QuickActionCard(
                           icon: Icons.directions_car_outlined,
                           title: 'My Driving Tasks',
-                          description: 'Upcoming and past transport assignments.',
-                          onTap: () => _push(context, const DriverTasksScreen()),
+                          description:
+                              'Upcoming and past transport assignments.',
+                          onTap: () =>
+                              _push(context, const DriverTasksScreen()),
                         ),
                         const SizedBox(height: AppSpacing.md),
                         QuickActionCard(
                           icon: Icons.person_outline,
                           title: 'Driver Profile & Settings',
                           description: 'Update your details and password.',
-                          onTap: () => _push(context, const DriverProfileScreen()),
+                          onTap: () =>
+                              _push(context, const DriverProfileScreen()),
                         ),
                       ] else ...[
                         QuickActionCard(
                           icon: Icons.card_travel_outlined,
                           title: 'Browse Packages',
-                          description: 'Explore tour packages and their pricing tiers.',
-                          onTap: onSelectTab == null ? null : () => onSelectTab!(1),
+                          description:
+                              'Explore tour packages and their pricing tiers.',
+                          onTap: onSelectTab == null
+                              ? null
+                              : () => onSelectTab!(1),
                         ),
                         const SizedBox(height: AppSpacing.md),
                         QuickActionCard(
                           icon: Icons.event_note_outlined,
                           title: 'Track your bookings',
-                          description: 'Follow the status of your booking requests.',
-                          onTap: onSelectTab == null ? null : () => onSelectTab!(2),
+                          description:
+                              'Follow the status of your booking requests.',
+                          onTap: onSelectTab == null
+                              ? null
+                              : () => onSelectTab!(2),
                         ),
                         const SizedBox(height: AppSpacing.md),
                         QuickActionCard(
                           icon: Icons.support_agent_outlined,
                           title: 'Get help',
                           description: 'Create or follow a support ticket.',
-                          onTap: onSelectTab == null ? null : () => onSelectTab!(3),
+                          onTap: onSelectTab == null
+                              ? null
+                              : () => onSelectTab!(3),
                         ),
                       ],
                     ],

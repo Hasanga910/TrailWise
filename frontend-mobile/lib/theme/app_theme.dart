@@ -237,6 +237,8 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: Border(bottom: BorderSide(color: c.border)),
         titleTextStyle: textTheme.titleLarge,
+        iconTheme: IconThemeData(color: c.fgMuted),
+        actionsIconTheme: IconThemeData(color: c.fgMuted),
       ),
       cardTheme: CardThemeData(
         color: c.surfaceRaised,
@@ -319,7 +321,10 @@ class AppTheme {
         backgroundColor: c.surfaceRaised,
         surfaceTintColor: Colors.transparent,
         indicatorColor: c.brandSoft,
+        // Rounded-rect pill like the web sidebar's active item.
+        indicatorShape: RoundedRectangleBorder(borderRadius: inputRadius),
         elevation: 0,
+        height: 68,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             color: states.contains(WidgetState.selected) ? c.brandFg : c.fgMuted,
@@ -328,7 +333,7 @@ class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w600,
+            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
             color: states.contains(WidgetState.selected) ? c.brandText : c.fgMuted,
           ),
         ),

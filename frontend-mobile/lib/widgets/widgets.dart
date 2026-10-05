@@ -10,3 +10,4 @@ export 'quick_action_card.dart';
 export 'logo.dart';
 export 'section_header.dart';
 export 'status_badge.dart';
+export 'user_avatar.dart';
