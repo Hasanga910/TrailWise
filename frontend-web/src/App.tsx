@@ -11,12 +11,16 @@ import { DriverLayout } from './components/driver/DriverLayout';
 import { RoleLayout } from './components/layout/RoleLayout';
 import { lazyNamed } from './components/layout/lazyNamed';
 import { PageSkeleton } from './components/ui/Skeleton';
+import { PublicLayout } from './components/public/PublicLayout';
+// The landing page is the entry route for most visitors: bundling it avoids a second round trip before first paint.
+import { HomePage } from './pages/HomePage';
 import { PortalRedirect } from './pages/PortalRedirect';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { NoAccessPage } from './pages/NoAccessPage';
 
 const UiGalleryPage = import.meta.env.DEV ? lazyNamed(() => import('./pages/dev/UiGalleryPage'), 'UiGalleryPage') : null;
-const HomePage = lazyNamed(() => import('./pages/HomePage'), 'HomePage');
+const ExplorerPage = lazyNamed(() => import('./pages/public/ExplorerPage'), 'ExplorerPage');
+const PackageDetailPage = lazyNamed(() => import('./pages/public/PackageDetailPage'), 'PackageDetailPage');
 const LoginPage = lazyNamed(() => import('./pages/LoginPage'), 'LoginPage');
 const RegisterPage = lazyNamed(() => import('./pages/RegisterPage'), 'RegisterPage');
 const AdminOverviewPage = lazyNamed(() => import('./pages/admin/AdminOverviewPage'), 'AdminOverviewPage');
@@ -64,7 +68,11 @@ function App() {
       }
     >
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/explore" element={<ExplorerPage />} />
+        <Route path="/explore/:packageId" element={<PackageDetailPage />} />
+      </Route>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 

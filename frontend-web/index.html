@@ -15,6 +15,19 @@
         } catch (e) {}
       })();
     </script>
+    <script>
+      // The home hero image is the largest paint: start fetching it before the JS bundle has run.
+      if (location.pathname === '/') {
+        var l = document.createElement('link');
+        l.rel = 'preload';
+        l.as = 'image';
+        l.href = '/hero/mountain-ridge-hikers-800.webp';
+        l.setAttribute('imagesrcset', '/hero/mountain-ridge-hikers-800.webp 800w, /hero/mountain-ridge-hikers-1600.webp 1600w');
+        l.setAttribute('imagesizes', '100vw');
+        l.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(l);
+      }
+    </script>
     <title>TrailWise — Operations Console</title>
   </head>
   <body>

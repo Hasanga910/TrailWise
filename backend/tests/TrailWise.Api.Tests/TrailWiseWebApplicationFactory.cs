@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Tests;
 
@@ -28,7 +29,11 @@ public class TrailWiseWebApplicationFactory : WebApplicationFactory<Program>
                 // IP" — raise the limit so the login rate limiter (Program.cs) never interferes
                 // with test setup while still enforcing the real, low default outside tests.
                 ["RateLimiting:LoginPermitLimit"] = "10000",
-                ["RateLimiting:LoginWindowSeconds"] = "60"
+                ["RateLimiting:LoginWindowSeconds"] = "60",
+                ["RateLimiting:PublicReadPermitLimit"] = "100000",
+                ["RateLimiting:PublicReadWindowSeconds"] = "60",
+                // Geocoding is faked in tests and must not sleep between lookups.
+                ["Geocoding:DelayBetweenRequestsMs"] = "0"
             });
         });
 
@@ -37,6 +42,10 @@ public class TrailWiseWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions<TrailWiseDbContext>>();
             services.AddDbContext<TrailWiseDbContext>(options =>
                 options.UseInMemoryDatabase(DatabaseName));
+
+            services.RemoveAll<ILocationSearchService>();
+            services.AddSingleton<FakeLocationSearchService>();
+            services.AddSingleton<ILocationSearchService>(sp => sp.GetRequiredService<FakeLocationSearchService>());
         });
     }
 }

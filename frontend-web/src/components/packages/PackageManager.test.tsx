@@ -246,6 +246,38 @@ describe('PackageManager', () => {
       expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument();
     });
 
+    it('flags locations that are not on the map and keeps existing coordinates when saving', async () => {
+      mockedGetPackages.mockResolvedValue([
+        samplePackage({
+          locations: [
+            { id: 'a', name: 'Sigiriya', latitude: 7.957, longitude: 80.76 },
+            { id: 'b', name: 'Atlantis', latitude: null, longitude: null },
+          ],
+        }),
+      ]);
+      mockedUpdatePackage.mockResolvedValue(samplePackage());
+
+      const user = userEvent.setup();
+      renderManager();
+      await screen.findByText('Cultural Triangle Explorer');
+      await user.click(screen.getByRole('button', { name: /^edit$/i }));
+
+      const form = screen.getByRole('button', { name: /^save$/i }).closest('form')!;
+      expect(within(form).getAllByText('Not on map')).toHaveLength(1);
+
+      await user.click(within(form).getByRole('button', { name: 'Remove Atlantis' }));
+      await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+      expect(mockedUpdatePackage).toHaveBeenCalledWith(
+        'pkg-1',
+        expect.objectContaining({
+          locationNames: ['Sigiriya'],
+          // only names still in the form are sent, with the coordinates they already had
+          locationCoordinates: [{ name: 'Sigiriya', latitude: 7.957, longitude: 80.76 }],
+        }),
+      );
+    });
+
     it('cancels edit mode without calling updatePackage', async () => {
       mockedGetPackages.mockResolvedValue([samplePackage()]);
 

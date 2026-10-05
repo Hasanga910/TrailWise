@@ -1,11 +1,11 @@
 @import "tailwindcss";
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/inter/700.css";
-@import "@fontsource/plus-jakarta-sans/600.css";
-@import "@fontsource/plus-jakarta-sans/700.css";
-@import "@fontsource/plus-jakarta-sans/800.css";
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
+@import "@fontsource/inter/latin-600.css";
+@import "@fontsource/inter/latin-700.css";
+@import "@fontsource/plus-jakarta-sans/latin-600.css";
+@import "@fontsource/plus-jakarta-sans/latin-700.css";
+@import "@fontsource/plus-jakarta-sans/latin-800.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
@@ -203,6 +203,16 @@ h3 {
   animation: tw-fade-in 200ms ease-out both;
 }
 
+/* Staggered entrance for hero content; pass animation-delay inline. Reduced motion is handled globally below. */
+@keyframes tw-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+.animate-rise {
+  animation: tw-rise 500ms ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -221,4 +231,24 @@ h3 {
   --rdp-day-height: 2.5rem;
   --rdp-day-width: 2.5rem;
   color: var(--fg);
+}
+
+/* Package map: numbered pins use brand tokens; tiles are dimmed and inverted in dark mode. */
+.tw-map-pin span {
+  display: flex;
+  height: 30px;
+  width: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  background: var(--color-brand-700);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  box-shadow: var(--sh-raised);
+}
+
+[data-theme="dark"] .tw-map .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
 }

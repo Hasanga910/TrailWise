@@ -1,10 +1,15 @@
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { AuthContext, type AuthContextValue } from './AuthContext';
 import { ProtectedRoute } from './ProtectedRoute';
 
-function renderProtected(status: AuthContextValue['status']) {
+function LoginProbe() {
+  const location = useLocation();
+  return <div>Login Page from={(location.state as { from?: string } | null)?.from ?? 'none'}</div>;
+}
+
+function renderProtected(status: AuthContextValue['status'], initialPath = '/') {
   const value: AuthContextValue = {
     user:
       status === 'authenticated'
@@ -19,12 +24,12 @@ function renderProtected(status: AuthContextValue['status']) {
   };
 
   render(
-    <MemoryRouter initialEntries={['/']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <AuthContext.Provider value={value}>
         <Routes>
-          <Route path="/login" element={<div>Login Page</div>} />
+          <Route path="/login" element={<LoginProbe />} />
           <Route
-            path="/"
+            path="/*"
             element={
               <ProtectedRoute>
                 <div>Protected Content</div>
@@ -45,7 +50,12 @@ describe('ProtectedRoute', () => {
 
   it('redirects to /login when unauthenticated', () => {
     renderProtected('unauthenticated');
-    expect(screen.getByText('Login Page')).toBeInTheDocument();
+    expect(screen.getByText(/Login Page/)).toBeInTheDocument();
+  });
+
+  it('remembers the requested path (with its query) for the return trip', () => {
+    renderProtected('unauthenticated', '/traveler/bookings/new?tier=abc&guests=3');
+    expect(screen.getByText('Login Page from=/traveler/bookings/new?tier=abc&guests=3')).toBeInTheDocument();
   });
 
   it('renders children when authenticated', () => {

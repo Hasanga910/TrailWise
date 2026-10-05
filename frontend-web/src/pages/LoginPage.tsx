@@ -1,87 +1,87 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { getHomeRouteForRole } from '../auth/roleHome';
-import { AuthBrandPanel } from '../components/AuthBrandPanel';
-import { Logo } from '../components/Logo';
+import { clearReturnTo, pickReturnTo, resolvePostAuthRoute } from '../auth/returnTo';
+import { AuthShell } from '../components/auth/AuthShell';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { PasswordInput } from '../components/ui/PasswordInput';
+import { loginSchema, type LoginValues } from '../forms/authSchemas';
+import { zodResolver } from '../forms/zodResolver';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 export function LoginPage() {
-  const { login, status, error, user } = useAuth();
+  const { login, status, error, clearError, user } = useAuth();
   const location = useLocation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  usePageTitle('Log in');
+
+  // Read once on arrival: the stored copy is cleared after a successful sign-in, and the redirect must not lose it.
+  const [from] = useState(() => pickReturnTo((location.state as { from?: unknown } | null)?.from));
+  const continuingBooking = from?.startsWith('/traveler/bookings/new') ?? false;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), mode: 'onBlur', defaultValues: { email: '', password: '' } });
+
+  // An error left over from the register page should not greet someone who just arrived here.
+  useEffect(() => {
+    clearError?.();
+  }, [clearError]);
+
+  useEffect(() => {
+    if (status === 'authenticated') clearReturnTo();
+  }, [status]);
 
   if (status === 'authenticated') {
-    const defaultRedirect = user ? getHomeRouteForRole(user.role) : '/login';
-    const redirectTo = (location.state as { from?: string } | null)?.from ?? defaultRedirect;
-    return <Navigate to={redirectTo} replace />;
+    return <Navigate to={user ? resolvePostAuthRoute(user, from) : '/login'} replace />;
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    await login(email, password);
-    setSubmitting(false);
+  async function onSubmit(values: LoginValues) {
+    await login(values.email, values.password);
   }
 
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <AuthBrandPanel tagline="Plan, book, and run unforgettable tours." />
+    <AuthShell
+      tagline="Your next Sri Lankan adventure starts here."
+      title={continuingBooking ? 'Log in to continue' : 'Welcome back'}
+      subtitle={continuingBooking ? 'Sign in to pick up your booking where you left off.' : 'Log in to your TrailWise account.'}
+      footer={
+        <>
+          New to TrailWise?{' '}
+          <Link to="/register" state={location.state} className="font-semibold text-brand-text hover:underline">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="email"
+          error={errors.email?.message}
+          {...register('email')}
+        />
+        <PasswordInput
+          label="Password"
+          autoComplete="current-password"
+          error={errors.password?.message}
+          {...register('password')}
+        />
 
-      <div className="flex min-w-0 items-center justify-center bg-surface-raised px-6 py-12">
-        <form className="w-full min-w-0 max-w-sm space-y-6" onSubmit={handleSubmit}>
-          <div>
-            <Logo className="mb-4 h-8 w-auto lg:hidden" />
-            <h1 className="font-heading text-2xl font-bold text-fg">Login</h1>
-            <p className="mt-1.5 text-sm text-fg-muted">Sign in to manage your tours.</p>
-          </div>
-
-          <div className="space-y-4">
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-fg">Email</span>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="block w-full rounded-lg border border-border px-3.5 py-2.5 text-base text-fg outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-fg">Password</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="block w-full rounded-lg border border-border px-3.5 py-2.5 text-base text-fg outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15"
-              />
-            </label>
-          </div>
-
-          {error && (
-            <p role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm font-medium text-danger-fg">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-lg bg-brand-700 px-4 py-2.5 font-semibold text-white shadow-sm shadow-brand-600/20 transition hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {submitting ? 'Logging in...' : 'Log in'}
-          </button>
-
-          <p className="text-sm text-fg-muted">
-            Don't have an account?{' '}
-            <Link to="/register" className="font-semibold text-brand-text hover:text-brand-text">
-              Create an account
-            </Link>
+        {error && (
+          <p role="alert" className="rounded-input border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-body font-medium text-danger-fg">
+            {error}
           </p>
-        </form>
-      </div>
-    </div>
+        )}
+
+        <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>
+          {isSubmitting ? 'Logging in…' : 'Log in'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

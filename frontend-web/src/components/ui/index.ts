@@ -7,6 +7,7 @@ export { IconButton } from './IconButton';
 export { Field } from './Field';
 export { Input } from './Input';
 export { Textarea } from './Textarea';
+export { PasswordInput } from './PasswordInput';
 export { Select } from './Select';
 export { Checkbox } from './Checkbox';
 export { Switch } from './Switch';

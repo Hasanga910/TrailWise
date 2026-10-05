@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { Logo } from '../components/Logo';
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { status } = useAuth();
+  const location = useLocation();
 
   if (status === 'loading') {
     return (
@@ -19,7 +20,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   if (status === 'unauthenticated') {
-    return <Navigate to="/login" replace />;
+    // Remember where the visitor was heading so login/register can send them back.
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
   }
 
   return <>{children}</>;

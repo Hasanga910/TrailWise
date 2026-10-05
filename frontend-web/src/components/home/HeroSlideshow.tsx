@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
-import mountainRidgeHikers from '../../assets/hero/mountain-ridge-hikers.jpg';
-import lisbonStreetCouple from '../../assets/hero/lisbon-street-couple.jpg';
-import sigiriyaRockFortress from '../../assets/hero/sigiriya-rock-fortress.jpg';
-import tropicalBeachPalm from '../../assets/hero/tropical-beach-palm.jpg';
+import sigiriya1024 from '../../assets/hero/sigiriya-rock-fortress-1024.webp';
+import sigiriya640 from '../../assets/hero/sigiriya-rock-fortress-640.webp';
+import beach1600 from '../../assets/hero/tropical-beach-palm-1600.webp';
+import beach800 from '../../assets/hero/tropical-beach-palm-800.webp';
 
+// The first slide lives in /public so index.html can preload it by a stable URL.
+const MOUNTAIN_800 = '/hero/mountain-ridge-hikers-800.webp';
+const MOUNTAIN_1600 = '/hero/mountain-ridge-hikers-1600.webp';
+
+// Photos are Sri Lankan only. TODO: add one more Sri Lankan photo (see the Session 2 follow-ups).
+// Each is exported at two widths so phones don't download the desktop image.
 interface Slide {
-  image: string;
+  src: string;
+  srcSet: string;
+  width: number;
+  height: number;
   alt: string;
   caption: string;
   objectPosition: string;
@@ -13,25 +22,28 @@ interface Slide {
 
 const slides: Slide[] = [
   {
-    image: mountainRidgeHikers,
+    src: MOUNTAIN_1600,
+    srcSet: `${MOUNTAIN_800} 800w, ${MOUNTAIN_1600} 1600w`,
+    width: 1600,
+    height: 899,
     alt: 'Two hikers silhouetted on a mountain ridge at golden hour',
     caption: 'Mountain trekking',
     objectPosition: 'center 65%',
   },
   {
-    image: lisbonStreetCouple,
-    alt: 'A couple exploring a cobblestone European street with a map',
-    caption: 'Guided city tours',
-    objectPosition: '40% 25%',
-  },
-  {
-    image: sigiriyaRockFortress,
+    src: sigiriya1024,
+    srcSet: `${sigiriya640} 640w, ${sigiriya1024} 1024w`,
+    width: 1024,
+    height: 640,
     alt: 'Aerial view of Sigiriya Rock Fortress rising above the jungle',
     caption: 'Ancient wonders',
     objectPosition: 'center 40%',
   },
   {
-    image: tropicalBeachPalm,
+    src: beach1600,
+    srcSet: `${beach800} 800w, ${beach1600} 1600w`,
+    width: 1600,
+    height: 1200,
     alt: 'A leaning coconut palm over a tropical beach',
     caption: 'Coastal escapes',
     objectPosition: 'center 70%',
@@ -40,6 +52,13 @@ const slides: Slide[] = [
 
 export function HeroSlideshow() {
   const [activeIndex, setActiveIndex] = useState(0);
+  // Only the first photo loads up front; the others wait until the page has settled so they never compete with it.
+  const [loadRest, setLoadRest] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoadRest(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -69,14 +88,21 @@ export function HeroSlideshow() {
             index === activeIndex ? 'opacity-100' : 'opacity-0'
           }`}
         >
+          {(index === 0 || loadRest) && (
           <img
-            src={slide.image}
+            src={slide.src}
+            srcSet={slide.srcSet}
+            sizes="100vw"
+            width={slide.width}
+            height={slide.height}
             alt={slide.alt}
             className="h-full w-full object-cover"
             style={{ objectPosition: slide.objectPosition }}
-            loading="eager"
+            loading={index === 0 ? 'eager' : 'lazy'}
+            decoding="async"
             fetchPriority={index === 0 ? 'high' : 'auto'}
           />
+          )}
           <div className="absolute inset-0 bg-brand-950/40" />
           <div className="absolute inset-0 bg-gradient-to-t from-brand-950/70 via-transparent to-transparent" />
         </div>
@@ -109,17 +135,22 @@ export function HeroSlideshow() {
         </svg>
       </button>
 
-      <div className="absolute inset-x-0 bottom-8 z-10 flex justify-center gap-2">
+      <div className="absolute inset-x-0 bottom-6 z-10 flex justify-center">
         {slides.map((slide, index) => (
           <button
             key={slide.caption}
             type="button"
             aria-label={slide.caption}
+            aria-current={index === activeIndex}
             onClick={() => setActiveIndex(index)}
-            className={`h-2 rounded-full transition-all ${
-              index === activeIndex ? 'w-6 bg-white' : 'w-2 bg-white/40 hover:bg-white/60'
-            }`}
-          />
+            className="flex h-6 w-6 items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-full"
+          >
+            <span
+              className={`block h-2 rounded-full transition-all ${
+                index === activeIndex ? 'w-6 bg-white' : 'w-2 bg-white/50 hover:bg-white/70'
+              }`}
+            />
+          </button>
         ))}
       </div>
     </div>

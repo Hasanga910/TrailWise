@@ -16,12 +16,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   ref,
 ) {
   return (
-    <Field label={label} hint={hint} error={error} className={wrapperClassName}>
+    <Field id={idProp} label={label} hint={hint} error={error} className={wrapperClassName}>
       {({ id, describedBy, invalid }) => (
         <div className="relative">
           <select
             ref={ref}
-            id={idProp ?? id}
+            id={id}
             aria-invalid={invalid || undefined}
             aria-describedby={describedBy}
             className={cn(FIELD_BASE, 'appearance-none pr-9', className)}

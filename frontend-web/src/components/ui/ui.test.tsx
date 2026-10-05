@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { Button, DataTable, DropdownMenu, Modal, StatusBadge, Tabs, type Column } from '.';
+import { Button, DataTable, DropdownMenu, Input, Modal, Select, StatusBadge, Tabs, type Column } from '.';
 
 describe('Button', () => {
   it('is disabled and busy while loading', () => {
@@ -132,5 +132,25 @@ describe('DataTable', () => {
   it('shows the empty state', () => {
     render(<DataTable columns={columns} rows={[]} rowKey={(r) => r.id} emptyTitle="Nothing" />);
     expect(screen.getByText('Nothing')).toBeInTheDocument();
+  });
+});
+
+describe('field labels', () => {
+  it('associates the label with the control when a custom id is given', () => {
+    render(
+      <>
+        <Input id="custom-input" label="Email" />
+        <Select id="custom-select" label="Class">
+          <option>Any</option>
+        </Select>
+      </>,
+    );
+    expect(screen.getByLabelText('Email')).toHaveAttribute('id', 'custom-input');
+    expect(screen.getByLabelText('Class')).toHaveAttribute('id', 'custom-select');
+  });
+
+  it('associates the label with the control when no id is given', () => {
+    render(<Input label="Name" />);
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
   });
 });

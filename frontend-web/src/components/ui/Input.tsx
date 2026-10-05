@@ -15,11 +15,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   ref,
 ) {
   return (
-    <Field label={label} hint={hint} error={error} className={wrapperClassName}>
+    <Field id={idProp} label={label} hint={hint} error={error} className={wrapperClassName}>
       {({ id, describedBy, invalid }) => (
         <input
           ref={ref}
-          id={idProp ?? id}
+          id={id}
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           className={cn(FIELD_BASE, className)}

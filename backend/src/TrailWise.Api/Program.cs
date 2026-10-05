@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 const string CorsPolicyName = "TrailWiseClients";
 const string LoginRateLimiterPolicy = "LoginRateLimiter";
+const string PublicReadRateLimiterPolicy = "PublicReadLimiter";
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -80,9 +81,12 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, ct) =>
     {
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        var policyName = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
         await context.HttpContext.Response.WriteAsJsonAsync(new
         {
-            title = "Too many login attempts. Please wait a minute and try again."
+            title = policyName == LoginRateLimiterPolicy
+                ? "Too many login attempts. Please wait a minute and try again."
+                : "Too many requests. Please slow down and try again shortly."
         }, ct);
     };
 
@@ -91,6 +95,22 @@ builder.Services.AddRateLimiter(options =>
     // the real default used in Development/Production.
     var loginPermitLimit = builder.Configuration.GetValue("RateLimiting:LoginPermitLimit", 5);
     var loginWindowSeconds = builder.Configuration.GetValue("RateLimiting:LoginWindowSeconds", 60);
+
+    // Anonymous catalogue reads (packages, facets, reviews, discounts): per-IP fixed window.
+    // Behind a reverse proxy the client IP is the proxy's unless forwarded headers are configured.
+    var publicPermitLimit = builder.Configuration.GetValue("RateLimiting:PublicReadPermitLimit", 120);
+    var publicWindowSeconds = builder.Configuration.GetValue("RateLimiting:PublicReadWindowSeconds", 60);
+
+    options.AddPolicy(PublicReadRateLimiterPolicy, context =>
+    {
+        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = publicPermitLimit,
+            Window = TimeSpan.FromSeconds(publicWindowSeconds),
+            QueueLimit = 0
+        });
+    });
 
     options.AddPolicy(LoginRateLimiterPolicy, context =>
     {

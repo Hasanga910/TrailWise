@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { apiClient, extractErrorMessage, setAuthToken, setSessionExpiredHandler } from '../api/apiClient';
+import { apiClient, extractErrorMessage, extractFieldErrors, setAuthToken, setSessionExpiredHandler } from '../api/apiClient';
 import { AuthContext, type AuthStatus } from './AuthContext';
 import type { AuthResponse, CurrentUser } from './types';
 
@@ -11,6 +11,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.getItem(STORAGE_KEY) ? 'loading' : 'unauthenticated',
   );
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const clearError = useCallback(() => {
+    setError(null);
+    setFieldErrors({});
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
@@ -53,22 +59,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      setError(null);
+      clearError();
       try {
         const response = await apiClient.post<AuthResponse>('/api/auth/login', { email, password });
         applyAuthResponse(response.data);
         return true;
       } catch (err) {
         setError(extractErrorMessage(err, 'Login failed. Please try again.'));
+        setFieldErrors(extractFieldErrors(err));
         return false;
       }
     },
-    [applyAuthResponse],
+    [applyAuthResponse, clearError],
   );
 
   const register = useCallback(
     async (name: string, email: string, password: string, contactNumber: string) => {
-      setError(null);
+      clearError();
       try {
         const response = await apiClient.post<AuthResponse>('/api/auth/register', {
           name,
@@ -80,10 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return true;
       } catch (err) {
         setError(extractErrorMessage(err, 'Registration failed. Please try again.'));
+        setFieldErrors(extractFieldErrors(err));
         return false;
       }
     },
-    [applyAuthResponse],
+    [applyAuthResponse, clearError],
   );
 
   const updateUser = useCallback((updated: CurrentUser) => {
@@ -91,8 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, status, error, login, register, logout, updateUser }),
-    [user, status, error, login, register, logout, updateUser],
+    () => ({ user, status, error, fieldErrors, clearError, login, register, logout, updateUser }),
+    [user, status, error, fieldErrors, clearError, login, register, logout, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

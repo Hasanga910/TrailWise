@@ -33,6 +33,12 @@ public static class DependencyInjection
         });
         services.AddScoped<ILocationSearchService, NominatimLocationSearchService>();
 
+        services.Configure<GeocodingOptions>(configuration.GetSection(GeocodingOptions.SectionName));
+        services.AddSingleton<IGeocodingDelay, TaskGeocodingDelay>();
+        services.AddSingleton<GeocodingThrottle>();
+        services.AddScoped<IPackageLocationGeocoder, PackageLocationGeocoder>();
+        services.AddScoped<IPackageLocationResolver, PackageLocationResolver>();
+
         var llmOptions = configuration.GetSection(LlmOptions.SectionName).Get<LlmOptions>() ?? new LlmOptions();
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
         services.AddHttpClient("Groq", client =>

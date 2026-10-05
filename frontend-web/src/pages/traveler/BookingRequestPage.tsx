@@ -30,6 +30,15 @@ function flattenTiers(packages: TourPackage[]): TierOption[] {
   );
 }
 
+function parsePositiveInt(value: string | null): number | null {
+  const n = value ? Number.parseInt(value, 10) : NaN;
+  return Number.isInteger(n) && n > 0 && n <= 1000 ? n : null;
+}
+
+function parseIsoDate(value: string | null): string | null {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : null;
+}
+
 export function BookingRequestPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -38,8 +47,9 @@ export function BookingRequestPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [packageTierId, setPackageTierId] = useState(searchParams.get('tier') ?? '');
-  const [groupSize, setGroupSize] = useState(1);
-  const [startDate, setStartDate] = useState('');
+  // Optional prefill from the public explorer: ?guests=4&start=2026-11-02
+  const [groupSize, setGroupSize] = useState(() => parsePositiveInt(searchParams.get('guests')) ?? 1);
+  const [startDate, setStartDate] = useState(() => parseIsoDate(searchParams.get('start')) ?? '');
   const [endDate, setEndDate] = useState('');
   const [budgetPerPerson, setBudgetPerPerson] = useState(0);
   const [specialRequests, setSpecialRequests] = useState('');

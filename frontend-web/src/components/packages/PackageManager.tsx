@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { extractErrorMessage, API_BASE_URL } from '../../api/apiClient';
 import { searchLocations, type LocationSuggestion } from '../../api/locations';
+import { coordinatesForSubmit, isNotOnMap, namesNotOnMap } from './locationCoordinates';
 import {
   addTier,
   createPackage,
@@ -23,9 +24,12 @@ const labelClass = 'text-xs font-semibold text-fg-muted';
 function LocationPicker({
   selected,
   onChange,
+  notOnMap,
 }: {
   selected: string[];
   onChange: (next: string[]) => void;
+  /** Existing locations the map can't place yet (full map editing arrives with the itinerary builder). */
+  notOnMap?: ReadonlySet<string>;
 }) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
@@ -78,8 +82,14 @@ function LocationPicker({
               className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand-text"
             >
               {name}
+              {isNotOnMap(notOnMap, name) && (
+                <span className="rounded-full bg-warning-soft px-1.5 py-0.5 text-[10px] font-semibold text-warning-fg" title="This place isn't on the public map yet. We retry when the package is saved.">
+                  Not on map
+                </span>
+              )}
               <button
                 type="button"
+                aria-label={`Remove ${name}`}
                 onClick={() => removeLocation(name)}
                 className="text-brand-text hover:text-brand-text"
               >
@@ -222,7 +232,10 @@ export function PackageManager() {
     setEditError(null);
     setSavingEdit(true);
     try {
-      await updatePackage(editingId, editForm);
+      await updatePackage(editingId, {
+        ...editForm,
+        locationCoordinates: coordinatesForSubmit(packages?.find((p) => p.id === editingId), editForm.locationNames),
+      });
       setEditingId(null);
       loadPackages();
     } catch (err) {
@@ -552,6 +565,7 @@ export function PackageManager() {
                       <div className="mt-2">
                         <LocationPicker
                           selected={editForm.locationNames}
+                          notOnMap={namesNotOnMap(packages?.find((p) => p.id === editingId))}
                           onChange={(next) => setEditForm((f) => ({ ...f, locationNames: next }))}
                         />
                       </div>

@@ -12,6 +12,15 @@ export interface DiscountDto {
   updatedAt: string;
 }
 
+export interface ActiveDiscount {
+  id: string;
+  description: string;
+  percentageOff: number;
+  minGroupSize: number;
+  validFrom: string | null;
+  validUntil: string | null;
+}
+
 export interface CreateDiscountRequest {
   description: string;
   percentageOff: number;
@@ -32,6 +41,12 @@ export interface UpdateDiscountRequest {
 
 export interface ToggleDiscountActiveRequest {
   isActive: boolean;
+}
+
+/** Public: discounts currently in effect (no login needed). */
+export async function getActiveDiscounts(signal?: AbortSignal): Promise<ActiveDiscount[]> {
+  const response = await apiClient.get<ActiveDiscount[]>('/api/discounts/active', { signal });
+  return response.data;
 }
 
 export async function getDiscounts(): Promise<DiscountDto[]> {

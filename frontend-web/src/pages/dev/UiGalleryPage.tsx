@@ -27,11 +27,13 @@ import {
   Textarea,
   Tooltip,
   Avatar,
+  PasswordInput,
   notify,
   STATUS_META,
   type Column,
 } from '../../components/ui';
 import type { BadgeTone } from '../../components/ui';
+import { PasswordStrength } from '../../components/auth/PasswordStrength';
 import { useTheme } from '../../theme/useTheme';
 import type { BookingStatus } from '../../api/bookings';
 
@@ -81,6 +83,7 @@ export function UiGalleryPage() {
   const [tab, setTab] = useState('one');
   const [on, setOn] = useState(true);
   const [date, setDate] = useState<Date | undefined>();
+  const [password, setPassword] = useState('');
 
   return (
     <>
@@ -171,6 +174,13 @@ export function UiGalleryPage() {
               <label className="flex items-center gap-2 text-body text-fg">
                 <Switch checked={on} onChange={setOn} label="Email notifications" /> Email notifications
               </label>
+            </div>
+          </Section>
+
+          <Section title="Password field and strength meter">
+            <div className="max-w-sm space-y-2">
+              <PasswordInput label="Password" value={password} onChange={(e) => setPassword(e.target.value)} hint="Try typing to see the meter move" />
+              <PasswordStrength password={password} />
             </div>
           </Section>
 

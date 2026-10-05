@@ -15,11 +15,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   ref,
 ) {
   return (
-    <Field label={label} hint={hint} error={error} className={wrapperClassName}>
+    <Field id={idProp} label={label} hint={hint} error={error} className={wrapperClassName}>
       {({ id, describedBy, invalid }) => (
         <textarea
           ref={ref}
-          id={idProp ?? id}
+          id={id}
           rows={rows}
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}

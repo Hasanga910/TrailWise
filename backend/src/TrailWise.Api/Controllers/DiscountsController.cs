@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TrailWise.Api.Contracts.Discounts;
 using TrailWise.Infrastructure.Services;
 
@@ -30,6 +31,7 @@ public class DiscountsController : ControllerBase
 
     [HttpGet("active")]
     [AllowAnonymous]
+    [EnableRateLimiting("PublicReadLimiter")]
     public async Task<ActionResult<IReadOnlyList<ActiveDiscountDto>>> GetActive(CancellationToken ct)
     {
         var activeDiscounts = await _discountService.GetActiveDiscountsAsync(ct: ct);

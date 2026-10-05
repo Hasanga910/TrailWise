@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getGuideAvailability,
   getGuides,
@@ -73,10 +73,18 @@ function renderWithAuth(currentUser: CurrentUser) {
 
 describe('GuideAvailabilityPage', () => {
   beforeEach(() => {
+    // Pin only Date (not timers) so the displayed month is deterministic
+    // and waitFor/userEvent keep working.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 2, 15, 12, 0, 0));
     vi.clearAllMocks();
     mockedGetGuides.mockResolvedValue(sampleGuides);
     mockedGetGuideAvailability.mockResolvedValue([]);
     mockedUpdateGuideAvailability.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('calendar renders the selected month', async () => {
@@ -147,17 +155,14 @@ describe('GuideAvailabilityPage', () => {
       role: 'TourGuide',
     });
 
+    // Wait for the specific outcomes instead of a single 1s waitFor: the availability
+    // fetch runs in a separate effect keyed on the selected guide.
+    expect(await screen.findByText('Your Guide Profile')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Kasun Perera' })).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText('Your Guide Profile')).toBeInTheDocument();
+      expect(mockedGetGuideAvailability).toHaveBeenCalledWith('guide-1', '2026-03-01', '2026-03-31');
     });
-
     expect(screen.queryByTestId('guide-select')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Kasun Perera' })).toBeInTheDocument();
-    expect(mockedGetGuideAvailability).toHaveBeenCalledWith(
-      'guide-1',
-      expect.any(String),
-      expect.any(String),
-    );
   });
 
   it('TourGuide with no linked profile shows a clear error message', async () => {
