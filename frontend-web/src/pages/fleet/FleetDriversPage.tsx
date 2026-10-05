@@ -30,7 +30,7 @@ function DriverFields({
       <Input label="Full Name" required type="text" placeholder="e.g. Sunil Perera" value={values.name} onChange={(e) => onChange({ name: e.target.value })} />
       <Input label="License Number" required type="text" placeholder="e.g. B-8492019" value={values.licenseNumber} onChange={(e) => onChange({ licenseNumber: e.target.value })} />
       <Input label="Contact Number" type="tel" placeholder="e.g. +94 77 123 4567" value={values.contactInfo} onChange={(e) => onChange({ contactInfo: e.target.value })} />
-      <Input label={emailLabel} type="email" placeholder="e.g. driver@trailwise.local" value={values.email} onChange={(e) => onChange({ email: e.target.value })} />
+      <Input label={emailLabel} type="email" placeholder="e.g. driver@example.com" value={values.email} onChange={(e) => onChange({ email: e.target.value })} />
       <Input label={passwordLabel} type="password" placeholder={passwordPlaceholder} value={values.password} onChange={(e) => onChange({ password: e.target.value })} />
     </>
   );

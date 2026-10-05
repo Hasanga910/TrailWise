@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using TrailWise.Infrastructure.Persistence;
 using TrailWise.Infrastructure.Services;
 
@@ -11,6 +12,24 @@ namespace TrailWise.Api.Tests;
 public class TrailWiseWebApplicationFactory : WebApplicationFactory<Program>
 {
     public readonly string DatabaseName = Guid.NewGuid().ToString();
+
+    /// <summary>Override to false for tests that need an empty database (only the Admin exists).</summary>
+    protected virtual bool SeedTestCatalogue => true;
+
+    /// <summary>The app seeds only the Admin, so give every test host the fixture catalogue it books against.</summary>
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        if (!SeedTestCatalogue)
+        {
+            return host;
+        }
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        TestCatalogueSeeder.SeedAsync(db).GetAwaiter().GetResult();
+        return host;
+    }
 
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {

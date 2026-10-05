@@ -164,19 +164,19 @@ public class DriverAccountLinkerTests
     }
 
     [Fact]
-    public async Task SeedAsync_DoesNotRepointTheDemoDriverAwayFromAnotherAccount()
+    public async Task SeedAsync_DoesNotRepointADriverAwayFromAnotherAccount()
     {
         using var db = TestDbContextFactory.Create();
         var options = Options.Create(new AdminSeedOptions());
-        await DbSeeder.SeedAsync(db, options);
-        var demoDriver = await db.Drivers.SingleAsync(d => d.Name == "Sunil Jayawardena");
         var someoneElse = AddUser(db, "Someone Else", "+94770009090");
-        demoDriver.UserId = someoneElse.Id;
+        var driverUser = AddUser(db, "Sunil Jayawardena", "+94711122334");
+        var driver = AddDriver(db, "Sunil Jayawardena", "+94711122334", someoneElse);
         await db.SaveChangesAsync();
 
         await DbSeeder.SeedAsync(db, options);
 
-        Assert.Equal(someoneElse.Id, (await db.Drivers.SingleAsync(d => d.Id == demoDriver.Id)).UserId);
+        Assert.Equal(someoneElse.Id, (await db.Drivers.SingleAsync(d => d.Id == driver.Id)).UserId);
+        Assert.NotEqual(driverUser.Id, (await db.Drivers.SingleAsync(d => d.Id == driver.Id)).UserId);
     }
 
     private static User AddUser(TrailWiseDbContext db, string name, string phone, UserRole role = UserRole.Driver)
