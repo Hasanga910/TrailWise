@@ -50,6 +50,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const Center(child: Logo(height: 36)),
+                    const SizedBox(height: AppSpacing.xl),
                     Text(
                       'Welcome back',
                       style: Theme.of(context).textTheme.headlineMedium,

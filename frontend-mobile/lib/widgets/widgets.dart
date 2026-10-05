@@ -3,5 +3,6 @@ export 'app_card.dart';
 export 'empty_state.dart';
 export 'error_state.dart';
 export 'loading_view.dart';
+export 'logo.dart';
 export 'section_header.dart';
 export 'status_badge.dart';

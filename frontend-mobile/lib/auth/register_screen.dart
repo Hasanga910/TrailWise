@@ -58,6 +58,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const Center(child: Logo(height: 36)),
+                    const SizedBox(height: AppSpacing.xl),
                     TextFormField(
                       controller: _nameController,
                       decoration: const InputDecoration(labelText: 'Full name'),

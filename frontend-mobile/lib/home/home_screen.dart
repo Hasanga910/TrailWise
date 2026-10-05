@@ -19,7 +19,14 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TrailWise'),
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LogoMark(height: 26),
+            SizedBox(width: AppSpacing.sm),
+            Text('TrailWise'),
+          ],
+        ),
         actions: [
           const ThemeToggleButton(),
           IconButton(
