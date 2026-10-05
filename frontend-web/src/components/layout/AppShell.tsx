@@ -2,7 +2,6 @@ import { Suspense, useState, type ComponentType, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { ChevronLeft, LogOut, Menu, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
-import logoIcon from '../../assets/logo-icon.png';
 import { ThemeToggle } from '../../theme/ThemeToggle';
 import { useTheme } from '../../theme/useTheme';
 import { Avatar } from '../ui/Avatar';
@@ -13,7 +12,7 @@ import { PageSkeleton } from '../ui/Skeleton';
 import { Drawer } from '../ui/Drawer';
 import { DropdownMenu, type MenuEntry } from '../ui/DropdownMenu';
 import { IconButton } from '../ui/IconButton';
-import { Logo } from '../Logo';
+import { Logo, LogoMark } from '../Logo';
 
 const ROLE_DISPLAY_LABELS: Record<string, string> = {
   Admin: 'Administrator',
@@ -183,7 +182,7 @@ export function AppShell({ navItems, pageTitles, portalLabel, children }: AppShe
         <div className={cn('relative flex items-center px-4 py-5', isCollapsed ? 'justify-center' : 'justify-between')}>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-brand-soft via-transparent to-transparent" />
           {isCollapsed ? (
-            <img src={logoIcon} alt="TrailWise" className="relative z-10 h-8 w-8 object-contain" />
+            <LogoMark className="relative z-10 h-8 w-auto" />
           ) : (
             <Logo className="relative z-10 h-7 w-auto" />
           )}
