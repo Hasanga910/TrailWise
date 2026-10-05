@@ -8,6 +8,8 @@
 > 3. Implement step by step. **Never run `git commit`.** After each step, stage the changes, give the user a commit message (summary line plus bullets), and wait for "committed".
 > 4. Run the checks in "Definition of done" and update the **Progress log** at the bottom.
 
+> **Current status and remaining order (team decision, time constraint).** Sessions 1–3 are complete. Session 4 is **partially done** (tier endpoints and the package catalogue UI shipped; the rest was skipped). Sessions 5, 6, 7, 9 and 10 are **not done (time constraint, team decision)**. Session 8 was removed. **The remaining work, in order: Session 5b (restyle every remaining web page), then Session 6b (Flutter restyle).** No new features or backend work are planned. The skipped items are gaps against the design document and are listed in the Session 4 progress entry.
+
 ---
 
 ## 1. What the design document requires (summary)
@@ -80,6 +82,8 @@ Keep the Session 1 design system: teal `brand` + amber `accent`, semantic tokens
 
 ### Session 4: Packages, bookings, add-ons and reports (React + backend)
 
+> **Status: partially done.** Shipped: tier edit/delete endpoints and the package catalogue UI with tier configuration. **Skipped (time constraint, team decision):** server-side searchable/filterable booking list and detail drawer, the cancellation-rate report, the charts and the reports rebuild. **Add-ons: not implemented (team decision); the `BookingAddOn` entity is kept as in design doc §4.** See the progress log.
+
 **Why:** doc §6 package and booking management, §4 `BookingAddOn`, §6 reports, §1.1 cancellation rate.
 
 - **Package catalogue with tier configuration:** create/edit packages and tiers (class type, food included, AC required, tier price) in one clear screen.
@@ -95,6 +99,8 @@ Keep the Session 1 design system: teal `brand` + amber `accent`, semantic tokens
 ---
 
 ### Session 5: Availability calendars, fleet review and itinerary builder with maps and weather (React + backend)
+
+> **Status: not done (time constraint, team decision).** Kept below for reference only; do not run it.
 
 **Why:** doc §6 calendars and itinerary builder, §9 maps and weather APIs, Fleet Coordinator permissions in §2.
 
@@ -112,38 +118,42 @@ Keep the Session 1 design system: teal `brand` + amber `accent`, semantic tokens
 
 ---
 
-### Session 5b: Restyle remaining web pages with the design system (React, looks only)
+### Session 5b: Restyle every remaining web page with the design system (React, looks only)
 
-**Why:** Session 1 gave every page the new tokens, dark mode, toasts and shell, but many pages still use hand-made buttons, inputs, tables and modals. This session makes the whole web app visually consistent for the demo.
+> **Status: next.** First of the two remaining sessions (then Session 6b).
 
-**Pages:**
-- Admin: overview, user management, staff role pages, profile.
-- All profile/settings pages: Ops, Fleet, Guide, Driver, Traveler.
-- Support: `OpsSupportPage`, `OpsTicketDetailPage`.
-- Discounts: `DiscountManager`.
-- Guide pages not rebuilt in Session 5: dashboard, assigned tours, tour detail, profile.
-- Driver dashboard.
-- Traveler web pages: dashboard, packages, my bookings, booking request.
-- Any remaining page still using hand-made controls.
-- `OpsPaymentsPage` only if its owner (Person 4) agrees; otherwise skip it.
+**Why:** Session 1 gave every page the new tokens, dark mode, toasts and shell, but many pages still use hand-made buttons, inputs, tables and modals. This session makes the whole web app visually consistent for the demo. Already on `components/ui`: the public site, auth pages, approval queue, workflow monitor, Ops dashboard and the package catalogue.
+
+**Pages (every remaining web page):**
+- **Ops:** bookings (`OpsBookingsPage`), reports (`OpsReportsPage`), discounts (`DiscountManager`), support (`OpsSupportPage`, `OpsTicketDetailPage`).
+- **Guide:** availability, dashboard, assigned tours, tour detail, profile.
+- **Fleet:** vehicles, drivers, assignments, guide assignments (`FleetManager` and the Fleet pages).
+- **Admin:** overview, user management, staff role pages, profile.
+- **Profile and settings pages for every role:** Ops, Fleet, Guide, Driver, Traveler.
+- **Driver:** dashboard and any other driver pages.
+- **Traveler:** dashboard, packages, my bookings, booking request.
+- Any other page still using hand-made controls.
+- `OpsPaymentsPage` **only if its owner (Person 4) agrees**; otherwise skip it.
 
 **Rules:**
 - **Looks only:** replace hand-made buttons, inputs, selects, tables, modals, badges and empty/loading states with `components/ui` primitives and tokens.
-- **No behaviour changes:** no API, route, validation or business-logic changes; keep all `data-testid`s and visible texts that tests rely on.
-- **Big files:** split files over ~500 lines while touching them.
-- **One commit per role area:** admin, profiles, support and discounts, guide, driver, traveler.
+- **No behaviour changes:** no API, route, validation or business-logic changes; keep all `data-testid`s and visible texts that tests rely on. No new features and no backend work.
+- **Big files:** split files over ~500 lines while touching them (`FleetManager.tsx` is ~1.3k lines).
+- **One commit per role area:** Ops, Guide, Fleet, Admin, profiles and settings, Driver, Traveler.
 
 **Definition of done:**
 - no page uses hand-made versions of components that exist in `components/ui`,
-- all tests, lint and build pass,
+- `npm run lint`, `npm test` and `npm run build` pass (the `noRawColors` guard stays green),
 - light and dark mode checked at 360px and 1440px.
 
 **Kickoff prompt:**
-> Read `docs/UI_OVERHAUL_PLAN.md` (sections 1–3 and Session 5b). Plan the restyle of the listed pages onto `components/ui`, looks only, no behaviour changes. Do not run git commit: stage each step and give me a commit message. Wait for my approval before coding.
+> Read `docs/UI_OVERHAUL_PLAN.md` (sections 1–3 and Session 5b). Plan the restyle of every remaining web page listed there onto `components/ui`, looks only, no behaviour changes, no new features, no backend work. Do not run git commit: stage each step and give me a commit message. Wait for my approval before coding.
 
 ---
 
 ### Session 6: Flutter design system and traveler app
+
+> **Status: not done (time constraint, team decision).** Kept below for reference only; do not run it.
 
 **Why:** doc §7 traveler features.
 
@@ -173,6 +183,8 @@ Keep the Session 1 design system: teal `brand` + amber `accent`, semantic tokens
 
 ### Session 7: Flutter guide app, GPS/maps and push notifications
 
+> **Status: not done (time constraint, team decision).** Kept below for reference only; do not run it.
+
 **Why:** doc §7 guide view, GPS/maps and push notifications.
 
 - Guide side: assigned tours, **attendance/completion marking**, tour notes, availability.
@@ -184,6 +196,33 @@ Keep the Session 1 design system: teal `brand` + amber `accent`, semantic tokens
 
 **Kickoff prompt:**
 > Read `docs/UI_OVERHAUL_PLAN.md` (sections 1–3 and Session 7) and the design document section 7. Stay strictly within the design document. Plan Session 7: Flutter guide view with attendance/completion marking and notes, meeting-point directions, live tour location sharing (backend + map), and push notifications via Firebase Cloud Messaging. Tell me what Firebase setup I need to do myself. Do not run git commit: stage each step and give me a commit message. Wait for my approval before coding.
+
+---
+
+### Session 6b: Flutter restyle (looks only)
+
+> **Status: after Session 5b.** Second of the two remaining sessions.
+
+**Why:** the web app has a full design system (Session 1); the Flutter app should look like the same product for the demo. This replaces the unfinished Flutter work in Sessions 6 and 7 with a restyle only.
+
+**Scope:**
+- A Flutter theme and shared widgets matching the web design: brand teal and amber, Plus Jakarta Sans (headings) and Inter (body), status colours (the same table as the web status badges), light and dark mode.
+- Apply it to **all existing screens** (login/registration, tour browsing, request form, booking list and detail, itinerary, payment status, reviews, guide screens, loading/empty/error states).
+- **Looks only, no new features, no backend work.** Exactly two small display-only additions, both reading fields the API already returns (Session 3):
+  - on the traveler booking screens, show **"Cancellation awaiting approval"** when `approvalPending` is true;
+  - show the Operations Manager's **revision note** (`revisionNote`) on the booking.
+- The traveler cannot act on a revision note yet (the revision flow in Session 6 is not done); the note is display-only.
+
+**Rules:** keep behaviour, navigation, API calls and state management as they are; add the fonts as bundled assets (no runtime downloads); keep widget keys and texts that tests rely on.
+
+**Definition of done:**
+- every screen uses the shared theme and widgets, with no hard-coded colours or text styles left on screens,
+- light and dark mode both work,
+- the two display-only states show for a booking with `approvalPending` and one with a `revisionNote`, with a widget test each,
+- `flutter analyze` and `flutter test` pass.
+
+**Kickoff prompt:**
+> Read `docs/UI_OVERHAUL_PLAN.md` (sections 1–3 and Session 6b). Plan the Flutter restyle: a theme and shared widgets matching the web design (brand teal and amber, Plus Jakarta Sans and Inter, status colours, light and dark) applied to all screens, looks only, no new features, except two display-only states on the traveler booking screens ("Cancellation awaiting approval" when `approvalPending` is true, and the `revisionNote`). Keep `flutter analyze` and `flutter test` passing. Do not run git commit: stage each step and give me a commit message. Wait for my approval before coding.
 
 ---
 
@@ -205,6 +244,8 @@ The original scope is kept below for reference only.
 
 ### Session 9: Testing plan from the design document
 
+> **Status: not done (time constraint, team decision).** Kept below for reference only; do not run it.
+
 **Why:** doc §11.
 
 - Backend: unit tests per service (e.g. budget-override threshold), controller/API integration and auth tests.
@@ -221,6 +262,8 @@ The original scope is kept below for reference only.
 ---
 
 ### Session 10: ADRs, deployment and final polish
+
+> **Status: not done (time constraint, team decision).** Kept below for reference only; do not run it.
 
 **Why:** doc §10, §12, §13 week 8–9.
 
@@ -243,11 +286,12 @@ Claude Code: append one entry per session.
 | 1 | 2026-10-05 | Complete | Design system and shell: semantic light/dark tokens and type scale; `ThemeProvider` (system/light/dark, no-flash script); `components/ui` library (Button, IconButton, fields, DatePicker, Card, Badge/StatusBadge, Avatar, Modal, Drawer, Tabs, DropdownMenu, Tooltip, DataTable, Skeleton, EmptyState, PageHeader/Breadcrumbs, StatCard, Toaster/notify); `AppShell` for all role layouts (lucide icons, sections, breadcrumbs, account menu, mobile drawer); guide and driver pages inside shells (`DriverLayout`, role-aware `/guides/availability`); lazy routes with skeleton fallbacks; 404 and `/no-access` pages; dev-only `/dev/ui` gallery. Completion pass: `RequireRole` now sends wrong-role users to `/no-access` (RequireRole plus 4 other role-guard tests updated); every page swept off raw `slate-*`/`bg-white`/soft status colours onto theme tokens (white-on-brand buttons moved to brand-700 for AA contrast); action banners replaced by toasts (errors persist until dismissed), while load failures with retry, field validation (including password confirmation) and in-modal errors stay inline with `role="alert"`; `noRawColors.test.ts` guards against regressions with a documented allowlist (modal scrims, hero indicator dot). Tests: 29 files, 206 passing. | Hand-rolled modals, buttons, inputs and tables are still not on `ui` primitives (Session 10 consistency sweep). Big files unsplit (`FleetManager.tsx` 1.3k lines: Session 5). `motion` installed but unused. No global `slate-*` dark fallback was added, so there is no temporary debt to remove. Dark mode and layouts were checked by tests, contrast math and build only, not by eye: do a manual dark-mode walkthrough per role. Possibly flaky under load: `GuideAvailabilityPage.test.tsx` failed once in a full run and passed on rerun. |
 | 2 | 2026-10-05 | Complete | **Backend:** anonymous `GET /api/packages`, `/api/packages/{id}` and new `/api/packages/facets`; optional filters (`q`, `theme`, days, price, `classType`, food, AC, `guests`, `minRating`) and `sort`/`dir`, with the old natural order kept when `sort` is omitted so existing callers (mobile, traveler pages) are unchanged; `startingPrice` and per-location `latitude`/`longitude` added to the DTO; public `GET /api/reviews/featured`; `PublicReadLimiter` rate limit (generic 429 body); package locations geocoded on create/update (Sri Lanka only, throttled to 1 request/second, time-boxed, never blocks saving, no guessing), optional manual `locationCoordinates` that geocoding never overwrites (no migration needed), and a batched `POST /api/packages/geocode-missing` backfill. **Web:** public layout; `/explore` with URL-synced filters, grid/list view and facets; `/explore/:packageId` with class comparison, lazy Leaflet/OpenStreetMap map, reviews with rating breakdown, current offers and a booking card; booking intent survives sign-up and login (`ProtectedRoute` passes `from`, `returnTo` sanitising helper plus sessionStorage backup, booking form prefills `tier`, `guests`, `start`); traveler-first home page (hero search, top-rated carousel, why/how sections incl. the smart booking check, real testimonials); redesigned login/register on react-hook-form + zod with show/hide password, strength meter and inline validation; contact details in one file (`src/config/contact.ts`); package forms show a 'Not on map' note and keep coordinates on edit. **Quality:** flaky `GuideAvailabilityPage` test fixed (pinned `Date`, awaited outcomes, 5s async timeout; 20 looped runs and 5 full runs green); fixed a Session 1 bug where `Input`/`Select`/`Textarea` labels did not follow a custom `id`. Lighthouse on the production build against a stub API with realistic data: home page mobile 92 performance / 100 accessibility, desktop 100 / 100 (with the API unreachable, mobile performance was 88). Web: 39 test files, 311 passing. Backend: 616 tests, 612 passing. | **Needs doing:** (1) Rebuild the Docker backend image (`docker compose up --build backend`): the running container is the old build, so anonymous browsing and the new endpoints do not exist there yet. (2) Run the geocode backfill once on real data (POST `/api/packages/geocode-missing`, repeat with `skip=nextSkip` until `remaining` is 0). (3) Replace the placeholder footer contact details in `src/config/contact.ts`. (4) Add the web origin to `Cors:AllowedOrigins` in deployment and configure forwarded headers if the API sits behind a proxy (the public rate limiter keys on client IP). **Follow-ups:** TODO add one more Sri Lankan hero photo (the Lisbon photo was removed, so the slideshow has 3 slides). 4 backend tests fail on the untouched baseline too (`BookingsSortingTests.GetMine_WithSortByStatus_SortsCorrectly`, `FleetEndpointsTests.VehicleAvailability_ChecksMaintenanceAndOverlap` and `GetAssignmentByBookingId_TravelerCanRetrieveTheirAssignment`, `BookingLifecycleEndpointsTests.Decide_Approve_FromNeedsManualReview_WithoutAssignedGuide...`): they depend on test order or shared seeded data and need their own fix. The home page is bundled eagerly and its entrance uses CSS keyframes instead of `motion` (kept off the critical path for the performance target), so `motion` is still unused. Hero images are WebP at two widths (`sharp-cli` via npx, not a dependency). Map editing for locations is deferred to Session 6; map tiles load from public OpenStreetMap servers (fine for launch traffic, revisit with a tile provider if usage grows). Prices on the public pages use `$` to match the existing portals; confirm the intended currency. |
 | 3 | 2026-10-05 | Complete | **Decisions:** in-person-only payments were considered and rejected by the team; no new payment work, the existing payment code (bank slips, deadlines, expiry job, Ops verification, Flutter pay screen) is unchanged. Session 8 (payment gateway) removed: payment gateway out of scope for this campus project; existing bank-slip flow kept as is. **Baseline fixes:** the 4 failing backend tests fixed (3 were test-only: order-dependent status sort, background-coordinator races; 1 was a real bug). **Real bugs fixed (each its own commit):** approving a booking only auto-assigns a guide who passes the Guide Matching rules (specialization, language, availability), otherwise 409 `Missing: Tour Guide`, and the unused `CanApprove` was removed; cancelling releases the guide's availability rows and stores `CancellationReason` (the payment-expiry job releases the guide too); `Drivers` model drift fixed with an idempotent migration (`UserId`, `ContactInfo` varchar(200), SET NULL foreign key) so deleting a driver's staff account no longer fails; privacy fix: `GET /api/drivers/me/assignments` is Driver-only and served only through `Driver.UserId` (no phone/name fallback, so travelers' phone numbers cannot leak), with unambiguous-phone startup linking of existing drivers and the web `/driver/*` routes Driver-only. **Backend:** `ApprovalRequest` table (+ `Booking.RevisionNote`, `ApprovalRequest.RequesterNote`), `ApprovalService` (approve/reject/request-revision in one transaction with guide, vehicle and audit), `GET /api/approvals/pending` with evidence, `POST /api/approvals/{id}/decide`; cancellation / refund exception (`Cancellation:RefundWindowDays` = 7; a traveler cancelling less than 7 days before start with a DepositPaid/FullyPaid payment creates a `RefundException` approval; approve marks payments `Refunded` (status only) and cancels, reject cancels without refund, revision restores the previous status); booking DTO gains `approvalPending`, `pendingApprovalType`, `revisionNote`; workflow monitor endpoints (`GET /api/agent-workflows`, `.../runs/{runId}`, `.../{id}/summary`, `POST .../start`, `POST .../{id}/approve`), `GET /api/reports/dashboard` (upcoming tours, approvals with urgent refund exceptions, guide and vehicle utilisation, workflow health); real tool calls recorded in `AgentStepLog.ToolCallsJson` with the doc 8.4 tool names (`deterministic_rule_check` is the one in-code check) and redacted. **Web:** Zustand stores and API clients, `/ops/approvals` (tabs per type, evidence, decision dialog with required notes, deep link, nav badge), `/ops/workflows` (live list, drill-down with plan, steps, tool calls, summary, re-run) and the rebuilt Ops dashboard (urgent cancellations within 2 days link into the queue). **ADRs:** 0002 React state management (Zustand), 0003 workflow-state schema and `ApprovalRequest`. **Checks:** backend 843 tests passing (was 616 with 4 failing), web 46 files and 430 tests passing, lint without errors, production build OK; migrations apply from scratch on a real PostgreSQL 16 and an end-to-end smoke run on it (throwaway database, local API) exercised a large-group, a budget-override and two refund-exception requests through approve, reject, request-revision, note validation, the monitor, the summary and the dashboard. Not checked by eye: layouts and dark mode of the new pages (tests and tokens only). | **Needs doing:** rebuild the Docker backend image (`docker compose up --build backend`; the new migrations apply on start). A booking sent back with Request revision (`PlanProposed`) has no way to be revised by the traveler yet (web or Flutter): decide this for Session 6; `POST /api/agent-workflows/start` only accepts Requested or NeedsManualReview. The Flutter booking list should use `approvalPending` / `pendingApprovalType` / `revisionNote`. ~~Guide utilisation counts only recorded availability rows, so it reads 100% when only assignments exist (existing report definition).~~ **Fixed after Session 3:** guide utilisation is now assigned days ÷ days in the window, and a day with no availability row counts as available (reports and Ops dashboard; `windowDays` added to the DTO, `recordedDays` kept and equal to it). Tool calls are recorded only for new runs. Existing lint warnings in untouched files remain. Session 5b (restyle) is planned separately. |
-| 4 | | Not started | | |
-| 5 | | Not started | | |
-| 5b | | Not started | | |
-| 6 | | Not started | | |
-| 7 | | Not started | | |
+| 4 | 2026-10-05 | Partially done (time constraint, team decision) | **Shipped (2 steps):** (1) **Tier endpoints:** `PUT /api/packages/{id}/tiers/{tierId}` and `DELETE .../tiers/{tierId}` (Operations Manager / Admin); one tier per (class, `includesFood`) combination, so Normal with and without food can both exist (409 on a true duplicate, on add and update; design doc §1); delete refused with 409 when bookings use the tier or it is the package's last tier; `PackageTierAdded/Updated/Deleted` audit entries; 10 new backend tests (858 passing). (2) **Package catalogue UI:** `/ops/packages` rebuilt as a card grid with tiers and locations, loading/empty/error-with-retry states, one editor drawer to create or edit a package (details, photo, locations) with a tier table (add, edit, delete with confirmation, API reasons shown inline), delete-package confirmation dialog, `PackageManager` split into `PackageEditor`, `TierTable`, `TierFields`, `LocationPicker` and `tierHelpers`, on `components/ui` with toasts; tests rewritten (web 47 files, 438 passing; lint without errors, build OK). **Not implemented (time constraint, team decision):** the server-side searchable/filterable/paginated booking list and booking detail drawer (`GET /api/bookings/paged` still has only status and date filters and `OpsBookingsPage` still loads all bookings client-side), the cancellation-rate report, the report charts (Recharts) and the reports page rebuild (the occupancy, revenue, guide-utilisation and audit-export endpoints and the existing reports page remain as they were). **No add-ons (team decision): add-on selection not implemented; `BookingAddOn` entity kept as in design doc §4** (the pricing agent still sums add-ons, but nothing creates them and the DTO does not expose them). | **Gaps against the design document:** searchable/filterable/**paginated** booking list (§6), cancellation rate (§1.1), report charts (§6), booking add-ons (§4). **Needs doing:** rebuild the Docker backend image so the tier endpoints exist (`docker compose up --build backend`). Package creation does not enforce class/food tier uniqueness on the server (the create form checks it in the browser). The catalogue page was checked by tests, build and lint only, not by eye: do a light/dark walkthrough in Session 5b. |
+| 5 | | Not done (time constraint, team decision) | | |
+| 5b | | Not started (next; scope extended to every remaining web page) | | |
+| 6b | | Not started (after 5b; Flutter restyle) | | |
+| 6 | | Not done (time constraint, team decision) | | |
+| 7 | | Not done (time constraint, team decision) | | |
 | 8 | | Not started | | |
-| 9 | | Not started | | |
-| 10 | | Not started | | |
+| 9 | | Not done (time constraint, team decision) | | |
+| 10 | | Not done (time constraint, team decision) | | |
