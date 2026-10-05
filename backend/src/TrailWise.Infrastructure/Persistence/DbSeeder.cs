@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
@@ -9,7 +10,11 @@ namespace TrailWise.Infrastructure.Persistence;
 
 public static class DbSeeder
 {
-    public static async Task SeedAsync(TrailWiseDbContext db, IOptions<AdminSeedOptions> adminOptions, CancellationToken ct = default)
+    public static async Task SeedAsync(
+        TrailWiseDbContext db,
+        IOptions<AdminSeedOptions> adminOptions,
+        CancellationToken ct = default,
+        ILogger? logger = null)
     {
         if (db.Database.IsRelational())
         {
@@ -70,23 +75,6 @@ public static class DbSeeder
             driverUser.PasswordHash = hasher.HashPassword(driverUser, "ChangeMe123!");
             db.Users.Add(driverUser);
             await db.SaveChangesAsync(ct);
-
-            var driverProfile = await db.Drivers.FirstOrDefaultAsync(d => d.ContactInfo == "+94711122334" || d.Name == "Sunil Jayawardena", ct);
-            if (driverProfile != null)
-            {
-                driverProfile.UserId = driverUser.Id;
-                await db.SaveChangesAsync(ct);
-            }
-        }
-        else
-        {
-            var driverUser = await db.Users.FirstAsync(u => u.Email == driverEmail, ct);
-            var driverProfile = await db.Drivers.FirstOrDefaultAsync(d => d.ContactInfo == "+94711122334" || d.Name == "Sunil Jayawardena", ct);
-            if (driverProfile != null && driverProfile.UserId != driverUser.Id)
-            {
-                driverProfile.UserId = driverUser.Id;
-                await db.SaveChangesAsync(ct);
-            }
         }
 
         if (!await db.TourPackages.AnyAsync(ct))
@@ -256,6 +244,10 @@ public static class DbSeeder
                 });
             await db.SaveChangesAsync(ct);
         }
+
+        // Driver records that predate Driver.UserId: link to the matching Driver account, but only
+        // when the contact number identifies exactly one driver and one account (never by name).
+        await DriverAccountLinker.LinkUnambiguousAsync(db, logger, ct);
 
         if (!await db.Guides.AnyAsync(ct))
         {

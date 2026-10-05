@@ -222,7 +222,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
     var adminOptions = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AdminSeedOptions>>();
-    await DbSeeder.SeedAsync(db, adminOptions);
+    await DbSeeder.SeedAsync(db, adminOptions, logger: app.Logger);
 }
 
 app.Run();

@@ -115,7 +115,7 @@ function App() {
       <Route
         path="/driver"
         element={
-          <RequireRole allowedRoles={['Driver', 'FleetCoordinator', 'Admin']}>
+          <RequireRole allowedRoles={['Driver']}>
             <DriverLayout />
           </RequireRole>
         }
