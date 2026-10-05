@@ -35,7 +35,9 @@ export interface GuideUtilizationDto {
   guideName: string;
   assignedDays: number;
   availableDays: number;
+  /** Kept for older clients; equals windowDays. */
   recordedDays: number;
+  windowDays: number;
   utilizationPercentage: number;
 }
 

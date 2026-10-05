@@ -170,7 +170,7 @@ export function OpsDashboardPage() {
                   <span className="text-caption text-fg-muted">{windowText(data.guideUtilization.window.from, data.guideUtilization.window.to)}</span>
                 </CardHeader>
                 <p className="mb-3 font-heading text-h2 text-fg">
-                  {Math.round(data.guideUtilization.overallPercentage)}% <span className="text-body font-normal text-fg-muted">of recorded guide days assigned</span>
+                  {Math.round(data.guideUtilization.overallPercentage)}% <span className="text-body font-normal text-fg-muted">of guide days assigned</span>
                 </p>
                 {data.guideUtilization.guides.length === 0 ? (
                   <p className="text-body text-fg-muted">No guides yet.</p>
@@ -181,7 +181,7 @@ export function OpsDashboardPage() {
                         key={g.guideId}
                         label={g.guideName}
                         percentage={g.utilizationPercentage}
-                        detail={`${g.assignedDays} of ${g.recordedDays} days`}
+                        detail={`${g.assignedDays} of ${g.windowDays} days`}
                       />
                     ))}
                   </ul>

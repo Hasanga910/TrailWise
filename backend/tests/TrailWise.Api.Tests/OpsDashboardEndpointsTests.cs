@@ -144,7 +144,7 @@ public class OpsDashboardEndpointsTests
     // ---------------------------------------------------------------- utilisation
 
     [Fact]
-    public async Task GuideUtilization_UsesOnlyTheNext30Days_AndTheOverallIsAssignedOverRecorded()
+    public async Task GuideUtilization_UsesOnlyTheNext30Days_AndTheOverallIsAssignedOverGuideDays()
     {
         using var factory = new TrailWiseWebApplicationFactory();
         Guid guideId;
@@ -168,9 +168,9 @@ public class OpsDashboardEndpointsTests
         var utilization = (await GetAsync(factory)).GuideUtilization;
 
         var mine = Assert.Single(utilization.Guides, g => g.GuideId == guideId);
-        Assert.Equal((5, 5, 10, 50.0), (mine.AssignedDays, mine.AvailableDays, mine.RecordedDays, mine.UtilizationPercentage));
-        var recorded = utilization.Guides.Sum(g => g.RecordedDays);
-        var expectedOverall = recorded > 0 ? Math.Round((double)utilization.Guides.Sum(g => g.AssignedDays) / recorded * 100.0, 2) : 0.0;
+        // 5 assigned of 30 days; the other 25 days are available (5 free rows plus 20 days without a row).
+        Assert.Equal((5, 25, 30, 16.67), (mine.AssignedDays, mine.AvailableDays, mine.WindowDays, mine.UtilizationPercentage));
+        var expectedOverall = Math.Round((double)utilization.Guides.Sum(g => g.AssignedDays) / (utilization.Guides.Count * 30) * 100.0, 2);
         Assert.Equal(expectedOverall, utilization.OverallPercentage);
         Assert.True(utilization.OverallPercentage > 0);
     }

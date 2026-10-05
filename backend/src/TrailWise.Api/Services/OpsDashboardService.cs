@@ -127,14 +127,14 @@ public class OpsDashboardService
     private async Task<GuideUtilizationSummaryDto> GuideUtilizationAsync(UtilizationWindowDto window, CancellationToken ct)
     {
         var guides = await _reports.GetGuideUtilizationReportAsync(window.From, window.To, ct);
-        var recorded = guides.Sum(g => g.RecordedDays);
-        var overall = recorded > 0 ? Math.Round((double)guides.Sum(g => g.AssignedDays) / recorded * 100.0, 2) : 0.0;
+        var capacityDays = guides.Count * window.Days;
+        var overall = capacityDays > 0 ? Math.Round((double)guides.Sum(g => g.AssignedDays) / capacityDays * 100.0, 2) : 0.0;
 
         return new GuideUtilizationSummaryDto(
             window,
             overall,
             guides.Select(g => new GuideUtilizationDto(
-                g.GuideId, g.GuideName, g.AssignedDays, g.AvailableDays, g.RecordedDays, g.UtilizationPercentage)).ToList());
+                g.GuideId, g.GuideName, g.AssignedDays, g.AvailableDays, g.RecordedDays, g.UtilizationPercentage, g.WindowDays)).ToList());
     }
 
     private async Task<VehicleUtilizationSummaryDto> VehicleUtilizationAsync(UtilizationWindowDto window, CancellationToken ct)

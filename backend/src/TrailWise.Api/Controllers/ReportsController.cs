@@ -187,7 +187,11 @@ public class ReportsController : ControllerBase
             });
         }
 
-        var results = await _operationsReportService.GetGuideUtilizationReportAsync(from, to, ct);
+        // No dates: the last 30 days up to today, the same window the reports page opens with.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var windowTo = to ?? today;
+        var windowFrom = from ?? windowTo.AddDays(-30);
+        var results = await _operationsReportService.GetGuideUtilizationReportAsync(windowFrom, windowTo, ct);
 
         var dtos = results.Select(g => new GuideUtilizationDto(
             g.GuideId,
@@ -195,7 +199,8 @@ public class ReportsController : ControllerBase
             g.AssignedDays,
             g.AvailableDays,
             g.RecordedDays,
-            g.UtilizationPercentage
+            g.UtilizationPercentage,
+            g.WindowDays
         )).ToList();
 
         return Ok(dtos);

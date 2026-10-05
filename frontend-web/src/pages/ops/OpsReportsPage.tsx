@@ -336,7 +336,7 @@ export function OpsReportsPage() {
                         <th className="px-4 py-3">Guide</th>
                         <th className="px-4 py-3 text-right">Assigned Days</th>
                         <th className="px-4 py-3 text-right">Available Days</th>
-                        <th className="px-4 py-3 text-right">Recorded Days</th>
+                        <th className="px-4 py-3 text-right">Days in Window</th>
                         <th className="px-4 py-3">Utilization</th>
                       </tr>
                     </thead>
@@ -348,7 +348,7 @@ export function OpsReportsPage() {
                             <td className="px-4 py-3 font-medium text-fg">{g.guideName}</td>
                             <td className="px-4 py-3 text-right text-fg-muted">{g.assignedDays}</td>
                             <td className="px-4 py-3 text-right text-fg-muted">{g.availableDays}</td>
-                            <td className="px-4 py-3 text-right text-fg-muted">{g.recordedDays}</td>
+                            <td className="px-4 py-3 text-right text-fg-muted">{g.windowDays}</td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <span className="w-14 text-sm font-semibold text-fg">

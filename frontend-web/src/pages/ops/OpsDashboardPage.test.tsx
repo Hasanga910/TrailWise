@@ -64,8 +64,8 @@ function dashboard(overrides: Partial<OpsDashboardDto> = {}): OpsDashboardDto {
     },
     guideUtilization: {
       window: { from: '2026-10-05', to: '2026-11-03', days: 30 },
-      overallPercentage: 50,
-      guides: [{ guideId: 'g1', guideName: 'Nimali Guide', assignedDays: 5, availableDays: 5, recordedDays: 10, utilizationPercentage: 50 }],
+      overallPercentage: 16.67,
+      guides: [{ guideId: 'g1', guideName: 'Nimali Guide', assignedDays: 5, availableDays: 25, recordedDays: 30, windowDays: 30, utilizationPercentage: 16.67 }],
     },
     vehicleUtilization: {
       window: { from: '2026-10-05', to: '2026-11-03', days: 30 },
@@ -255,10 +255,10 @@ describe('OpsDashboardPage', () => {
       renderPage();
 
       const guides = await screen.findByRole('region', { name: 'Guide utilisation' });
-      expect(guides).toHaveTextContent('50% of recorded guide days assigned');
+      expect(guides).toHaveTextContent('17% of guide days assigned');
       const meter = within(guides).getByRole('meter', { name: 'Nimali Guide utilisation' });
-      expect(meter).toHaveAttribute('aria-valuenow', '50');
-      expect(guides).toHaveTextContent('5 of 10 days · 50%');
+      expect(meter).toHaveAttribute('aria-valuenow', '17');
+      expect(guides).toHaveTextContent('5 of 30 days · 17%');
     });
 
     it('shows the overall vehicle figure, flags out-of-service vehicles, and a bar per vehicle', async () => {

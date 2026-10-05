@@ -47,7 +47,8 @@ public record GuideUtilizationResult(
     int AssignedDays,
     int AvailableDays,
     int RecordedDays,
-    double UtilizationPercentage
+    double UtilizationPercentage,
+    int WindowDays
 );
 
 public interface IOperationsReportService
@@ -71,8 +72,13 @@ public interface IOperationsReportService
         DateOnly to,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Days each guide is assigned to a booking inside [from, to], as a share of the days in that window.
+    /// A day with no availability row counts as available. <c>RecordedDays</c> is kept for older clients
+    /// and equals <c>WindowDays</c>.
+    /// </summary>
     Task<IReadOnlyList<GuideUtilizationResult>> GetGuideUtilizationReportAsync(
-        DateOnly? from,
-        DateOnly? to,
+        DateOnly from,
+        DateOnly to,
         CancellationToken ct = default);
 }
