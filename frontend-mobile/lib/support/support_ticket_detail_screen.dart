@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../models/support_ticket.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class SupportTicketDetailScreen extends StatefulWidget {
   final String ticketId;
@@ -15,11 +18,13 @@ class SupportTicketDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<SupportTicketDetailScreen> createState() => _SupportTicketDetailScreenState();
+  State<SupportTicketDetailScreen> createState() =>
+      _SupportTicketDetailScreenState();
 }
 
 class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
-  late final ApiClient _apiClient = widget.apiClient ?? context.read<AuthProvider>().apiClient;
+  late final ApiClient _apiClient =
+      widget.apiClient ?? context.read<AuthProvider>().apiClient;
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
 
@@ -91,14 +96,15 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not send message. Please try again.')),
+          const SnackBar(
+            content: Text('Could not send message. Please try again.'),
+          ),
         );
       }
     } finally {
@@ -108,6 +114,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(_ticket?.subject ?? 'Ticket Details'),
@@ -120,23 +127,27 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(onPressed: _loadTicket, child: const Text('Retry')),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_error!, style: TextStyle(color: colors.danger)),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: _loadTicket,
+                    child: const Text('Retry'),
                   ),
-                )
-              : _buildContent(),
+                ],
+              ),
+            )
+          : _buildContent(),
     );
   }
 
   Widget _buildContent() {
+    final colors = AppColors.of(context);
     final ticket = _ticket!;
     final statusColor = TicketStatusHelper.color(ticket.status);
     final statusLabel = TicketStatusHelper.displayName(ticket.status);
@@ -144,71 +155,96 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
 
     return Column(
       children: [
-        // Ticket Overview Card
-        Card(
-          margin: const EdgeInsets.all(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        // Ticket Overview Card (scrolls inside its own box on small screens)
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.4,
+          ),
+          child: SingleChildScrollView(
+            child: Card(
+              margin: const EdgeInsets.all(12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        ticket.subject,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ticket.subject,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Chip(
-                      label: Text(
-                        statusLabel,
-                        style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      backgroundColor: statusColor.withValues(alpha: 0.12),
-                      visualDensity: VisualDensity.compact,
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Chip(
+                          label: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          backgroundColor: statusColor.withValues(alpha: 0.12),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Chip(
+                          label: Text(
+                            ticket.category,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          avatar: const Icon(Icons.category, size: 14),
+                        ),
+                        Chip(
+                          label: Text(
+                            ticket.priority,
+                            style: TextStyle(
+                              color: priorityColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          backgroundColor: priorityColor.withValues(
+                            alpha: 0.12,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        if (ticket.packageName != null)
+                          Chip(
+                            label: Text(
+                              ticket.packageName!,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            avatar: const Icon(Icons.card_travel, size: 14),
+                          ),
+                      ],
+                    ),
+                    const Divider(height: 20),
+                    Text(
+                      ticket.description,
+                      style: const TextStyle(fontSize: 14, height: 1.4),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Created: ${ticket.createdAt.toLocal().toString().split('.')[0]}',
+                      style: TextStyle(fontSize: 11, color: colors.fgMuted),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    Chip(
-                      label: Text(ticket.category, style: const TextStyle(fontSize: 12)),
-                      visualDensity: VisualDensity.compact,
-                      avatar: const Icon(Icons.category, size: 14),
-                    ),
-                    Chip(
-                      label: Text(
-                        ticket.priority,
-                        style: TextStyle(color: priorityColor, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      backgroundColor: priorityColor.withValues(alpha: 0.12),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    if (ticket.packageName != null)
-                      Chip(
-                        label: Text(ticket.packageName!, style: const TextStyle(fontSize: 12)),
-                        visualDensity: VisualDensity.compact,
-                        avatar: const Icon(Icons.card_travel, size: 14),
-                      ),
-                  ],
-                ),
-                const Divider(height: 20),
-                Text(
-                  ticket.description,
-                  style: const TextStyle(fontSize: 14, height: 1.4),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Created: ${ticket.createdAt.toLocal().toString().split('.')[0]}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -219,12 +255,18 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
               ? Center(
                   child: Text(
                     'No replies yet. Our support team will respond shortly.',
-                    style: TextStyle(color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      color: colors.fgMuted,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 )
               : ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   itemCount: ticket.messages.length,
                   itemBuilder: (context, index) {
                     final msg = ticket.messages[index];
@@ -240,10 +282,11 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
   }
 
   Widget _buildMessageBubble(SupportMessage msg) {
+    final colors = AppColors.of(context);
     final isStaff = msg.isStaff;
     final align = isStaff ? CrossAxisAlignment.start : CrossAxisAlignment.end;
-    final bgColor = isStaff ? Colors.grey.shade100 : Colors.blue.shade50;
-    final borderColor = isStaff ? Colors.grey.shade300 : Colors.blue.shade200;
+    final bgColor = isStaff ? colors.surfaceSunken : colors.infoSoft;
+    final borderColor = isStaff ? colors.border : colors.border;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -254,28 +297,38 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (isStaff) ...[
-                const Icon(Icons.support_agent, size: 16, color: Colors.indigo),
+                Icon(Icons.support_agent, size: 16, color: colors.info),
                 const SizedBox(width: 4),
-                const Text(
+                Text(
                   'TrailWise Support',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: colors.info,
+                  ),
                 ),
               ] else ...[
-                const Text(
+                Text(
                   'You',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: colors.info,
+                  ),
                 ),
               ],
               const SizedBox(width: 8),
               Text(
                 '${msg.createdAt.toLocal().hour.toString().padLeft(2, '0')}:${msg.createdAt.toLocal().minute.toString().padLeft(2, '0')}',
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 10, color: colors.fgMuted),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.8,
+            ),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: bgColor,
@@ -293,19 +346,22 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
   }
 
   Widget _buildBottomBar(SupportTicket ticket) {
+    final colors = AppColors.of(context);
     if (ticket.isClosed) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        color: Colors.grey.shade200,
-        child: const Row(
+        padding: EdgeInsets.all(16),
+        color: colors.border,
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.lock_outline, size: 18, color: Colors.grey),
-            SizedBox(width: 8),
-            Text(
-              'This support ticket is closed.',
-              style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+            Icon(Icons.lock_outline, size: 18, color: colors.fgMuted),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'This support ticket is closed.',
+                style: TextStyle(color: colors.fg, fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -315,14 +371,8 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        color: colors.surfaceRaised,
+        border: Border(top: BorderSide(color: colors.border)),
       ),
       child: SafeArea(
         child: Row(
@@ -333,8 +383,13 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
                   hintText: 'Type your message...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24))),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(24)),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                 ),
                 maxLines: null,
               ),
@@ -345,7 +400,10 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.send),
               onPressed: _sending ? null : _sendMessage,

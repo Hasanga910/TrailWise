@@ -1202,7 +1202,7 @@ class _PaymentStatusScreenState extends State<PaymentStatusScreen> {
                             decoration: BoxDecoration(
                               border: Border.all(color: colors.border),
                               borderRadius: BorderRadius.circular(8),
-                              color: Colors.teal.shade50.withValues(alpha: 0.3),
+                              color: AppColors.of(context).brandSoft,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,

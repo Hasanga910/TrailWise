@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../models/driver_assignment.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class DriverTasksScreen extends StatefulWidget {
   const DriverTasksScreen({super.key, this.apiClient});
@@ -130,32 +132,11 @@ class _DriverTasksScreenState extends State<DriverTasksScreen>
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingView();
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red, fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _load,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
+      return ErrorState(message: _error!, onRetry: _load);
     }
 
     final all = _assignments ?? [];
@@ -175,31 +156,10 @@ class _DriverTasksScreenState extends State<DriverTasksScreen>
     if (list.isEmpty) {
       return RefreshIndicator(
         onRefresh: _load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            SizedBox(
-              height: 350,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.directions_car_outlined,
-                        size: 64, color: Colors.grey.shade400),
-                    const SizedBox(height: 16),
-                    Text(
-                      emptyMessage,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        child: EmptyState(
+          icon: Icons.directions_car_outlined,
+          title: emptyMessage,
+          message: 'Driving assignments will appear here.',
         ),
       );
     }
@@ -207,7 +167,7 @@ class _DriverTasksScreenState extends State<DriverTasksScreen>
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: AppSpacing.page,
         itemCount: list.length,
         itemBuilder: (context, index) {
           final item = list[index];
@@ -252,6 +212,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     final theme = Theme.of(context);
     final assignment = widget.assignment;
     final vehicleType = assignment.vehicleType ?? 'Transport';
@@ -263,7 +224,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: colors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -281,12 +242,12 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.teal.shade50,
+                          color: colors.brandSoft,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           _vehicleIcon(assignment.vehicleType),
-                          color: Colors.teal.shade700,
+                          color: colors.brandText,
                           size: 24,
                         ),
                       ),
@@ -306,7 +267,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                             Text(
                               'Booking #${assignment.bookingId.length > 8 ? assignment.bookingId.substring(0, 8) : assignment.bookingId}',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.grey.shade600,
+                                color: colors.fgMuted,
                                 fontFamily: 'monospace',
                               ),
                             ),
@@ -320,16 +281,16 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                      color: colors.infoSoft,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
+                      border: Border.all(color: colors.border),
                     ),
                     child: Text(
                       assignment.bookingStatus!,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
+                        color: colors.info,
                       ),
                     ),
                   ),
@@ -350,7 +311,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                 ),
                 Chip(
                   label: Text(hasAc ? '❄️ AC' : 'Non-AC'),
-                  backgroundColor: hasAc ? Colors.cyan.shade50 : Colors.grey.shade100,
+                  backgroundColor: hasAc ? colors.infoSoft : colors.surfaceSunken,
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -368,7 +329,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
             // Tour Dates
             Row(
               children: [
-                Icon(Icons.calendar_month, size: 18, color: Colors.teal.shade700),
+                Icon(Icons.calendar_month, size: 18, color: colors.brandText),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -384,22 +345,22 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: colors.surfaceSunken,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 18,
-                    backgroundColor: Colors.teal.shade100,
+                    backgroundColor: colors.brandSoft,
                     child: Text(
                       (assignment.travelerName?.isNotEmpty ?? false)
                           ? assignment.travelerName![0].toUpperCase()
                           : 'T',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.teal.shade800,
+                        color: colors.brandText,
                       ),
                     ),
                   ),
@@ -420,7 +381,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                           assignment.travelerContact ?? 'No phone provided',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade600,
+                            color: colors.fgMuted,
                           ),
                         ),
                       ],
@@ -446,9 +407,9 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: colors.surfaceSunken,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,15 +417,15 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                     // Tour Package Header
                     Row(
                       children: [
-                        Icon(Icons.tour_outlined, size: 18, color: Colors.teal.shade800),
+                        Icon(Icons.tour_outlined, size: 18, color: colors.brandText),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             assignment.packageName ?? 'Expedition Tour Package',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: Colors.teal,
+                              color: colors.brandText,
                             ),
                           ),
                         ),
@@ -472,7 +433,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.teal.shade100,
+                              color: colors.brandSoft,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -480,7 +441,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.teal.shade900,
+                                color: colors.brandText,
                               ),
                             ),
                           ),
@@ -538,12 +499,12 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                     // Itinerary Highlights
                     if (assignment.itineraryHighlights != null && assignment.itineraryHighlights!.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'Itinerary Highlights:',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: colors.fg,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -556,11 +517,11 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.grey.shade300),
+                              border: Border.all(color: colors.border),
                             ),
                             child: Text(
                               '• $highlight',
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+                              style: TextStyle(fontSize: 11, color: colors.fg),
                             ),
                           );
                         }).toList(),
@@ -588,7 +549,7 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
                 label: Text(_expanded ? 'Less Info' : 'More Info'),
                 style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact,
-                  foregroundColor: Colors.teal.shade800,
+                  foregroundColor: colors.brandText,
                   textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
@@ -604,26 +565,27 @@ class _DriverTaskCardState extends State<_DriverTaskCard> {
     required String label,
     required String value,
   }) {
+    final colors = AppColors.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
+        Icon(icon, size: 16, color: colors.fgMuted),
         const SizedBox(width: 8),
         Text(
           '$label: ',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
+            color: colors.fgMuted,
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: colors.fg,
             ),
           ),
         ),

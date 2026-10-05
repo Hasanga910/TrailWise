@@ -66,7 +66,7 @@ class TransportInfoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: colors.border, width: 1),
       ),
-      color: Colors.amber.shade50.withValues(alpha: 0.5),
+      color: AppColors.of(context).warningSoft,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
