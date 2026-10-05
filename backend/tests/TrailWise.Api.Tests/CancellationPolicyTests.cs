@@ -35,6 +35,18 @@ public class CancellationPolicyTests
     public void RequiresApproval_UsesTheConfiguredWindow(int daysAhead, int windowDays, bool expected) =>
         Assert.Equal(expected, CancellationPolicy.RequiresApproval(Today, Today.AddDays(daysAhead), windowDays, true));
 
+    [Theory]
+    [InlineData(-5, true)]
+    [InlineData(0, true)]
+    [InlineData(2, true)]
+    [InlineData(3, false)]
+    [InlineData(30, false)]
+    public void IsUrgent_MeansTheTourStartsWithinTwoDaysOrHasStarted(int daysUntilStart, bool expected)
+    {
+        Assert.Equal(2, CancellationPolicy.UrgentRefundExceptionDays);
+        Assert.Equal(expected, CancellationPolicy.IsUrgent(daysUntilStart));
+    }
+
     [Fact]
     public void DaysUntilStart_CountsWholeDays_AndIsNegativeOnceStarted()
     {

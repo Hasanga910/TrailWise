@@ -16,6 +16,8 @@ const string LoginRateLimiterPolicy = "LoginRateLimiter";
 const string PublicReadRateLimiterPolicy = "PublicReadLimiter";
 
 builder.Services.AddScoped<TrailWise.Api.Services.ApprovalQueueService>();
+builder.Services.AddScoped<TrailWise.Api.Services.AgentWorkflowQueryService>();
+builder.Services.AddScoped<TrailWise.Api.Services.OpsDashboardService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

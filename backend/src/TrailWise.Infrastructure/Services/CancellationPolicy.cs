@@ -5,6 +5,14 @@ namespace TrailWise.Infrastructure.Services;
 /// </summary>
 public static class CancellationPolicy
 {
+    /// <summary>
+    /// A pending refund exception whose tour starts within this many days (or has already started)
+    /// is flagged urgent on the Ops dashboard.
+    /// </summary>
+    public const int UrgentRefundExceptionDays = 2;
+
+    public static bool IsUrgent(int daysUntilStart) => daysUntilStart <= UrgentRefundExceptionDays;
+
     /// <summary>Whole days from <paramref name="today"/> until the tour starts (negative once it has started).</summary>
     public static int DaysUntilStart(DateOnly today, DateOnly startDate) => startDate.DayNumber - today.DayNumber;
 

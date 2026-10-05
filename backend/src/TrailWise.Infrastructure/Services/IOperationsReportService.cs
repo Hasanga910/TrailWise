@@ -1,3 +1,5 @@
+using TrailWise.Domain.Enums;
+
 namespace TrailWise.Infrastructure.Services;
 
 public record PackageOccupancyResult(
@@ -29,6 +31,16 @@ public record RevenueReportResult(
     IReadOnlyList<MonthlyRevenueResult> ByMonth
 );
 
+public record VehicleUtilizationResult(
+    Guid VehicleId,
+    string RegistrationNumber,
+    VehicleType Type,
+    VehicleMaintenanceStatus MaintenanceStatus,
+    int BookedDays,
+    int WindowDays,
+    double UtilizationPercentage
+);
+
 public record GuideUtilizationResult(
     Guid GuideId,
     string GuideName,
@@ -48,6 +60,15 @@ public interface IOperationsReportService
     Task<RevenueReportResult> GetRevenueReportAsync(
         DateOnly? from,
         DateOnly? to,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Days each vehicle is reserved for a non-cancelled booking inside [from, to], as a share of the
+    /// days in that window.
+    /// </summary>
+    Task<IReadOnlyList<VehicleUtilizationResult>> GetVehicleUtilizationReportAsync(
+        DateOnly from,
+        DateOnly to,
         CancellationToken ct = default);
 
     Task<IReadOnlyList<GuideUtilizationResult>> GetGuideUtilizationReportAsync(

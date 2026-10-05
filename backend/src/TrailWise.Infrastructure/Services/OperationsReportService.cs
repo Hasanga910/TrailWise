@@ -134,6 +134,50 @@ public class OperationsReportService : IOperationsReportService
 
     // Utilization is based only on recorded GuideAvailability rows because
     // Person 2's reservation flow does not yet populate every calendar day.
+    public async Task<IReadOnlyList<VehicleUtilizationResult>> GetVehicleUtilizationReportAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default)
+    {
+        var windowDays = Math.Max(0, to.DayNumber - from.DayNumber + 1);
+
+        var vehicles = await _db.Vehicles.AsNoTracking().OrderBy(v => v.RegistrationNumber).ToListAsync(ct);
+        var assignments = await _db.VehicleAssignments
+            .AsNoTracking()
+            .Where(a => a.StartDate <= to && a.EndDate >= from && a.Booking.Status != BookingStatus.Cancelled)
+            .Select(a => new { a.VehicleId, a.StartDate, a.EndDate })
+            .ToListAsync(ct);
+
+        var daysByVehicle = assignments
+            .GroupBy(a => a.VehicleId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var days = new HashSet<int>();
+                    foreach (var a in g)
+                    {
+                        var start = Math.Max(a.StartDate.DayNumber, from.DayNumber);
+                        var end = Math.Min(a.EndDate.DayNumber, to.DayNumber);
+                        for (var d = start; d <= end; d++)
+                        {
+                            days.Add(d);
+                        }
+                    }
+                    return days.Count;
+                });
+
+        return vehicles
+            .Select(v =>
+            {
+                var booked = daysByVehicle.TryGetValue(v.Id, out var count) ? count : 0;
+                var percentage = windowDays > 0 ? Math.Round((double)booked / windowDays * 100.0, 2) : 0.0;
+                return new VehicleUtilizationResult(
+                    v.Id, v.RegistrationNumber, v.Type, v.MaintenanceStatus, booked, windowDays, percentage);
+            })
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<GuideUtilizationResult>> GetGuideUtilizationReportAsync(
         DateOnly? from,
         DateOnly? to,

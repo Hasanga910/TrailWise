@@ -313,6 +313,129 @@ public class ApprovalsEndpointsTests : IClassFixture<TrailWiseWebApplicationFact
         Assert.Equal("ok", approval.DecisionNote);
     }
 
+    // ---------------------------------------------------------------- POST /api/agent-workflows/{id}/approve
+
+    [Theory]
+    [InlineData(ApprovalType.LargeGroupOrCustomItinerary)]
+    [InlineData(ApprovalType.BudgetOverride)]
+    public async Task WorkflowApprove_DelegatesToTheApprovalsDecideLogic(ApprovalType type)
+    {
+        var seeded = await SeedAsync(type, groupSize: 12);
+        var client = await StaffClientAsync("OperationsManager");
+
+        var response = await client.PostAsJsonAsync($"/api/agent-workflows/{seeded.RunId}/approve", new { Note = "Looks right to me." });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ApprovalDecidedDto>(JsonOptions);
+        Assert.Equal(seeded.ApprovalId, body!.Id);
+        Assert.Equal(ApprovalStatus.Approved, body.Status);
+        Assert.Equal(BookingStatus.Confirmed, body.Booking.Status);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var approval = await db.ApprovalRequests.SingleAsync(a => a.Id == seeded.ApprovalId);
+        Assert.Equal("Looks right to me.", approval.DecisionNote);
+        Assert.NotNull(approval.DecidedBy);
+        Assert.Equal("Completed", (await db.AgentWorkflowRuns.SingleAsync(r => r.Id == seeded.RunId)).Status);
+        Assert.Single(db.AuditLogs, a => a.EntityId == seeded.BookingId && a.Action == "BookingApproved");
+        Assert.True(await db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == seeded.BookingId));
+    }
+
+    [Fact]
+    public async Task WorkflowApprove_WorksWithoutAnyRequestBody()
+    {
+        var seeded = await SeedAsync(ApprovalType.BudgetOverride, groupSize: 2);
+        var client = await StaffClientAsync("Admin");
+
+        var response = await client.PostAsync($"/api/agent-workflows/{seeded.RunId}/approve", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WorkflowApprove_WhenTheReservationFails_Returns409_AndRollsBackEverything()
+    {
+        var seeded = await SeedAsync(ApprovalType.BudgetOverride, groupSize: 2, withMatchingGuide: false);
+        var client = await StaffClientAsync("OperationsManager");
+
+        var response = await client.PostAsJsonAsync($"/api/agent-workflows/{seeded.RunId}/approve", new { });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await AssertUntouchedAsync(seeded);
+    }
+
+    [Fact]
+    public async Task WorkflowApprove_RefusesARunThatIsNotWaitingForApproval()
+    {
+        var seeded = await SeedAsync(ApprovalType.BudgetOverride, groupSize: 2);
+        var client = await StaffClientAsync("OperationsManager");
+        (await client.PostAsJsonAsync($"/api/agent-workflows/{seeded.RunId}/approve", new { })).EnsureSuccessStatusCode();
+
+        var again = await client.PostAsJsonAsync($"/api/agent-workflows/{seeded.RunId}/approve", new { });
+
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task WorkflowApprove_RefusesAnOlderRunOfTheBooking()
+    {
+        var seeded = await SeedAsync(ApprovalType.BudgetOverride, groupSize: 2);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            db.AgentWorkflowRuns.Add(new AgentWorkflowRun
+            {
+                BookingId = seeded.BookingId,
+                Objective = "A newer run",
+                Status = "AwaitingApproval",
+                StartedAt = DateTimeOffset.UtcNow.AddMinutes(5)
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await (await StaffClientAsync("OperationsManager"))
+            .PostAsJsonAsync($"/api/agent-workflows/{seeded.RunId}/approve", new { });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await AssertUntouchedAsync(seeded);
+    }
+
+    [Fact]
+    public async Task WorkflowApprove_UnknownRun_Returns404()
+    {
+        var response = await (await StaffClientAsync("OperationsManager"))
+            .PostAsJsonAsync($"/api/agent-workflows/{Guid.NewGuid()}/approve", new { });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("FleetCoordinator")]
+    [InlineData("TourGuide")]
+    [InlineData("Traveler")]
+    public async Task WorkflowApprove_IsForbiddenForOtherRoles_AndChangesNothing(string role)
+    {
+        var seeded = await SeedAsync(ApprovalType.BudgetOverride, groupSize: 2);
+
+        var response = await (await StaffClientAsync(role))
+            .PostAsJsonAsync($"/api/agent-workflows/{seeded.RunId}/approve", new { });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        await AssertUntouchedAsync(seeded);
+    }
+
+    [Fact]
+    public async Task WorkflowApprove_RejectsAnOverlongNote()
+    {
+        var seeded = await SeedAsync(ApprovalType.BudgetOverride, groupSize: 2);
+
+        var response = await (await StaffClientAsync("OperationsManager"))
+            .PostAsJsonAsync($"/api/agent-workflows/{seeded.RunId}/approve", new { Note = new string('x', 501) });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertUntouchedAsync(seeded);
+    }
+
     // ---------------------------------------------------------------- transaction rollback
 
     [Fact]
