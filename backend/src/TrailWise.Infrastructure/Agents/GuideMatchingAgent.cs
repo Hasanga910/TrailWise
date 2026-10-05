@@ -16,12 +16,15 @@ public class GuideMatchingAgent : IGuideMatchingAgent
     private readonly TrailWiseDbContext _db;
     private readonly IGuideAvailabilityService _availabilityService;
     private readonly ILogger<GuideMatchingAgent> _logger;
+    private readonly IToolCallRecorder? _recorder;
 
     public GuideMatchingAgent(
         TrailWiseDbContext db,
         IGuideAvailabilityService availabilityService,
-        ILogger<GuideMatchingAgent> logger)
+        ILogger<GuideMatchingAgent> logger,
+        IToolCallRecorder? recorder = null)
     {
+        _recorder = recorder;
         _db = db;
         _availabilityService = availabilityService;
         _logger = logger;
@@ -162,11 +165,11 @@ public class GuideMatchingAgent : IGuideMatchingAgent
             foreach (var guide in candidateGuides)
             {
                 // Must be available for the complete booking date range
-                var isAvailable = await _availabilityService.IsGuideAvailableAsync(
-                    guide.Id,
-                    booking.StartDate,
-                    booking.EndDate,
-                    ct);
+                var isAvailable = await _recorder.TrackAsync(
+                    AgentTools.GuideAvailabilityRead,
+                    $"guide {guide.Id}, {booking.StartDate:yyyy-MM-dd} to {booking.EndDate:yyyy-MM-dd}",
+                    () => _availabilityService.IsGuideAvailableAsync(guide.Id, booking.StartDate, booking.EndDate, ct),
+                    available => available ? "available for the full period" : "not available");
 
                 if (!isAvailable)
                 {

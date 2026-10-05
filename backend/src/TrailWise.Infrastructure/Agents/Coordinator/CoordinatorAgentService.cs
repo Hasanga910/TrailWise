@@ -39,6 +39,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
     private readonly IBookingLifecycleService _bookingLifecycleService;
     private readonly IClock _clock;
     private readonly IServiceScopeFactory? _scopeFactory;
+    private readonly IToolCallRecorder? _toolCalls;
 
     public CoordinatorAgentService(
         TrailWiseDbContext db,
@@ -52,8 +53,10 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         IBookingLifecycleService? bookingLifecycleService = null,
         IClock? clock = null,
         IFleetReservationService? fleetReservationService = null,
-        IServiceScopeFactory? scopeFactory = null)
+        IServiceScopeFactory? scopeFactory = null,
+        IToolCallRecorder? toolCalls = null)
     {
+        _toolCalls = toolCalls;
         _db = db;
         _preferenceAgent = preferenceAgent;
         _guideAgent = guideAgent;
@@ -164,6 +167,12 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         var decisionResult = BookingApprovalEvaluator.Evaluate(evaluatorInput);
         sw.Stop();
 
+        _toolCalls.RecordCall(
+            AgentTools.DeterministicRuleCheck,
+            $"group size {booking.GroupSize}, budget ceiling, AC match, vehicle conflict, guide match score",
+            $"{decisionResult.Decision}; {decisionResult.Reasons.Count} reason(s)",
+            sw.ElapsedMilliseconds);
+
         var validateStepLog = new AgentStepLog
         {
             WorkflowRunId = run.Id,
@@ -195,6 +204,11 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                         var hasAssignment = await _db.VehicleAssignments.AnyAsync(a => a.BookingId == bookingId, ct);
                         if (!hasAssignment)
                         {
+                            _toolCalls.RecordCall(
+                                AgentTools.VehicleAvailabilityWrite,
+                                $"reserve vehicle {vehicleResult.VehicleId} with driver {vehicleResult.DriverId}, {booking.StartDate:yyyy-MM-dd} to {booking.EndDate:yyyy-MM-dd}",
+                                "reserved (workflow auto-approved, the write is no longer gated)",
+                                0);
                             _db.VehicleAssignments.Add(new VehicleAssignment
                             {
                                 VehicleId = vehicleResult.VehicleId,
@@ -244,6 +258,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                 break;
         }
 
+        validateStepLog.ToolCallsJson = _toolCalls?.DrainJson();
         _db.AgentStepLogs.Add(validateStepLog);
 
         var isRelational = _db.Database.IsRelational();
@@ -320,6 +335,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                 AgentName = "ProposalSummaryAgent",
                 InputJson = Serialize(summaryInput),
                 OutputJson = Serialize(summary),
+                ToolCallsJson = _toolCalls?.DrainJson(),
                 DurationMs = summarySw.ElapsedMilliseconds,
             });
             MarkStepDone(plan, "summarize");
@@ -373,6 +389,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             AgentName = agentName,
             InputJson = Serialize(input),
             OutputJson = Serialize(result),
+            ToolCallsJson = _toolCalls?.DrainJson(),
             DurationMs = sw.ElapsedMilliseconds,
         });
 

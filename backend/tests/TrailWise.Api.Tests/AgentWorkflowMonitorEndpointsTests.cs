@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.AgentWorkflows;
 using TrailWise.Api.Contracts.Common;
-using TrailWise.Api.Services;
+using TrailWise.Infrastructure.Agents;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;

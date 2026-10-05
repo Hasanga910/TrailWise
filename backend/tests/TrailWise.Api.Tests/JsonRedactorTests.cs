@@ -1,5 +1,5 @@
 using System.Text.Json;
-using TrailWise.Api.Services;
+using TrailWise.Infrastructure.Agents;
 using Xunit;
 
 namespace TrailWise.Api.Tests;

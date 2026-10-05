@@ -10,8 +10,11 @@ public class FleetCapacityAgent : IFleetCapacityAgent
     private readonly TrailWiseDbContext _db;
     private readonly ILogger<FleetCapacityAgent> _logger;
 
-    public FleetCapacityAgent(TrailWiseDbContext db, ILogger<FleetCapacityAgent> logger)
+    private readonly IToolCallRecorder? _recorder;
+
+    public FleetCapacityAgent(TrailWiseDbContext db, ILogger<FleetCapacityAgent> logger, IToolCallRecorder? recorder = null)
     {
+        _recorder = recorder;
         _db = db;
         _logger = logger;
     }
@@ -37,12 +40,16 @@ public class FleetCapacityAgent : IFleetCapacityAgent
             var endDate = booking.EndDate;
 
             // Query booked vehicle assignments that overlap with this booking's date range
-            var conflictingVehicleIds = await _db.VehicleAssignments
-                .AsNoTracking()
-                .Where(a => a.StartDate <= endDate && startDate <= a.EndDate)
-                .Select(a => a.VehicleId)
-                .Distinct()
-                .ToListAsync(ct);
+            var conflictingVehicleIds = await _recorder.TrackAsync(
+                AgentTools.VehicleAvailabilityRead,
+                $"reserved vehicles, {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}",
+                () => _db.VehicleAssignments
+                    .AsNoTracking()
+                    .Where(a => a.StartDate <= endDate && startDate <= a.EndDate)
+                    .Select(a => a.VehicleId)
+                    .Distinct()
+                    .ToListAsync(ct),
+                ids => $"{ids.Count} vehicle(s) already reserved");
 
             // Filter vehicles that:
             // 1. Are available (not under maintenance or retired)
@@ -61,10 +68,14 @@ public class FleetCapacityAgent : IFleetCapacityAgent
             }
 
             // Always select the vehicle with the least unused seating capacity (smallest suitable available vehicle)
-            var selectedVehicle = await query
-                .OrderBy(v => v.Capacity - groupSize)
-                .ThenBy(v => v.Capacity)
-                .FirstOrDefaultAsync(ct);
+            var selectedVehicle = await _recorder.TrackAsync(
+                AgentTools.VehicleAvailabilityRead,
+                $"candidate vehicles, {groupSize} seat(s), AC required: {requiresAc}",
+                () => query
+                    .OrderBy(v => v.Capacity - groupSize)
+                    .ThenBy(v => v.Capacity)
+                    .FirstOrDefaultAsync(ct),
+                v => v is null ? "no suitable vehicle" : $"vehicle {v.Id}, capacity {v.Capacity}, AC {v.HasAC}");
 
             // Fallback: If requiresAc was true but no AC vehicle exists, find the smallest available vehicle meeting capacity
             var acMatch = true;
@@ -91,18 +102,25 @@ public class FleetCapacityAgent : IFleetCapacityAgent
             var seatConfigMatch = selectedVehicle.Capacity >= groupSize;
 
             // Find an available driver not scheduled during the full booking dates
-            var conflictingDriverIds = await _db.VehicleAssignments
-                .AsNoTracking()
-                .Where(a => a.StartDate <= endDate && startDate <= a.EndDate)
-                .Select(a => a.DriverId)
-                .Distinct()
-                .ToListAsync(ct);
+            var availableDriver = await _recorder.TrackAsync(
+                AgentTools.VehicleAvailabilityRead,
+                $"available drivers, {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}",
+                async () =>
+                {
+                    var conflictingDriverIds = await _db.VehicleAssignments
+                        .AsNoTracking()
+                        .Where(a => a.StartDate <= endDate && startDate <= a.EndDate)
+                        .Select(a => a.DriverId)
+                        .Distinct()
+                        .ToListAsync(ct);
 
-            var availableDriver = await _db.Drivers
-                .AsNoTracking()
-                .Where(d => !conflictingDriverIds.Contains(d.Id))
-                .OrderBy(d => d.Name)
-                .FirstOrDefaultAsync(ct);
+                    return await _db.Drivers
+                        .AsNoTracking()
+                        .Where(d => !conflictingDriverIds.Contains(d.Id))
+                        .OrderBy(d => d.Name)
+                        .FirstOrDefaultAsync(ct);
+                },
+                d => d is null ? "no driver available" : $"driver {d.Id} available");
 
             if (availableDriver is null)
             {
@@ -130,4 +148,4 @@ public class FleetCapacityAgent : IFleetCapacityAgent
             return new VehicleMatchResult(Guid.Empty, Guid.Empty, false, false, true);
         }
     }
-}
+}

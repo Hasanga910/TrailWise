@@ -25,6 +25,7 @@ public class ApprovalService : IApprovalService
     private readonly ILogger<ApprovalService> _logger;
     private readonly CancellationOptions _cancellation;
     private readonly IClock _clock;
+    private readonly IToolCallRecorder? _toolCalls;
 
     public ApprovalService(
         TrailWiseDbContext db,
@@ -38,8 +39,10 @@ public class ApprovalService : IApprovalService
         IBookingLifecycleService bookingLifecycleService,
         ILogger<ApprovalService> logger,
         IOptions<CancellationOptions> cancellation,
-        IClock clock)
+        IClock clock,
+        IToolCallRecorder? toolCalls = null)
     {
+        _toolCalls = toolCalls;
         _db = db;
         _scopeFactory = scopeFactory;
         _auditLogService = auditLogService;
@@ -389,6 +392,7 @@ public class ApprovalService : IApprovalService
                     OutputJson = JsonSerializer.Serialize(
                         new { newStatus = booking.Status.ToString() },
                         AgentJsonOptions.Default),
+                    ToolCallsJson = _toolCalls?.DrainJson(),
                     DurationMs = 0,
                 });
             }
@@ -510,6 +514,20 @@ public class ApprovalService : IApprovalService
         return message;
     }
 
+    private Task<bool> CheckVehicleAsync(Guid vehicleId, Booking booking, CancellationToken ct) =>
+        _toolCalls.TrackAsync(
+            AgentTools.VehicleAvailabilityRead,
+            $"vehicle {vehicleId}, {booking.StartDate:yyyy-MM-dd} to {booking.EndDate:yyyy-MM-dd}",
+            () => _fleetReservationService.IsVehicleAvailableAsync(vehicleId, booking.StartDate, booking.EndDate, ct),
+            ok => ok ? "available" : "not available");
+
+    private Task<bool> CheckDriverAsync(Guid driverId, Booking booking, CancellationToken ct) =>
+        _toolCalls.TrackAsync(
+            AgentTools.VehicleAvailabilityRead,
+            $"driver {driverId}, {booking.StartDate:yyyy-MM-dd} to {booking.EndDate:yyyy-MM-dd}",
+            () => _fleetReservationService.IsDriverAvailableAsync(driverId, booking.StartDate, booking.EndDate, ct),
+            ok => ok ? "available" : "not available");
+
     private async Task AssignVehicleAndDriverIfMissingAsync(Booking booking, AgentWorkflowRun? run, CancellationToken ct)
     {
         if (await _db.VehicleAssignments.AnyAsync(a => a.BookingId == booking.Id, ct))
@@ -545,8 +563,8 @@ public class ApprovalService : IApprovalService
         }
 
         // Check if proposed vehicle and driver are still available
-        bool isVehAvail = vehicleId != Guid.Empty && await _fleetReservationService.IsVehicleAvailableAsync(vehicleId, booking.StartDate, booking.EndDate, ct);
-        bool isDrvAvail = driverId != Guid.Empty && await _fleetReservationService.IsDriverAvailableAsync(driverId, booking.StartDate, booking.EndDate, ct);
+        bool isVehAvail = vehicleId != Guid.Empty && await CheckVehicleAsync(vehicleId, booking, ct);
+        bool isDrvAvail = driverId != Guid.Empty && await CheckDriverAsync(driverId, booking, ct);
 
         // If neither was proposed or if either has been taken by an earlier approval, dynamically re-match against the currently available fleet
         if (!isVehAvail || !isDrvAvail)
@@ -562,13 +580,19 @@ public class ApprovalService : IApprovalService
             {
                 vehicleId = rematch.VehicleId;
                 driverId = rematch.DriverId;
-                isVehAvail = await _fleetReservationService.IsVehicleAvailableAsync(vehicleId, booking.StartDate, booking.EndDate, ct);
-                isDrvAvail = await _fleetReservationService.IsDriverAvailableAsync(driverId, booking.StartDate, booking.EndDate, ct);
+                isVehAvail = await CheckVehicleAsync(vehicleId, booking, ct);
+                isDrvAvail = await CheckDriverAsync(driverId, booking, ct);
             }
         }
 
         if (isVehAvail && isDrvAvail)
         {
+            // The vehicle write is gated behind approval (design doc 8.4): this is the approved write.
+            _toolCalls.RecordCall(
+                AgentTools.VehicleAvailabilityWrite,
+                $"reserve vehicle {vehicleId} with driver {driverId}, {booking.StartDate:yyyy-MM-dd} to {booking.EndDate:yyyy-MM-dd}",
+                "reserved after the Operations Manager's approval",
+                0);
             _db.VehicleAssignments.Add(new VehicleAssignment
             {
                 VehicleId = vehicleId,

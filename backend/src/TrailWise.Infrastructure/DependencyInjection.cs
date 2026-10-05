@@ -58,6 +58,7 @@ public static class DependencyInjection
                 sp.GetRequiredService<ILogger<GroqAgentClient>>())
             : new NullLlmClient());
 
+        services.AddScoped<IToolCallRecorder, ToolCallRecorder>();
         services.AddScoped<IPreferenceExtractionAgent, PreferenceExtractionAgent>();
         services.AddScoped<IProposalSummaryAgent, ProposalSummaryAgent>();
         services.AddScoped<IGuideMatchingAgent, GuideMatchingAgent>();
