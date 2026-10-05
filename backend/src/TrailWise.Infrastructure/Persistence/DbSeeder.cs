@@ -32,6 +32,8 @@ public static class DbSeeder
             await db.Database.EnsureCreatedAsync(ct);
         }
 
+        await BackfillApprovalRequestsAsync(db, ct);
+
         var admin = adminOptions.Value;
         if (!string.IsNullOrWhiteSpace(admin.Email) && !string.IsNullOrWhiteSpace(admin.Password))
         {
@@ -281,5 +283,34 @@ public static class DbSeeder
                 });
             await db.SaveChangesAsync(ct);
         }
+    }
+    /// <summary>
+    /// Bookings that were already waiting in PendingApproval before approval requests existed get an
+    /// open request, so they show up in the approvals queue. Idempotent.
+    /// </summary>
+    private static async Task BackfillApprovalRequestsAsync(TrailWiseDbContext db, CancellationToken ct)
+    {
+        var orphans = await db.Bookings
+            .Where(b => b.Status == BookingStatus.PendingApproval
+                && !db.ApprovalRequests.Any(a => a.BookingId == b.Id && a.Status == ApprovalStatus.Pending))
+            .ToListAsync(ct);
+        if (orphans.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var booking in orphans)
+        {
+            db.ApprovalRequests.Add(new ApprovalRequest
+            {
+                BookingId = booking.Id,
+                Type = Agents.BookingApprovalEvaluator.ClassifyApprovalType(booking.GroupSize),
+                Status = ApprovalStatus.Pending,
+                PreviousBookingStatus = BookingStatus.Requested,
+                RequestedAt = booking.UpdatedAt,
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 }

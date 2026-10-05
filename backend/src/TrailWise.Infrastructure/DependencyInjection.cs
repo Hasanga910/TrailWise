@@ -64,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<IFleetReservationService, FleetReservationService>();
         services.AddScoped<IGuideAvailabilityService, GuideAvailabilityService>();
         services.AddScoped<IGuideAssignmentService, GuideAssignmentService>();
+        services.AddScoped<IApprovalService, ApprovalService>();
         services.AddScoped<IItineraryService, ItineraryService>();
         services.AddScoped<IPricingValidationAgent, PricingValidationAgent>();
         services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();

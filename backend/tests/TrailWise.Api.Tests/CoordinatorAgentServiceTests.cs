@@ -267,6 +267,76 @@ public class CoordinatorAgentServiceTests
     }
 
     [Fact]
+    public async Task StartWorkflowAsync_LargeGroup_CreatesALargeGroupApprovalRequestWithReasons()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 11, budgetPerPerson: 500m, basePricePerPerson: 100m);
+
+        await CreateSut(db).StartWorkflowAsync(bookingId);
+
+        var approval = Assert.Single(db.ApprovalRequests, a => a.BookingId == bookingId);
+        Assert.Equal(ApprovalType.LargeGroupOrCustomItinerary, approval.Type);
+        Assert.Equal(ApprovalStatus.Pending, approval.Status);
+        Assert.Equal(BookingStatus.Requested, approval.PreviousBookingStatus);
+        Assert.Contains("large-group threshold", approval.ReasonsJson);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_OverBudget_CreatesABudgetOverrideApprovalRequest()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 100m, basePricePerPerson: 300m);
+
+        await CreateSut(db).StartWorkflowAsync(bookingId);
+
+        var approval = Assert.Single(db.ApprovalRequests, a => a.BookingId == bookingId);
+        Assert.Equal(ApprovalType.BudgetOverride, approval.Type);
+        Assert.Contains("budget ceiling", approval.ReasonsJson);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_LargeGroupOverBudget_IsALargeGroupRequestListingBothReasons()
+    {
+        var db = TestDbContextFactory.Create();
+        // 11 people at a 300 base price against a 100 budget trips both rules.
+        var bookingId = SeedBooking(db, groupSize: 11, budgetPerPerson: 100m, basePricePerPerson: 300m);
+
+        await CreateSut(db).StartWorkflowAsync(bookingId);
+
+        var approval = Assert.Single(db.ApprovalRequests, a => a.BookingId == bookingId);
+        Assert.Equal(ApprovalType.LargeGroupOrCustomItinerary, approval.Type);
+        Assert.Contains("large-group threshold", approval.ReasonsJson);
+        Assert.Contains("budget ceiling", approval.ReasonsJson);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_AutoConfirmedBooking_CreatesNoApprovalRequest()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+
+        await CreateSut(db).StartWorkflowAsync(bookingId);
+
+        Assert.DoesNotContain(db.ApprovalRequests, a => a.BookingId == bookingId);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_RunAgain_SupersedesTheOpenApprovalRequest()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 11, budgetPerPerson: 500m, basePricePerPerson: 100m);
+        var sut = CreateSut(db);
+
+        await sut.StartWorkflowAsync(bookingId);
+        await sut.StartWorkflowAsync(bookingId);
+
+        var requests = db.ApprovalRequests.Where(a => a.BookingId == bookingId).OrderBy(a => a.RequestedAt).ToList();
+        Assert.Equal(2, requests.Count);
+        Assert.Single(requests, a => a.Status == ApprovalStatus.Pending);
+        Assert.Single(requests, a => a.Status == ApprovalStatus.Superseded);
+    }
+
+    [Fact]
     public async Task StartWorkflowAsync_MissingBooking_ReturnsWithoutThrowingOrCreatingRun()
     {
         var db = TestDbContextFactory.Create();

@@ -18,6 +18,7 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.TourStartedAt);
         builder.Property(b => b.TourEndedAt);
         builder.Property(b => b.CancellationReason).HasMaxLength(500);
+        builder.Property(b => b.RevisionNote).HasMaxLength(500);
 
         builder.HasOne(b => b.Traveler)
             .WithMany(u => u.Bookings)

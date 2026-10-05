@@ -26,7 +26,8 @@ public record BookingDto(
     bool HasPendingPayment = false,
     DateTimeOffset? CreatedAt = null,
     DateTimeOffset? TourStartedAt = null,
-    DateTimeOffset? TourEndedAt = null)
+    DateTimeOffset? TourEndedAt = null,
+    string? RevisionNote = null)
 {
     // Duplicated by value in TrailWise.Infrastructure.Agents.BookingApprovalEvaluator.LargeGroupThreshold
     // since Infrastructure cannot reference this (Api) project. Keep both in sync if this ever changes.
@@ -72,6 +73,7 @@ public record BookingDto(
             HasPendingPayment: hasPendingPayment,
             CreatedAt: booking.CreatedAt,
             TourStartedAt: booking.TourStartedAt,
-            TourEndedAt: booking.TourEndedAt);
+            TourEndedAt: booking.TourEndedAt,
+            RevisionNote: booking.RevisionNote);
     }
 }

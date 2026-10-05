@@ -15,6 +15,7 @@ const string CorsPolicyName = "TrailWiseClients";
 const string LoginRateLimiterPolicy = "LoginRateLimiter";
 const string PublicReadRateLimiterPolicy = "PublicReadLimiter";
 
+builder.Services.AddScoped<TrailWise.Api.Services.ApprovalQueueService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

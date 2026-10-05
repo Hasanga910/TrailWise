@@ -80,6 +80,9 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             return;
         }
 
+        // A (re-)run replaces any approval still open from an earlier run.
+        await SupersedeOpenApprovalsAsync(bookingId, ct);
+
         var plan = new AgentWorkflowPlan
         {
             Steps =
@@ -222,6 +225,15 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             case BookingApprovalEvaluator.Decision.NeedsApproval:
                 booking.Status = BookingStatus.PendingApproval;
                 run.Status = WorkflowRunStatus.AwaitingApproval;
+                _db.ApprovalRequests.Add(new ApprovalRequest
+                {
+                    BookingId = bookingId,
+                    Type = BookingApprovalEvaluator.ClassifyApprovalType(booking.GroupSize),
+                    Status = ApprovalStatus.Pending,
+                    PreviousBookingStatus = BookingStatus.Requested,
+                    ReasonsJson = Serialize(decisionResult.Reasons),
+                    RequestedAt = _clock.UtcNow,
+                });
                 // CompletedAt intentionally left null: this run is paused pending a future
                 // (out-of-scope) human-approval step, not finished.
                 break;
@@ -318,6 +330,28 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         {
             _logger.LogWarning(ex, "Proposal summary generation failed for booking {BookingId}; leaving SummaryText null.", bookingId);
         }
+    }
+
+    /// <summary>
+    /// Closes any still-open approval for the booking (a re-run of the workflow replaces it). Done
+    /// and saved up front, before the run mutates anything, so the one-open-request-per-booking
+    /// index can never see the new insert before the old request is closed.
+    /// </summary>
+    private async Task SupersedeOpenApprovalsAsync(Guid bookingId, CancellationToken ct)
+    {
+        var open = await _db.ApprovalRequests
+            .Where(a => a.BookingId == bookingId && a.Status == ApprovalStatus.Pending)
+            .ToListAsync(ct);
+        if (open.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var request in open)
+        {
+            request.Status = ApprovalStatus.Superseded;
+        }
+        await _db.SaveChangesAsync(ct);
     }
 
     private async Task<TResult> RunStepAsync<TResult>(
