@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/apiClient';
 import { getStaff, type StaffMember, type StaffRole } from '../../api/staff';
 import { ArrowRightIcon, BriefcaseIcon, CompassIcon, TruckIcon } from '../../components/admin/icons';
+import { Card, Skeleton } from '../../components/ui';
 
 const CARDS: {
   to: string;
@@ -46,8 +47,8 @@ const CARDS: {
     description: 'Add or remove Driver accounts who operate vehicles and complete tour transfers.',
     role: 'Driver',
     icon: TruckIcon,
-    fromClass: 'from-blue-500',
-    toClass: 'to-blue-700',
+    fromClass: 'from-brand-600',
+    toClass: 'to-brand-800',
   },
 ];
 
@@ -69,18 +70,18 @@ export function UserManagementIndexPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <p className="text-sm text-fg-muted">
+        <p className="text-body text-fg-muted">
           Each staff role has its own page for creating and removing accounts.
         </p>
         {staff && (
-          <p className="text-sm text-fg-muted">
+          <p className="text-body text-fg-muted">
             <span className="font-semibold text-fg">{staff.length}</span> total staff accounts
           </p>
         )}
       </div>
 
       {error && (
-        <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+        <p role="alert" className="mb-4 rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
           {error}
         </p>
       )}
@@ -90,36 +91,28 @@ export function UserManagementIndexPage() {
           const Icon = card.icon;
           const count = countFor(card.role);
           return (
-            <Link
-              key={card.to}
-              to={card.to}
-              className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface-raised p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-            >
-              <div
-                className={`inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${card.fromClass} ${card.toClass} text-white shadow-sm`}
-              >
-                <Icon className="h-6 w-6" />
-              </div>
+            <Link key={card.to} to={card.to} className="group block rounded-card">
+              <Card interactive className="flex h-full flex-col p-6">
+                <div
+                  className={`inline-flex h-12 w-12 items-center justify-center rounded-card bg-gradient-to-br ${card.fromClass} ${card.toClass} text-white shadow-soft`}
+                >
+                  <Icon className="h-6 w-6" />
+                </div>
 
-              <h2 className="mt-4 font-heading text-lg font-bold text-fg">{card.title}</h2>
-              <p className="mt-1.5 flex-1 text-sm text-fg-muted">{card.description}</p>
+                <h2 className="mt-4 font-heading text-h3 text-fg">{card.title}</h2>
+                <p className="mt-1.5 flex-1 text-body text-fg-muted">{card.description}</p>
 
-              <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
-                <span className="text-2xl font-bold text-fg">
-                  {count === null ? (
-                    <span className="inline-block h-7 w-8 animate-pulse rounded bg-neutral-soft align-middle" />
-                  ) : (
-                    count
-                  )}
-                  <span className="ml-1.5 text-xs font-medium uppercase tracking-wide text-fg-muted">
-                    {count === 1 ? 'account' : 'accounts'}
+                <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+                  <span className="font-heading text-h2 text-fg">
+                    {count === null ? <Skeleton className="inline-block h-7 w-8 align-middle" /> : count}
+                    <span className="ml-1.5 text-overline text-fg-muted">{count === 1 ? 'account' : 'accounts'}</span>
                   </span>
-                </span>
-                <span className="inline-flex items-center gap-1 text-sm font-semibold text-brand-text">
-                  Manage
-                  <ArrowRightIcon className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                </span>
-              </div>
+                  <span className="inline-flex items-center gap-1 text-body font-semibold text-brand-text">
+                    Manage
+                    <ArrowRightIcon className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                </div>
+              </Card>
             </Link>
           );
         })}

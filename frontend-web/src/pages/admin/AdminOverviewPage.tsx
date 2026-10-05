@@ -13,6 +13,7 @@ import {
   TagIcon,
   UsersIcon,
 } from '../../components/admin/icons';
+import { Card, Skeleton } from '../../components/ui';
 
 const CARDS = [
   {
@@ -58,13 +59,13 @@ function StatTile({
       ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white'
       : 'bg-gradient-to-br from-accent-400 to-accent-600 text-white';
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg shadow-sm ${badgeClass}`}>
+    <Card interactive>
+      <div className={`inline-flex h-10 w-10 items-center justify-center rounded-input shadow-soft ${badgeClass}`}>
         <Icon className="h-5 w-5" />
       </div>
-      <p className="mt-3 text-2xl font-semibold text-fg">{value}</p>
-      <p className="mt-0.5 text-sm text-fg-muted">{label}</p>
-    </div>
+      <p className="mt-3 font-heading text-h2 text-fg">{value}</p>
+      <p className="mt-0.5 text-body text-fg-muted">{label}</p>
+    </Card>
   );
 }
 
@@ -72,7 +73,7 @@ function BarRow({ label, count, max, colorClass }: { label: string; count: numbe
   const widthPct = max > 0 ? Math.max((count / max) * 100, count > 0 ? 4 : 0) : 0;
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-sm">
+      <div className="mb-1 flex items-center justify-between text-body">
         <span className="font-medium text-fg">{label}</span>
         <span className="font-semibold text-fg">{count}</span>
       </div>
@@ -88,10 +89,10 @@ function BarRow({ label, count, max, colorClass }: { label: string; count: numbe
 
 function BarPanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-5">
-      <h2 className="font-heading text-sm font-bold text-fg">{title}</h2>
+    <Card>
+      <h2 className="font-heading text-h4 text-fg">{title}</h2>
       <div className="mt-4 space-y-3">{children}</div>
-    </div>
+    </Card>
   );
 }
 
@@ -107,15 +108,15 @@ function Meter({
   trackClass: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-5">
+    <Card>
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-sm font-medium text-fg">{label}</span>
-        <span className="text-lg font-semibold text-fg">{Math.round(percent)}%</span>
+        <span className="text-body font-medium text-fg">{label}</span>
+        <span className="font-heading text-h3 text-fg">{Math.round(percent)}%</span>
       </div>
       <div className={`h-2.5 w-full rounded-full ${trackClass}`}>
         <div className={`h-2.5 rounded-full ${fillClass}`} style={{ width: `${percent}%` }} />
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -199,7 +200,7 @@ export function AdminOverviewPage() {
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+        <p role="alert" className="mt-4 rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
           {error}
         </p>
       )}
@@ -207,7 +208,7 @@ export function AdminOverviewPage() {
       {!error && !stats && (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl border border-border bg-surface-raised" />
+            <Skeleton key={i} className="h-24 rounded-card border border-border bg-surface-raised" />
           ))}
         </div>
       )}
@@ -272,25 +273,23 @@ export function AdminOverviewPage() {
       )}
 
       <div className="mt-8">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-muted">Quick links</h2>
+        <h2 className="mb-3 text-overline text-fg-muted">Quick links</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           {CARDS.map((card) => {
             const Icon = card.icon;
             return (
-              <Link
-                key={card.to}
-                to={card.to}
-                className="group rounded-xl border border-border bg-surface-raised p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-500/30 hover:shadow-md"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-soft text-brand-text transition group-hover:bg-brand-700 group-hover:text-white">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="mt-4 font-heading text-lg font-bold text-fg">{card.title}</h3>
-                <p className="mt-1 text-sm text-fg-muted">{card.description}</p>
-                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-text">
-                  Open
-                  <ArrowRightIcon className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                </span>
+              <Link key={card.to} to={card.to} className="group block rounded-card">
+                <Card interactive className="h-full hover:border-brand-500/30">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-input bg-brand-soft text-brand-text transition group-hover:bg-brand-700 group-hover:text-white">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="mt-4 font-heading text-h3 text-fg">{card.title}</h3>
+                  <p className="mt-1 text-body text-fg-muted">{card.description}</p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-body font-semibold text-brand-text">
+                    Open
+                    <ArrowRightIcon className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                </Card>
               </Link>
             );
           })}

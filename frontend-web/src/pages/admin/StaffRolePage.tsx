@@ -7,7 +7,7 @@ import {
   type StaffMember,
   type StaffRole,
 } from '../../api/staff';
-import { Avatar } from '../../components/Avatar';
+import { Avatar, Button, Card, EmptyState, Input, Skeleton } from '../../components/ui';
 import { BriefcaseIcon, CompassIcon, PlusCircleIcon, TruckIcon, UsersIcon } from '../../components/admin/icons';
 
 interface StaffFormState {
@@ -83,108 +83,77 @@ export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel:
     }
   }
 
-  const inputClass =
-    'w-full rounded-lg border border-border px-3 py-2 text-sm text-fg focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-  const labelClass = 'text-xs font-semibold text-fg-muted';
-
   return (
     <div>
-      <div className="mb-6 flex items-center gap-4 rounded-2xl border border-border bg-gradient-to-br from-brand-soft to-surface-raised p-5">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">
+      <Card className="mb-6 flex items-center gap-4 bg-gradient-to-br from-brand-soft to-surface-raised">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-soft">
           <RoleIcon className="h-6 w-6" />
         </div>
         <div>
-          <h2 className="font-heading text-lg font-bold text-fg">{roleLabel} accounts</h2>
-          <p className="text-sm text-fg-muted">
+          <h2 className="font-heading text-h3 text-fg">{roleLabel} accounts</h2>
+          <p className="text-body text-fg-muted">
             {roleStaff === null ? 'Loading roster…' : `${roleStaff.length} active ${roleStaff.length === 1 ? 'account' : 'accounts'}`}
           </p>
         </div>
-      </div>
+      </Card>
 
-      <section className="mb-10 rounded-xl border border-border bg-surface-raised p-6 shadow-sm">
+      <Card className="mb-10 p-6">
         <div className="flex items-center gap-2">
           <PlusCircleIcon className="h-5 w-5 text-brand-text" />
-          <h2 className="font-heading text-lg font-bold text-fg">Add a {roleLabel.toLowerCase()}</h2>
+          <h2 className="font-heading text-h3 text-fg">Add a {roleLabel.toLowerCase()}</h2>
         </div>
         <form onSubmit={handleCreate} className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Input label="Name" required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          <Input label="Email" required type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+          <Input
+            label="Password"
+            required
+            type="password"
+            minLength={8}
+            value={form.password}
+            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+          />
+          <Input
+            label="Contact number"
+            required
+            type="tel"
+            value={form.contactNumber}
+            onChange={(e) => setForm((f) => ({ ...f, contactNumber: e.target.value }))}
+          />
           <div>
-            <label className={labelClass}>Name</label>
-            <input
-              required
-              className={inputClass}
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Email</label>
-            <input
-              required
-              type="email"
-              className={inputClass}
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Password</label>
-            <input
-              required
-              type="password"
-              minLength={8}
-              className={inputClass}
-              value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Contact number</label>
-            <input
-              required
-              type="tel"
-              className={inputClass}
-              value={form.contactNumber}
-              onChange={(e) => setForm((f) => ({ ...f, contactNumber: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Role</label>
-            <p className={`${inputClass} flex items-center gap-2 bg-brand-soft text-brand-fg`}>
+            <p className="mb-1 text-caption font-semibold text-fg">Role</p>
+            <p className="flex items-center gap-2 rounded-input border border-border bg-brand-soft px-3 py-2 text-body text-brand-fg">
               <RoleIcon className="h-4 w-4" /> {roleLabel}
             </p>
           </div>
 
           {createError && (
-            <p role="alert" className="sm:col-span-2 rounded-lg border border-danger/30 bg-danger-soft px-4 py-2 text-sm font-medium text-danger-fg">
+            <p role="alert" className="rounded-input border border-danger/30 bg-danger-soft px-4 py-2 text-body font-medium text-danger-fg sm:col-span-2">
               {createError}
             </p>
           )}
 
           <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={creating}
-              className="rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:opacity-60"
-            >
+            <Button type="submit" disabled={creating}>
               {creating ? 'Creating...' : 'Create account'}
-            </button>
+            </Button>
           </div>
         </form>
-      </section>
+      </Card>
 
       <section>
         <div className="mb-4 flex items-center gap-2">
           <UsersIcon className="h-5 w-5 text-fg-muted" />
-          <h2 className="font-heading text-lg font-bold text-fg">Existing {roleLabel.toLowerCase()}s</h2>
+          <h2 className="font-heading text-h3 text-fg">Existing {roleLabel.toLowerCase()}s</h2>
         </div>
 
         {listError && (
-          <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+          <p role="alert" className="mb-4 rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
             {listError}
           </p>
         )}
         {deleteError && (
-          <p role="alert" className="mb-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm font-medium text-danger-fg">
+          <p role="alert" className="mb-4 rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
             {deleteError}
           </p>
         )}
@@ -192,26 +161,26 @@ export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel:
         {roleStaff === null && !listError && (
           <div className="space-y-2">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-xl border border-border bg-surface-raised" />
+              <Skeleton key={i} className="h-14 rounded-card border border-border bg-surface-raised" />
             ))}
           </div>
         )}
 
         {roleStaff !== null && roleStaff.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border bg-surface-raised px-6 py-16 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand-text">
-              <RoleIcon className="h-6 w-6" />
-            </div>
-            <p className="mt-3 font-medium text-fg-muted">No {roleLabel.toLowerCase()} accounts yet.</p>
-            <p className="mt-1 text-sm text-fg-muted">Use the form above to add the first one.</p>
-          </div>
+          <Card padded={false} className="border-dashed">
+            <EmptyState
+              icon={<RoleIcon className="h-8 w-8" />}
+              title={`No ${roleLabel.toLowerCase()} accounts yet.`}
+              description="Use the form above to add the first one."
+            />
+          </Card>
         )}
 
         {roleStaff && roleStaff.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface-raised shadow-sm">
-            <table className="w-full text-sm">
+          <Card padded={false} className="overflow-x-auto">
+            <table className="w-full text-body">
               <thead>
-                <tr className="border-b border-border bg-surface-sunken text-left text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                <tr className="border-b border-border bg-surface-sunken text-left text-caption font-semibold uppercase tracking-wide text-fg-muted">
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Contact number</th>
@@ -230,19 +199,21 @@ export function StaffRolePage({ role, roleLabel }: { role: StaffRole; roleLabel:
                     <td className="px-4 py-3 text-fg-muted">{member.email}</td>
                     <td className="px-4 py-3 text-fg-muted">{member.contactNumber}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="border-danger/30 text-danger-fg"
                         onClick={() => handleDelete(member)}
                         disabled={deletingId === member.id}
-                        className="rounded-lg border border-danger/30 px-3 py-1.5 text-sm font-semibold text-danger-fg transition hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {deletingId === member.id ? 'Removing...' : 'Delete'}
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </Card>
         )}
       </section>
     </div>
