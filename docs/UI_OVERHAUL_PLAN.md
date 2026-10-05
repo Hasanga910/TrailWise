@@ -151,14 +151,23 @@ Keep the Session 1 design system: teal `brand` + amber `accent`, semantic tokens
 - Tour browsing and the **custom request form**: dates (date picker), group size, budget, theme, language preference, tier (class, with/without food), add-ons from Session 4.
 - **Document upload (ID/passport)** via camera or file picker: backend `BookingDocument` storage (private, size/type validated), viewable by Ops on the booking.
 - **Booking status tracking** with a status timeline, revision notes from Session 3, and the refund-exception request from Session 3.
+- **Traveler revision flow** (doc §8.2 step 7: the Operations Manager may request revision, so the traveler must be able to revise). Session 3 sends a booking back to `PlanProposed` with a `RevisionNote`, but nothing lets the traveler act on it yet.
+  - **Backend:** a traveler endpoint, e.g. `PATCH /api/bookings/{id}/revision`, that edits a `PlanProposed` booking and resubmits it.
+    - Only the booking's own traveler may call it, and only while the status is `PlanProposed`; anything else returns a ProblemDetails 403 or 409.
+    - Editable fields: dates, group size, budget per person, special requests, language preference and package tier. Validation is the same as booking creation (group size > 0, dates in range, valid tier). The special-requests text stays untrusted data for the agents.
+    - On success: save the changes, clear `RevisionNote`, set the status back to `Requested`, write an audit log entry and re-run the coordinator workflow (the same way booking creation starts it). `POST /api/agent-workflows/start` only accepts Requested or NeedsManualReview, which is why the status returns to `Requested`. The new run goes through the usual rules, so it may auto-confirm or create a new approval.
+    - Any open `ApprovalRequest` for the old proposal is closed as superseded in the same transaction.
+    - The booking DTO changes are additive, so the existing Flutter fields keep working.
+    - Tests: owner only, wrong status, validation errors, audit entry, workflow re-run and the status afterwards, superseded approval.
+  - **Flutter:** on the booking detail screen, a `PlanProposed` booking shows the Operations Manager's revision note and an "Edit and resubmit" action. The form reuses the request-form widgets, prefilled with the current values. It has loading, error (offline) and success states, then returns to status tracking. Widget test for the revision form.
 - **Itinerary viewer** (with the Session 5 route and weather), payment status screen, review submission.
 - Loading, empty ("no tours booked") and offline error states on every screen.
 - ADR: Provider vs Riverpod (doc §12); keep the current choice unless there is a reason to change.
 
-**Definition of done:** a traveler can request a tour, upload an ID, track status through confirmation, view the itinerary, see payment status and leave a review in the app; widget tests for the request form and itinerary viewer (doc §11).
+**Definition of done:** a traveler can request a tour, upload an ID, track status through confirmation, view the itinerary, see payment status and leave a review in the app; a booking sent back with Request revision can be edited and resubmitted by the traveler and goes through the workflow again; widget tests for the request form and itinerary viewer (doc §11).
 
 **Kickoff prompt:**
-> Read `docs/UI_OVERHAUL_PLAN.md` (sections 1–3 and Session 6) and the design document section 7. Stay strictly within the design document. Plan Session 6: Flutter theme and widgets, tour browsing and custom request form, ID/passport document upload (with backend storage), booking status tracking, itinerary viewer, payment status, review submission, responsive states, and the Flutter state-management ADR. Do not run git commit: stage each step and give me a commit message. Wait for my approval before coding.
+> Read `docs/UI_OVERHAUL_PLAN.md` (sections 1–3 and Session 6) and the design document section 7. Stay strictly within the design document. Plan Session 6: Flutter theme and widgets, tour browsing and custom request form, ID/passport document upload (with backend storage), booking status tracking, the traveler revision flow (backend edit-and-resubmit endpoint that re-runs the coordinator workflow, plus the Flutter revision screen), itinerary viewer, payment status, review submission, responsive states, and the Flutter state-management ADR. Do not run git commit: stage each step and give me a commit message. Wait for my approval before coding.
 
 ---
 
