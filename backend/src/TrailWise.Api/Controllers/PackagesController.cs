@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using TrailWise.Api.Contracts.Packages;
 using TrailWise.Domain.Entities;
+using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
 using TrailWise.Infrastructure.Services;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 
 namespace TrailWise.Api.Controllers;
 
@@ -31,19 +33,22 @@ public class PackagesController : ControllerBase
     private readonly IPackageLocationResolver _locationResolver;
     private readonly GeocodingOptions _geocoding;
     private readonly ILogger<PackagesController> _logger;
+    private readonly IAuditLogService _audit;
 
     public PackagesController(
         TrailWiseDbContext db,
         IWebHostEnvironment env,
         IPackageLocationResolver locationResolver,
         IOptions<GeocodingOptions> geocoding,
-        ILogger<PackagesController> logger)
+        ILogger<PackagesController> logger,
+        IAuditLogService audit)
     {
         _db = db;
         _env = env;
         _locationResolver = locationResolver;
         _geocoding = geocoding.Value;
         _logger = logger;
+        _audit = audit;
     }
 
     /// <summary>
@@ -516,21 +521,118 @@ public class PackagesController : ControllerBase
             return NotFound();
         }
 
+        if (package.PackageTiers.Any(t => t.ClassType == request.ClassType && t.IncludesFood == request.IncludesFood))
+        {
+            return DuplicateTierProblem(request.ClassType, request.IncludesFood);
+        }
+
         // package is already tracked (loaded above), so a new child appended only via its
         // navigation collection can be misdetected as Modified rather than Added, because
         // BaseEntity pre-populates Id with a non-default Guid. Adding it to the DbSet directly
         // guarantees EF marks it Added.
-        _db.PackageTiers.Add(new PackageTier
+        var tier = new PackageTier
         {
             TourPackageId = package.Id,
             ClassType = request.ClassType,
             IncludesFood = request.IncludesFood,
             BasePricePerPerson = request.BasePricePerPerson,
             RequiresAC = request.RequiresAC
-        });
+        };
+        _db.PackageTiers.Add(tier);
 
         await _db.SaveChangesAsync(ct);
+        await AuditTierAsync(tier, "PackageTierAdded", ct);
 
         return Ok(TourPackageDto.FromEntity(package));
+    }
+
+    [HttpPut("{id:guid}/tiers/{tierId:guid}")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<TourPackageDto>> UpdateTier(
+        Guid id, Guid tierId, CreatePackageTierRequest request, CancellationToken ct)
+    {
+        var package = await _db.TourPackages
+            .Include(p => p.PackageTiers)
+            .Include(p => p.Locations)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
+        var tier = package?.PackageTiers.FirstOrDefault(t => t.Id == tierId);
+        if (package is null || tier is null)
+        {
+            return NotFound();
+        }
+
+        if (package.PackageTiers.Any(t => t.Id != tierId && t.ClassType == request.ClassType && t.IncludesFood == request.IncludesFood))
+        {
+            return DuplicateTierProblem(request.ClassType, request.IncludesFood);
+        }
+
+        tier.ClassType = request.ClassType;
+        tier.IncludesFood = request.IncludesFood;
+        tier.BasePricePerPerson = request.BasePricePerPerson;
+        tier.RequiresAC = request.RequiresAC;
+
+        await _db.SaveChangesAsync(ct);
+        await AuditTierAsync(tier, "PackageTierUpdated", ct);
+
+        return Ok(TourPackageDto.FromEntity(package));
+    }
+
+    [HttpDelete("{id:guid}/tiers/{tierId:guid}")]
+    [Authorize(Roles = ManagerRoles)]
+    public async Task<ActionResult<TourPackageDto>> DeleteTier(Guid id, Guid tierId, CancellationToken ct)
+    {
+        var package = await _db.TourPackages
+            .Include(p => p.PackageTiers)
+            .Include(p => p.Locations)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
+        var tier = package?.PackageTiers.FirstOrDefault(t => t.Id == tierId);
+        if (package is null || tier is null)
+        {
+            return NotFound();
+        }
+
+        if (package.PackageTiers.Count == 1)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "A package needs at least one tier, so its last tier cannot be deleted.");
+        }
+
+        if (await _db.Bookings.AnyAsync(b => b.PackageTierId == tierId, ct))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "This tier has existing bookings and cannot be deleted.");
+        }
+
+        _db.PackageTiers.Remove(tier);
+        await _db.SaveChangesAsync(ct);
+        await AuditTierAsync(tier, "PackageTierDeleted", ct);
+
+        return Ok(TourPackageDto.FromEntity(package));
+    }
+
+    private ObjectResult DuplicateTierProblem(ClassType classType, bool includesFood) =>
+        Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            title: $"This package already has a {classType} tier {(includesFood ? "with" : "without")} food.");
+
+    private Task AuditTierAsync(PackageTier tier, string action, CancellationToken ct)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return _audit.LogAsync(
+            entityType: "PackageTier",
+            entityId: tier.Id,
+            action: action,
+            performedBy: Guid.TryParse(userId, out var id) ? id : null,
+            details: new
+            {
+                tourPackageId = tier.TourPackageId,
+                classType = tier.ClassType.ToString(),
+                tier.IncludesFood,
+                tier.BasePricePerPerson,
+                tier.RequiresAC
+            },
+            ct: ct);
     }
 }
