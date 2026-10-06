@@ -1,5 +1,6 @@
 import { Compass, ShieldCheck, Star } from 'lucide-react';
 import sigiriya from '../assets/hero/sigiriya-rock-fortress-1024.webp';
+import { Link } from 'react-router-dom';
 import { Logo } from './Logo';
 
 const BENEFITS = [
@@ -22,7 +23,13 @@ export function AuthBrandPanel({ tagline }: { tagline: string }) {
       <div className="absolute inset-0 bg-gradient-to-t from-brand-950 via-brand-950/60 to-brand-950/30" />
 
       <div className="relative z-10">
-        <Logo onDark className="h-8 w-auto" />
+        <Link
+          to="/"
+          aria-label="TrailWise home"
+          className="inline-block cursor-pointer rounded-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-950"
+        >
+          <Logo onDark className="h-8 w-auto" />
+        </Link>
       </div>
 
       <div className="relative z-10 max-w-md">
