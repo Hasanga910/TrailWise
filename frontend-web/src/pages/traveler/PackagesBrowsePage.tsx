@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL, extractErrorMessage } from '../../api/apiClient';
+import { extractErrorMessage } from '../../api/apiClient';
 import { getPackages, type TourPackage } from '../../api/packages';
+import { PackagePhoto } from '../../components/explorer/packagePhoto';
 import { Badge, Button, Card, EmptyState, PageHeader, Skeleton } from '../../components/ui';
 
 export function PackagesBrowsePage() {
@@ -48,21 +49,15 @@ export function PackagesBrowsePage() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {packages.map((pkg) => (
             <Card key={pkg.id} padded={false} interactive className="flex flex-col overflow-hidden">
-              <div className="h-36 bg-neutral-soft">
-                {pkg.photoUrl ? (
-                  <img src={`${API_BASE_URL}${pkg.photoUrl}`} alt={pkg.name} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-body text-fg-muted">No photo yet</div>
-                )}
+              <div className="relative aspect-[4/3] overflow-hidden">
+                <PackagePhoto pkg={pkg} className="h-full w-full" />
+                <Badge tone="brand" className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] shadow-soft" title={pkg.theme}>
+                  <span className="min-w-0 truncate">{pkg.theme}</span>
+                </Badge>
               </div>
 
               <div className="flex flex-1 flex-col p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-heading text-h3 text-fg">{pkg.name}</h3>
-                  <Badge tone="warning" className="whitespace-nowrap">
-                    {pkg.theme}
-                  </Badge>
-                </div>
+                <h3 className="break-words font-heading text-h3 text-fg">{pkg.name}</h3>
 
                 <p className="mt-1 text-body text-fg-muted">
                   {pkg.durationDays} {pkg.durationDays === 1 ? 'day' : 'days'} · up to {pkg.maxGroupSize} travelers
