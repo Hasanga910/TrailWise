@@ -84,18 +84,6 @@ export function OpsBookingsPage() {
     setBookings((prev) => prev?.map((b) => (b.id === bookingId ? { ...b, status } : b)) ?? prev);
   }
 
-  async function handleApprove(bookingId: string) {
-    setActioningId(bookingId);
-    try {
-      const updated = await decideBooking(bookingId, { decision: 'Approve' });
-      patchStatus(bookingId, updated.status);
-    } catch (err) {
-      notify.error(extractErrorMessage(err, 'Could not approve this booking.'));
-    } finally {
-      setActioningId(null);
-    }
-  }
-
   async function handleComplete(bookingId: string) {
     setActioningId(bookingId);
     try {
@@ -170,9 +158,6 @@ export function OpsBookingsPage() {
             <tbody className="divide-y divide-border">
               {bookings.map((booking) => {
                 const isActioning = actioningId === booking.id;
-                const canApprove =
-                  booking.status === 'PendingApproval' ||
-                  booking.status === 'PlanProposed';
                 const canReject =
                   booking.status === 'PendingApproval' ||
                   booking.status === 'NeedsManualReview' ||
@@ -195,11 +180,6 @@ export function OpsBookingsPage() {
                       <td className="px-4 py-3 text-fg-muted">{booking.groupSize}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                          {canApprove && (
-                            <Button size="sm" disabled={isActioning} onClick={() => handleApprove(booking.id)}>
-                              Approve
-                            </Button>
-                          )}
                           {canReject && (
                             <Button
                               size="sm"

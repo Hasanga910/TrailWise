@@ -24,7 +24,7 @@ describe('FleetManager', () => {
     );
 
     expect(screen.getByRole('heading', { name: /fleet & transport workspace/i })).toBeInTheDocument();
-    expect(await screen.findByText(/no bookings in this state/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no bookings require manual review/i)).toBeInTheDocument();
     expect(screen.getByText(/no booking selected/i)).toBeInTheDocument();
   });
 });

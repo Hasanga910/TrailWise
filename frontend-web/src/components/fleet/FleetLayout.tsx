@@ -4,7 +4,6 @@ import {
   IdCardIcon,
   ProfileIcon,
   TruckIcon,
-  UsersIcon,
 } from '../admin/icons';
 import { AppShell, type SidebarNavItem } from '../layout/AppShell';
 
@@ -13,7 +12,6 @@ const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/fleet/vehicles', label: 'Vehicles', icon: TruckIcon },
   { to: '/fleet/drivers', label: 'Drivers', icon: IdCardIcon },
   { to: '/fleet/assignments', label: 'Vehicle Assignments', icon: CalendarIcon },
-  { to: '/fleet/guide-assignments', label: 'Guide Assignments', icon: UsersIcon },
   { to: '/fleet/profile', label: 'Profile', icon: ProfileIcon },
 ];
 
@@ -23,11 +21,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/fleet/vehicles': 'Vehicle Management & Fleet Roster',
   '/fleet/drivers': 'Driver Roster & Management',
   '/fleet/assignments': 'Vehicle Assignments & Schedules',
-  '/fleet/guide-assignments': 'Tour Guide Fallback Assignment',
   '/fleet/profile': 'Profile Settings',
 };
 
 export function FleetLayout() {
-  return <AppShell navItems={NAV_ITEMS} pageTitles={PAGE_TITLES} portalLabel="Fleet Portal" />;
+  return <AppShell navItems={NAV_ITEMS} pageTitles={PAGE_TITLES} portalLabel="Fleet Portal" contentClassName="max-w-[1500px]" />;
 }
 

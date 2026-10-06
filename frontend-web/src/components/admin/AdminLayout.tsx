@@ -30,7 +30,6 @@ const NAV_ITEMS: SidebarNavItem[] = [
       { to: '/admin/staff/tour-guides', label: 'Tour Guides' },
       { to: '/admin/staff/operations-managers', label: 'Operations Managers' },
       { to: '/admin/staff/fleet-coordinators', label: 'Fleet Coordinators' },
-      { to: '/admin/staff/drivers', label: 'Drivers' },
     ],
   },
   { to: '/admin/profile', label: 'Profile', icon: ProfileIcon },
@@ -46,7 +45,6 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/staff/tour-guides': 'Tour Guides',
   '/admin/staff/operations-managers': 'Operations Managers',
   '/admin/staff/fleet-coordinators': 'Fleet Coordinators',
-  '/admin/staff/drivers': 'Drivers',
   '/admin/profile': 'Profile Settings',
 };
 

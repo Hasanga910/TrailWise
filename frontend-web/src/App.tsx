@@ -49,7 +49,6 @@ const FleetProfileSettingsPage = lazyNamed(() => import('./pages/fleet/FleetProf
 const FleetDriversPage = lazyNamed(() => import('./pages/fleet/FleetDriversPage'), 'FleetDriversPage');
 const FleetVehiclesPage = lazyNamed(() => import('./pages/fleet/FleetVehiclesPage'), 'FleetVehiclesPage');
 const FleetAssignmentsPage = lazyNamed(() => import('./pages/fleet/FleetAssignmentsPage'), 'FleetAssignmentsPage');
-const FleetGuideAssignmentsPage = lazyNamed(() => import('./pages/fleet/FleetGuideAssignmentsPage'), 'FleetGuideAssignmentsPage');
 const TravelerDashboardPage = lazyNamed(() => import('./pages/traveler/TravelerDashboardPage'), 'TravelerDashboardPage');
 const TravelerProfileSettingsPage = lazyNamed(() => import('./pages/traveler/TravelerProfileSettingsPage'), 'TravelerProfileSettingsPage');
 const GuideAvailabilityPage = lazyNamed(() => import('./pages/guides/GuideAvailabilityPage'), 'GuideAvailabilityPage');
@@ -175,7 +174,6 @@ function App() {
         <Route path="vehicles" element={<FleetVehiclesPage />} />
         <Route path="drivers" element={<FleetDriversPage />} />
         <Route path="assignments" element={<FleetAssignmentsPage />} />
-        <Route path="guide-assignments" element={<FleetGuideAssignmentsPage />} />
         <Route path="profile" element={<FleetProfileSettingsPage />} />
       </Route>
 
@@ -202,10 +200,6 @@ function App() {
         <Route
           path="staff/fleet-coordinators"
           element={<StaffRolePage role="FleetCoordinator" roleLabel="Fleet Coordinator" />}
-        />
-        <Route
-          path="staff/drivers"
-          element={<StaffRolePage role="Driver" roleLabel="Driver" />}
         />
         <Route path="profile" element={<AdminProfileSettingsPage />} />
       </Route>

@@ -82,13 +82,13 @@ describe('Admin pages', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('lists the staff role cards with account counts, and no Admin card', async () => {
+  it('lists the staff role cards with account counts, and no Admin card or Drivers card', async () => {
     renderPage(<UserManagementIndexPage />);
 
     expect(await screen.findByRole('heading', { name: 'Tour Guides' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Operations Managers' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Fleet Coordinators' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Drivers' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Drivers' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /^admins?$/i })).not.toBeInTheDocument();
   });
 

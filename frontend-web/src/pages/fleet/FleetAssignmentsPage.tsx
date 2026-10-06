@@ -3,12 +3,14 @@ import { extractErrorMessage } from '../../api/apiClient';
 import { getVehicleAssignments, type VehicleAssignmentDetailDto } from '../../api/vehicles';
 import { CalendarIcon, TruckIcon } from '../../components/admin/icons';
 import { VehicleTypeBadge } from '../../components/fleet/fleetBadges';
+import { ReassignResourcesModal } from '../../components/fleet/ReassignResourcesModal';
 import { Badge, Button, Card, EmptyState, Input, PageHeader, Select, Skeleton, cn } from '../../components/ui';
 
 export function FleetAssignmentsPage() {
   const [assignments, setAssignments] = useState<VehicleAssignmentDetailDto[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reassigningItem, setReassigningItem] = useState<VehicleAssignmentDetailDto | null>(null);
 
   // Filters
   const [filterType, setFilterType] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
@@ -152,14 +154,15 @@ export function FleetAssignmentsPage() {
           </div>
         ) : filteredAssignments && filteredAssignments.length > 0 ? (
           <div className="w-full overflow-x-auto">
-            <table className="w-full text-left text-body text-fg-muted">
+            <table className="w-full min-w-[1100px] text-left text-body text-fg-muted">
               <thead className="border-b border-border bg-surface-sunken text-caption font-semibold uppercase tracking-wider text-fg-muted">
                 <tr>
-                  <th className="px-5 py-4">Vehicle Details</th>
-                  <th className="px-5 py-4">Assigned Driver</th>
-                  <th className="px-5 py-4">Booking & Traveler</th>
-                  <th className="px-5 py-4">Service Period</th>
-                  <th className="px-5 py-4">Assignment Status</th>
+                  <th scope="col" className="w-[24%] min-w-[220px] px-6 py-4">Vehicle Details</th>
+                  <th scope="col" className="w-[18%] min-w-[170px] px-6 py-4">Assigned Driver</th>
+                  <th scope="col" className="w-[20%] min-w-[180px] px-6 py-4">Booking &amp; Traveler</th>
+                  <th scope="col" className="w-[18%] min-w-[170px] px-6 py-4">Service Period</th>
+                  <th scope="col" className="w-[12%] min-w-[140px] px-6 py-4">Assignment Status</th>
+                  <th scope="col" className="w-[8%] min-w-[120px] px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -167,16 +170,17 @@ export function FleetAssignmentsPage() {
                   const isCancelled = item.bookingStatus === 'Cancelled';
                   const isPast = item.endDate < todayStr;
                   const isCurrent = !isCancelled && item.startDate <= todayStr && item.endDate >= todayStr;
+                  const canReassign = !isCancelled && !isPast && item.bookingStatus === 'Confirmed';
 
                   return (
                     <tr
                       key={item.id}
                       className={cn('transition-colors', isCancelled ? 'bg-danger-soft/30 text-fg-muted' : 'hover:bg-surface-sunken/50')}
                     >
-                      <td className="whitespace-nowrap px-5 py-4 font-medium">
+                      <td className="px-6 py-4 font-medium">
                         <div className="flex items-center gap-2">
                           {item.vehicleType && <VehicleTypeBadge type={item.vehicleType} />}
-                          <span className={cn('font-semibold', isCancelled ? 'text-fg-muted line-through' : 'text-fg')}>
+                          <span className={cn('font-semibold truncate max-w-[180px]', isCancelled ? 'text-fg-muted line-through' : 'text-fg')} title={item.vehicleName}>
                             {item.vehicleName}
                           </span>
                         </div>
@@ -192,17 +196,25 @@ export function FleetAssignmentsPage() {
                         </div>
                       </td>
 
-                      <td className="whitespace-nowrap px-5 py-4">
-                        <div className={cn('font-semibold', isCancelled ? 'text-fg-muted' : 'text-fg')}>{item.driverName}</div>
-                        <div className="text-caption text-fg-muted">{item.driverContact || 'No contact provided'}</div>
+                      <td className="px-6 py-4">
+                        <div className={cn('font-semibold truncate max-w-[160px]', isCancelled ? 'text-fg-muted' : 'text-fg')} title={item.driverName}>
+                          {item.driverName}
+                        </div>
+                        <div className="text-caption text-fg-muted truncate max-w-[160px]" title={item.driverContact || undefined}>
+                          {item.driverContact || 'No contact provided'}
+                        </div>
                       </td>
 
-                      <td className="whitespace-nowrap px-5 py-4">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <Badge tone="brand" title={item.bookingId} className="font-mono">
                             {item.bookingId.length > 8 ? `${item.bookingId.slice(0, 8)}...` : item.bookingId}
                           </Badge>
-                          {item.travelerName && <span className="text-caption font-medium text-fg">({item.travelerName})</span>}
+                          {item.travelerName && (
+                            <span className="text-caption font-medium text-fg truncate max-w-[130px]" title={item.travelerName}>
+                              ({item.travelerName})
+                            </span>
+                          )}
                         </div>
                         {item.bookingStatus && (
                           <div className="mt-1 text-caption text-fg-muted">
@@ -211,17 +223,17 @@ export function FleetAssignmentsPage() {
                         )}
                       </td>
 
-                      <td className="whitespace-nowrap px-5 py-4 text-caption">
+                      <td className="whitespace-nowrap px-6 py-4 text-caption">
                         <span className={cn('font-medium', isCancelled ? 'text-fg-muted' : 'text-fg')}>{item.startDate}</span>
                         <span className="mx-1.5 text-fg-muted">to</span>
                         <span className={cn('font-medium', isCancelled ? 'text-fg-muted' : 'text-fg')}>{item.endDate}</span>
                       </td>
 
-                      <td className="whitespace-nowrap px-5 py-4">
+                      <td className="whitespace-nowrap px-6 py-4">
                         {isCancelled ? (
                           <Badge tone="danger" className="gap-1.5">
                             <span className="h-1.5 w-1.5 rounded-full bg-danger" aria-hidden />
-                            Cancelled (Released)
+                            Cancelled
                           </Badge>
                         ) : isCurrent ? (
                           <Badge tone="success" className="gap-1.5">
@@ -235,6 +247,21 @@ export function FleetAssignmentsPage() {
                             <span className="h-1.5 w-1.5 rounded-full bg-info" aria-hidden />
                             Scheduled
                           </Badge>
+                        )}
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4 text-right">
+                        {canReassign ? (
+                          <button
+                            type="button"
+                            onClick={() => setReassigningItem(item)}
+                            className="inline-flex items-center gap-1 rounded-input border border-warning/50 bg-warning-soft px-3 py-1.5 text-caption font-semibold text-warning-fg hover:bg-warning-soft/80 shadow-xs transition"
+                          >
+                            <span>🔄</span>
+                            <span>Reassign</span>
+                          </button>
+                        ) : (
+                          <span className="text-caption text-fg-muted">-</span>
                         )}
                       </td>
                     </tr>
@@ -251,6 +278,17 @@ export function FleetAssignmentsPage() {
           />
         )}
       </Card>
+
+      {reassigningItem && (
+        <ReassignResourcesModal
+          assignment={reassigningItem}
+          onClose={() => setReassigningItem(null)}
+          onSuccess={() => {
+            setReassigningItem(null);
+            loadAssignments();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -85,7 +85,7 @@ describe('OpsBookingsPage', () => {
     expect(await screen.findByText(/could not load bookings/i)).toBeInTheDocument();
   });
 
-  it('shows Approve only for PendingApproval, Reject for PendingApproval or NeedsManualReview, and not Confirmed', async () => {
+  it('shows Reject for PendingApproval or NeedsManualReview, Mark Completed for Confirmed, and no Approve button', async () => {
     vi.spyOn(bookingsApi, 'getAllBookings').mockResolvedValue([
       sampleBooking({ id: 'pending-1', status: 'PendingApproval' }),
       sampleBooking({ id: 'confirmed-1', status: 'Confirmed' }),
@@ -94,7 +94,7 @@ describe('OpsBookingsPage', () => {
     renderPage();
 
     await screen.findByText('Pending Approval');
-    expect(screen.getAllByRole('button', { name: /^approve$/i })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^approve$/i })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^reject$/i })).toHaveLength(1);
     expect(screen.getByRole('button', { name: /mark completed/i })).toBeInTheDocument();
   });
@@ -112,23 +112,6 @@ describe('OpsBookingsPage', () => {
     expect(screen.getByRole('button', { name: /^cancel$/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /assign tour guide/i })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /view agent workflow/i })).toBeInTheDocument();
-  });
-
-  it('approves a pending booking and updates its status in place', async () => {
-    vi.spyOn(bookingsApi, 'getAllBookings').mockResolvedValue([
-      sampleBooking({ status: 'PendingApproval' }),
-    ]);
-    const decideSpy = vi
-      .spyOn(bookingsApi, 'decideBooking')
-      .mockResolvedValue(sampleBookingDto({ status: 'Confirmed' }));
-
-    renderPage();
-    await screen.findByText('Pending Approval');
-
-    await userEvent.click(screen.getByRole('button', { name: /^approve$/i }));
-
-    await waitFor(() => expect(screen.getByText('Confirmed')).toBeInTheDocument());
-    expect(decideSpy).toHaveBeenCalledWith('booking-1', { decision: 'Approve' });
   });
 
   it('rejects a booking with notes via the confirm dialog', async () => {
