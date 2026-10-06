@@ -9,7 +9,7 @@ import { locationSummary, startingPrice, tierClasses } from './packageSummary';
 import { StarRating } from './StarRating';
 
 /** Grid card for the public explorer and the home carousel. The whole card is one link. */
-export function PackageCard({ pkg, linkSearch = '' }: { pkg: TourPackage; linkSearch?: string }) {
+export function PackageCard({ pkg, linkSearch = '', to }: { pkg: TourPackage; linkSearch?: string; to?: string }) {
   const { shown, more, full } = locationSummary(pkg);
   return (
     <Card interactive padded={false} className="group relative flex h-full flex-col overflow-hidden">
@@ -23,7 +23,7 @@ export function PackageCard({ pkg, linkSearch = '' }: { pkg: TourPackage; linkSe
         <div>
           <h3 className="font-heading text-h4 text-fg">
             <Link
-              to={`/explore/${pkg.id}${linkSearch}`}
+              to={to ?? `/explore/${pkg.id}${linkSearch}`}
               className="after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:rounded-card focus-visible:after:ring-2 focus-visible:after:ring-ring"
             >
               {pkg.name}

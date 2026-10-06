@@ -82,9 +82,10 @@ describe('traveler pages', () => {
 
     expect(screen.getByText('Tara Traveler')).toBeInTheDocument();
     expect(await screen.findByText(/haven't made any booking requests yet/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /browse packages/i })).toHaveAttribute('href', '/traveler/packages');
-    expect(screen.getByRole('link', { name: /my bookings/i })).toHaveAttribute('href', '/traveler/bookings');
-    expect(screen.getByRole('link', { name: /profile/i })).toHaveAttribute('href', '/traveler/profile');
+    const quickLinks = within(screen.getByRole('navigation', { name: /quick links/i }));
+    expect(quickLinks.getByRole('link', { name: /browse packages/i })).toHaveAttribute('href', '/traveler/packages');
+    expect(quickLinks.getByRole('link', { name: /my bookings/i })).toHaveAttribute('href', '/traveler/bookings');
+    expect(quickLinks.getByRole('link', { name: /profile/i })).toHaveAttribute('href', '/traveler/profile');
   });
 
   it('counts existing booking requests on the dashboard', async () => {
