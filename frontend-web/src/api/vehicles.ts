@@ -80,6 +80,7 @@ export interface VehicleAssignmentDetailDto {
   capacity?: number;
   hasAC?: boolean;
   registrationNumber?: string;
+  guideId?: string;
   bookingStatus?: string;
   travelerName?: string;
   travelerContact?: string;

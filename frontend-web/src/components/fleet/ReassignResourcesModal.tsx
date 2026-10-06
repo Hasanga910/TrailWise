@@ -11,7 +11,7 @@ import {
   type VehicleDto,
 } from '../../api/vehicles';
 import { AlertCircle } from 'lucide-react';
-import { Badge, Button, Input, Modal, Select, cn } from '../ui';
+import { Button, Input, Modal, Select } from '../ui';
 import { notify } from '../ui/notify';
 import { extractErrorMessage } from '../../api/apiClient';
 
@@ -259,7 +259,7 @@ export function ReassignResourcesModal({ assignment, onClose, onSuccess }: Reass
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3">
-                <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+                <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={!canProceed}>
@@ -312,7 +312,7 @@ export function ReassignResourcesModal({ assignment, onClose, onSuccess }: Reass
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowConfirmPrompt(false)} disabled={submitting}>
+              <Button variant="secondary" onClick={() => setShowConfirmPrompt(false)} disabled={submitting}>
                 Go Back
               </Button>
               <Button onClick={handleConfirmReassign} disabled={submitting}>
