@@ -40,8 +40,11 @@ const ROLE_LABELS: Record<string, string> = {
   TourGuide: 'Tour Guide',
   OperationsManager: 'Operations Manager',
   FleetCoordinator: 'Fleet Coordinator',
-  Admin: 'Admin',
+  Driver: 'Driver',
 };
+
+// "Staff" excludes Admin accounts.
+const STAFF_ROLES = Object.keys(ROLE_LABELS);
 
 function StatTile({
   icon: Icon,
@@ -140,7 +143,8 @@ export function AdminOverviewPage() {
 
     const allTiers = packages.flatMap((p) => p.tiers);
     const totalPackages = packages.length;
-    const totalStaff = staff.length;
+    const staffOnly = staff.filter((member) => STAFF_ROLES.includes(member.role));
+    const totalStaff = staffOnly.length;
     const avgPrice = totalPackages
       ? packages.reduce((sum, p) => sum + p.basePricePerPerson, 0) / totalPackages
       : 0;
@@ -148,9 +152,9 @@ export function AdminOverviewPage() {
       ? Math.round(packages.reduce((sum, p) => sum + p.maxGroupSize, 0) / totalPackages)
       : 0;
 
-    const roleCounts: Record<string, number> = { TourGuide: 0, OperationsManager: 0, FleetCoordinator: 0, Admin: 0 };
-    for (const member of staff) {
-      roleCounts[member.role] = (roleCounts[member.role] ?? 0) + 1;
+    const roleCounts: Record<string, number> = Object.fromEntries(STAFF_ROLES.map((role) => [role, 0]));
+    for (const member of staffOnly) {
+      roleCounts[member.role] += 1;
     }
     const staffByRole = Object.entries(roleCounts)
       .map(([role, count]) => ({ label: ROLE_LABELS[role] ?? role, count }))

@@ -19,7 +19,7 @@ export function AuthShell({ tagline, title, subtitle, children, footer }: AuthSh
 
       <main className="flex min-w-0 items-center justify-center bg-surface-raised px-6 py-12">
         <div className="w-full min-w-0 max-w-sm">
-          <Link to="/" aria-label="TrailWise home" className="mb-6 inline-block lg:hidden">
+          <Link to="/" aria-label="TrailWise home" className="mb-6 inline-block cursor-pointer rounded-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised lg:hidden">
             <Logo className="h-8 w-auto" />
           </Link>
           <h1 className="font-heading text-h1 text-fg">{title}</h1>

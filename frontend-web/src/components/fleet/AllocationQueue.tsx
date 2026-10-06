@@ -1,6 +1,6 @@
 import type { BookingDto } from '../../api/bookings';
 import { BookingsIcon } from '../admin/icons';
-import { Card, EmptyState, Skeleton, Tabs, cn } from '../ui';
+import { Card, EmptyState, Skeleton, cn } from '../ui';
 import { BookingStatusBadge } from './fleetBadges';
 
 export type QueueTab = 'NeedsManualReview';
@@ -23,12 +23,12 @@ export function AllocationQueue({ bookings, loading, selectedId, onSelect }: All
           <BookingsIcon className="h-5 w-5 text-brand-text" />
           <h2 className="font-heading text-h4 text-fg">Allocation Queue</h2>
         </div>
-        <span className="rounded-full bg-rose-500/10 px-2.5 py-0.5 text-caption font-bold text-rose-600 dark:text-rose-400">
+        <span className="rounded-full bg-danger-soft px-2.5 py-0.5 text-caption font-bold text-danger-fg">
           {needsReviewBookings.length} Needs Review
         </span>
       </div>
 
-      <div className="rounded-card border border-rose-500/20 bg-rose-500/5 p-2.5 text-caption text-rose-700 dark:text-rose-300">
+      <div className="rounded-card border border-danger/30 bg-danger-soft p-2.5 text-caption text-danger-fg">
         <span className="font-semibold">⚠️ Action Required:</span> Bookings where AI resource matching encountered conflicts or shortages.
       </div>
 
