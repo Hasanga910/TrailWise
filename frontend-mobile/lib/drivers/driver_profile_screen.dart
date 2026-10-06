@@ -6,6 +6,7 @@ import '../auth/auth_provider.dart';
 import '../auth/current_user.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_toggle_button.dart';
+import '../utils/validators.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key, this.apiClient});
@@ -48,6 +49,25 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     _nameController = TextEditingController(text: user?.name ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
     _contactController = TextEditingController(text: '');
+    _loadProfile();
+  }
+
+  /// CurrentUser has no contact number, so read the full profile from /api/auth/me.
+  /// Only fills fields the driver has not started typing in.
+  Future<void> _loadProfile() async {
+    try {
+      final res = await _apiClient.get('/api/auth/me');
+      if (!mounted || res is! Map<String, dynamic>) return;
+      void fill(TextEditingController controller, Object? value) {
+        if (controller.text.isEmpty && value is String) controller.text = value;
+      }
+
+      fill(_nameController, res['name']);
+      fill(_emailController, res['email']);
+      fill(_contactController, res['contactNumber']);
+    } catch (_) {
+      // Best-effort prefill; the driver can still type the details in.
+    }
   }
 
   @override
@@ -354,6 +374,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                     prefixIcon: Icon(Icons.phone_outlined),
                     border: OutlineInputBorder(),
                   ),
+                  validator: validatePhone,
                 ),
                 if (_profileError != null) ...[
                   SizedBox(height: 10),

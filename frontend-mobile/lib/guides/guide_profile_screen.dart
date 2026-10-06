@@ -6,6 +6,7 @@ import '../auth/auth_provider.dart';
 import '../auth/current_user.dart';
 import '../models/guide_profile.dart';
 import '../theme/app_theme.dart';
+import '../utils/validators.dart';
 import '../theme/theme_toggle_button.dart';
 import '../widgets/widgets.dart';
 
@@ -685,6 +686,7 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                   prefixIcon: Icon(Icons.phone_outlined),
                   border: OutlineInputBorder(),
                 ),
+                validator: validateOptionalPhone,
               ),
               const SizedBox(height: 16),
               // Languages Section
@@ -900,7 +902,7 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'New password is required';
-                  if (v.length < 6) return 'Minimum 6 characters required';
+                  if (v.length < 8) return 'Password must be at least 8 characters';
                   return null;
                 },
               ),

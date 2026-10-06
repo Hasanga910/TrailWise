@@ -53,11 +53,12 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> register(String name, String email, String password) async {
+  Future<bool> register(String name, String email, String password, String contactNumber) async {
     return _authenticate(() => _apiClient.post('/api/auth/register', {
           'name': name,
           'email': email,
           'password': password,
+          'contactNumber': contactNumber,
         }));
   }
 

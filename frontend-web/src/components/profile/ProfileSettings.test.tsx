@@ -63,6 +63,20 @@ describe('role profile pages', () => {
     expect(auth.updateUser).toHaveBeenCalled();
   });
 
+  it('rejects an invalid contact number without calling the API', async () => {
+    const user = userEvent.setup();
+    const spy = vi.spyOn(profileApi, 'updateProfile');
+    renderPage(<OpsProfileSettingsPage />, 'OperationsManager');
+
+    const field = screen.getByLabelText(/contact number/i);
+    await user.clear(field);
+    await user.type(field, 'abc');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(screen.getByText('Enter a valid phone number, for example +94 77 123 4567')).toBeInTheDocument();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
   it('rejects a mismatched confirmation without calling the API', async () => {
     const user = userEvent.setup();
     const spy = vi.spyOn(profileApi, 'changePassword');
