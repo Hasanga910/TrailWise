@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/validators.dart';
 import '../widgets/widgets.dart';
 import 'auth_provider.dart';
 
@@ -16,12 +17,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _contactController = TextEditingController();
   final _passwordController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _contactController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -32,6 +35,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _nameController.text.trim(),
       _emailController.text.trim(),
       _passwordController.text,
+      _contactController.text.trim(),
     );
     if (success && mounted) {
       Navigator.of(context).pop();
@@ -66,6 +70,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               decoration: const InputDecoration(labelText: 'Email'),
               validator: (value) =>
                   (value == null || !value.contains('@')) ? 'Enter a valid email' : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _contactController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Contact number'),
+              validator: validatePhone,
             ),
             const SizedBox(height: AppSpacing.md),
             TextFormField(

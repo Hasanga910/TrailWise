@@ -25,7 +25,7 @@ class _Auth extends ChangeNotifier implements AuthProvider {
   @override
   Future<bool> login(String e, String p) async => true;
   @override
-  Future<bool> register(String n, String e, String p) async => true;
+  Future<bool> register(String n, String e, String p, String c) async => true;
   @override
   Future<void> restoreSession() async {}
   @override

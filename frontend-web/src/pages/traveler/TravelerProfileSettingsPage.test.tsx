@@ -10,13 +10,13 @@ vi.mock('../../components/ui/notify', () => ({
   notify: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }));
 vi.mock('../../api/profile', () => ({
-  updateProfile: vi.fn().mockResolvedValue({ id: '1', name: 'Jane', email: 'j@e.com', contactNumber: '1', role: 'Traveler' }),
+  updateProfile: vi.fn().mockResolvedValue({ id: '1', name: 'Jane', email: 'j@e.com', contactNumber: '0771234567', role: 'Traveler' }),
   changePassword: vi.fn(),
   deleteAccount: vi.fn(),
 }));
 
 const auth: AuthContextValue = {
-  user: { id: '1', name: 'Jane', email: 'j@e.com', contactNumber: '1', role: 'Traveler' },
+  user: { id: '1', name: 'Jane', email: 'j@e.com', contactNumber: '0771234567', role: 'Traveler' },
   status: 'authenticated',
   error: null,
   login: vi.fn(),

@@ -23,6 +23,7 @@ void main() {
     expect(find.text('Create Traveler Account'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Full name'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Contact number'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Register'), findsOneWidget);
   });
@@ -34,7 +35,25 @@ void main() {
     await tester.pump();
     expect(find.text('Name is required'), findsOneWidget);
     expect(find.text('Enter a valid email'), findsOneWidget);
+    expect(find.text('Enter a valid phone number, for example +94 77 123 4567'), findsOneWidget);
     expect(find.text('Password must be at least 8 characters'), findsOneWidget);
+  });
+
+  testWidgets('RegisterScreen rejects a malformed contact number and accepts a valid one', (tester) async {
+    await tester.pumpWidget(_app(const RegisterScreen()));
+    final field = find.widgetWithText(TextFormField, 'Contact number');
+    const message = 'Enter a valid phone number, for example +94 77 123 4567';
+
+    await tester.enterText(field, 'abc');
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Register'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Register'));
+    await tester.pump();
+    expect(find.text(message), findsOneWidget);
+
+    await tester.enterText(field, '+94 77 123 4567');
+    await tester.tap(find.widgetWithText(FilledButton, 'Register'));
+    await tester.pump();
+    expect(find.text(message), findsNothing);
   });
 
   for (final dark in [false, true]) {

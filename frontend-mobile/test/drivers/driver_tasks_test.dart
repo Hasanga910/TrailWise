@@ -32,7 +32,7 @@ class _MockAuthProvider extends ChangeNotifier implements AuthProvider {
   Future<bool> login(String email, String password) async => true;
 
   @override
-  Future<bool> register(String name, String email, String password) async => true;
+  Future<bool> register(String name, String email, String password, String contactNumber) async => true;
 
   @override
   Future<void> restoreSession() async {}

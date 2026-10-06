@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/apiClient';
 import { changePassword, deleteSelfProfile, updateProfile } from '../../api/profile';
 import { useAuth } from '../../auth/AuthContext';
+import { PHONE_MESSAGE, PHONE_PATTERN } from '../../forms/authSchemas';
 import { LockIcon, MailIcon } from '../admin/icons';
 import { Avatar, Badge, Button, Card, Input, Modal } from '../ui';
 import { notify } from '../ui/notify';
@@ -76,6 +77,7 @@ export function ProfileSettings({
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [contactNumber, setContactNumber] = useState(user?.contactNumber ?? '');
+  const [contactError, setContactError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -90,6 +92,10 @@ export function ProfileSettings({
 
   async function handleSaveProfile(e: FormEvent) {
     e.preventDefault();
+    if (!PHONE_PATTERN.test(contactNumber.trim())) {
+      setContactError(PHONE_MESSAGE);
+      return;
+    }
     setSavingProfile(true);
     try {
       const updated = await updateProfile({ name, email, contactNumber });
@@ -174,7 +180,11 @@ export function ProfileSettings({
             required
             type="tel"
             value={contactNumber}
-            onChange={(e) => setContactNumber(e.target.value)}
+            error={contactError ?? undefined}
+            onChange={(e) => {
+              setContactNumber(e.target.value);
+              setContactError(null);
+            }}
           />
           {showRoleField && (
             <div>
