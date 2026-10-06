@@ -29,7 +29,8 @@ This starts:
 
 - `db` — Postgres on `localhost:${POSTGRES_PORT}` (default 5432)
 - `backend` — ASP.NET Core API on `http://localhost:${BACKEND_PORT}` (default 5080), applying EF
-  Core migrations and seeding an Admin user + a sample tour package on first boot
+  Core migrations and creating the first Admin user on boot (only if no Admin exists yet). The
+  database otherwise starts empty: no sample packages, vehicles, drivers or guides are seeded
 - `frontend-web` — React dev server on `http://localhost:${FRONTEND_WEB_PORT}` (default 5173).
   The container runs what was baked into the image at build time (no live-reload volume mount);
   after editing React code, re-run `docker compose up --build frontend-web`, or just run
@@ -37,10 +38,12 @@ This starts:
 
 Swagger UI: `http://localhost:5080/swagger` (Development environment only).
 
-The seeded Admin account (`ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` in `.env`) is the only way to
+The first Admin account (`ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` in `.env`) is the only way to
 create TourGuide / OperationsManager / FleetCoordinator / Admin accounts — via
 `POST /api/auth/admin/users`. Travelers self-register through `POST /api/auth/register` or the
-React/Flutter register screens.
+React/Flutter register screens. Packages, vehicles, drivers, guides and discounts are created by
+staff through the app. `backend/seed_all_tables.sql` and `backend/seed_driver_test_bookings.sql` are
+optional, manual scripts for filling a development database with demo data; the app never runs them.
 
 ## Running the Flutter app
 

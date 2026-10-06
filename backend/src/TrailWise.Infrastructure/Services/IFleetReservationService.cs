@@ -36,5 +36,14 @@ public interface IFleetReservationService
         Guid? guideId = null,
         CancellationToken ct = default);
 
+    Task<ReservationResult> ReassignResourcesAsync(
+        Guid bookingId,
+        Guid? newVehicleId,
+        Guid? newDriverId,
+        Guid? newGuideId,
+        string? reason,
+        Guid performedBy,
+        CancellationToken ct = default);
+
     Task<int> ReleaseBookingAssignmentsAsync(Guid bookingId, CancellationToken ct = default);
 }

@@ -26,8 +26,15 @@ public record BookingDto(
     bool HasPendingPayment = false,
     DateTimeOffset? CreatedAt = null,
     DateTimeOffset? TourStartedAt = null,
-    DateTimeOffset? TourEndedAt = null)
+    DateTimeOffset? TourEndedAt = null,
+    string? RevisionNote = null,
+    bool ApprovalPending = false,
+    ApprovalType? PendingApprovalType = null)
 {
+    /// <summary>Marks the booking as waiting for an Operations Manager decision (additive fields).</summary>
+    public BookingDto WithPendingApproval(ApprovalType? type) =>
+        this with { ApprovalPending = type is not null, PendingApprovalType = type };
+
     // Duplicated by value in TrailWise.Infrastructure.Agents.BookingApprovalEvaluator.LargeGroupThreshold
     // since Infrastructure cannot reference this (Api) project. Keep both in sync if this ever changes.
     public const int LargeGroupThreshold = 10;
@@ -72,6 +79,7 @@ public record BookingDto(
             HasPendingPayment: hasPendingPayment,
             CreatedAt: booking.CreatedAt,
             TourStartedAt: booking.TourStartedAt,
-            TourEndedAt: booking.TourEndedAt);
+            TourEndedAt: booking.TourEndedAt,
+            RevisionNote: booking.RevisionNote);
     }
 }

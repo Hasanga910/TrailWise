@@ -3,10 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
-import '../bookings/booking_status.dart';
 import '../models/assigned_tour.dart';
 import '../models/itinerary_step.dart';
 import 'guide_itinerary_edit_screen.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class TourDetailScreen extends StatefulWidget {
   const TourDetailScreen({
@@ -64,6 +65,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   Future<void> _save() async {
+    final colors = AppColors.of(context);
     if (_saving || _lifecycleLoading) return;
 
     setState(() {
@@ -94,9 +96,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Tour updates saved successfully'),
-          backgroundColor: Colors.green,
+          backgroundColor: colors.success,
         ),
       );
     } on ApiException catch (e) {
@@ -108,7 +110,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.message),
-          backgroundColor: Colors.red,
+          backgroundColor: colors.danger,
         ),
       );
     } catch (_) {
@@ -119,15 +121,16 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         _errorMessage = message;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(message),
-          backgroundColor: Colors.red,
+          backgroundColor: colors.danger,
         ),
       );
     }
   }
 
   Future<void> _confirmClearNote() async {
+    final colors = AppColors.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -140,7 +143,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: colors.danger),
             child: const Text('Clear'),
           ),
         ],
@@ -153,6 +156,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   Future<void> _clearNote() async {
+    final colors = AppColors.of(context);
     if (_saving || _lifecycleLoading) return;
 
     setState(() {
@@ -181,9 +185,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Guide note cleared.'),
-          backgroundColor: Colors.green,
+          backgroundColor: colors.success,
         ),
       );
     } on ApiException catch (e) {
@@ -193,7 +197,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         _errorMessage = e.message;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        SnackBar(content: Text(e.message), backgroundColor: colors.danger),
       );
     } catch (_) {
       if (!mounted) return;
@@ -203,12 +207,13 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         _errorMessage = message;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(content: Text(message), backgroundColor: colors.danger),
       );
     }
   }
 
   Future<void> _startTour() async {
+    final colors = AppColors.of(context);
     if (_saving || _lifecycleLoading || !_tour.isAdvancePaid) return;
 
     setState(() {
@@ -226,9 +231,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Tour started successfully.'),
-          backgroundColor: Colors.green,
+          backgroundColor: colors.success,
         ),
       );
     } on ApiException catch (e) {
@@ -238,7 +243,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         _errorMessage = e.message;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        SnackBar(content: Text(e.message), backgroundColor: colors.danger),
       );
     } catch (_) {
       if (!mounted) return;
@@ -248,12 +253,13 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         _errorMessage = message;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(content: Text(message), backgroundColor: colors.danger),
       );
     }
   }
 
   Future<void> _endTour() async {
+    final colors = AppColors.of(context);
     if (_saving || _lifecycleLoading) return;
 
     setState(() {
@@ -271,9 +277,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Tour ended successfully.'),
-          backgroundColor: Colors.green,
+          backgroundColor: colors.success,
         ),
       );
     } on ApiException catch (e) {
@@ -283,7 +289,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         _errorMessage = e.message;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        SnackBar(content: Text(e.message), backgroundColor: colors.danger),
       );
     } catch (_) {
       if (!mounted) return;
@@ -293,7 +299,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         _errorMessage = message;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(content: Text(message), backgroundColor: colors.danger),
       );
     }
   }
@@ -347,6 +353,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   Widget _buildItineraryList(List<ItineraryStep> steps) {
+    final colors = AppColors.of(context);
     final grouped = <int, List<ItineraryStep>>{};
     for (final step in steps) {
       grouped.putIfAbsent(step.dayNumber, () => []).add(step);
@@ -364,7 +371,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey.shade700,
+                color: colors.fgMuted,
                 letterSpacing: 0.5,
               ),
             ),
@@ -382,7 +389,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
+                        color: colors.fg,
                       ),
                     ),
                   ),
@@ -390,9 +397,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   Expanded(
                     child: Text(
                       '${step.activity} — ${step.location}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Colors.black87,
+                        color: colors.fg,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -408,7 +415,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = BookingStatus.color(_tour.status);
+    final colors = AppColors.of(context);
     final isCompleted = _tour.completed || _tour.tourEndedAt != null;
 
     return PopScope<AssignedTour>(
@@ -426,7 +433,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           ),
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: AppSpacing.page,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -435,18 +442,18 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: colors.dangerSoft,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                      Icon(Icons.error_outline, color: colors.danger, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: TextStyle(color: Colors.red.shade800, fontSize: 14),
+                          style: TextStyle(color: colors.dangerFg, fontSize: 14),
                         ),
                       ),
                     ],
@@ -457,8 +464,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
               // Tour Info Card
               Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -477,20 +482,12 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Chip(
-                            label: Text(
-                              _tour.status,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            backgroundColor: statusColor.withValues(alpha: 0.15),
-                            visualDensity: VisualDensity.compact,
-                          ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: StatusBadge(status: _tour.status),
                       ),
                       const SizedBox(height: 8),
 
@@ -498,44 +495,48 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.teal.withValues(alpha: 0.1),
+                          color: colors.brandSoft,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           _tour.theme,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Colors.teal,
+                            color: colors.brandText,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
 
                       // Date Range
                       Row(
                         children: [
-                          const Icon(Icons.date_range, size: 16, color: Colors.grey),
+                          Icon(Icons.date_range, size: 16, color: colors.fgMuted),
                           const SizedBox(width: 6),
-                          Text(
-                            '${_tour.startDate} to ${_tour.endDate}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
+                          Expanded(
+                            child: Text(
+                              '${_tour.startDate} to ${_tour.endDate}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
 
                       // Group Size
                       Row(
                         children: [
-                          const Icon(Icons.people_outline, size: 16, color: Colors.grey),
+                          Icon(Icons.people_outline, size: 16, color: colors.fgMuted),
                           const SizedBox(width: 6),
-                          Text(
-                            '${_tour.groupSize} ${_tour.groupSize == 1 ? 'traveler' : 'travelers'}',
-                            style: const TextStyle(fontSize: 14),
+                          Expanded(
+                            child: Text(
+                              '${_tour.groupSize} ${_tour.groupSize == 1 ? 'traveler' : 'travelers'}',
+                              style: const TextStyle(fontSize: 14),
+                            ),
                           ),
                         ],
                       ),
@@ -546,10 +547,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.location_on_outlined,
                               size: 16,
-                              color: Colors.grey,
+                              color: colors.fgMuted,
                             ),
                             const SizedBox(width: 6),
                             Expanded(
@@ -570,9 +571,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
+                            color: colors.warningSoft,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.amber.shade200),
+                            border: Border.all(color: colors.border),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -580,7 +581,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                               Icon(
                                 Icons.notes,
                                 size: 16,
-                                color: Colors.amber.shade800,
+                                color: colors.warningFg,
                               ),
                               const SizedBox(width: 6),
                               Expanded(
@@ -588,7 +589,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                   'Special requests: ${_tour.specialRequests}',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.amber.shade900,
+                                    color: colors.warningFg,
                                   ),
                                 ),
                               ),
@@ -604,8 +605,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
               // Guide Controls Card
               Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -664,8 +663,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                             icon: const Icon(Icons.delete_outline, size: 16),
                             label: const Text('Clear Note'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red.shade700,
-                              side: BorderSide(color: Colors.red.shade300),
+                              foregroundColor: colors.danger,
+                              side: BorderSide(color: colors.border),
                             ),
                           ),
                         ),
@@ -704,8 +703,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
               // Tour Lifecycle Card
               Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -725,23 +722,25 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade50,
+                            color: colors.successSoft,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade200),
+                            border: Border.all(color: colors.border),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                                  Icon(Icons.check_circle, color: colors.success, size: 20),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    'Tour Completed',
-                                    style: TextStyle(
-                                      color: Colors.green.shade900,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
+                                  Expanded(
+                                    child: Text(
+                                      'Tour Completed',
+                                      style: TextStyle(
+                                        color: colors.successFg,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -750,13 +749,13 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                 const SizedBox(height: 6),
                                 Text(
                                   'Started at: ${_formatDateTime(_tour.tourStartedAt!)}',
-                                  style: TextStyle(color: Colors.green.shade800, fontSize: 13),
+                                  style: TextStyle(color: colors.successFg, fontSize: 13),
                                 ),
                               ],
                               const SizedBox(height: 4),
                               Text(
                                 'Ended at: ${_formatDateTime(_tour.tourEndedAt!)}',
-                                style: TextStyle(color: Colors.green.shade800, fontSize: 13),
+                                style: TextStyle(color: colors.successFg, fontSize: 13),
                               ),
                             ],
                           ),
@@ -766,21 +765,21 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
+                            color: colors.warningSoft,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.orange.shade200),
+                            border: Border.all(color: colors.border),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.play_circle_filled, color: Colors.orange.shade700, size: 20),
+                                  Icon(Icons.play_circle_filled, color: colors.warning, size: 20),
                                   const SizedBox(width: 8),
                                   Text(
                                     'Tour Started',
                                     style: TextStyle(
-                                      color: Colors.orange.shade900,
+                                      color: colors.warningFg,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 15,
                                     ),
@@ -790,7 +789,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                               const SizedBox(height: 6),
                               Text(
                                 'Started at: ${_formatDateTime(_tour.tourStartedAt!)}',
-                                style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
+                                style: TextStyle(color: colors.warningFg, fontSize: 13),
                               ),
                             ],
                           ),
@@ -801,7 +800,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           height: 48,
                           child: FilledButton(
                             onPressed: (_lifecycleLoading || _saving) ? null : _endTour,
-                            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+                            style: FilledButton.styleFrom(backgroundColor: colors.danger),
                             child: _lifecycleLoading
                                 ? const SizedBox(
                                     width: 22,
@@ -819,20 +818,20 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.amber.shade50,
+                              color: colors.warningSoft,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.amber.shade300),
+                              border: Border.all(color: colors.border),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.info_outline, color: Colors.amber.shade900, size: 20),
+                                Icon(Icons.info_outline, color: colors.warningFg, size: 20),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Waiting for advance payment. Advance payment must be completed before starting this tour.',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: Colors.amber.shade900,
+                                      color: colors.warningFg,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -847,7 +846,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           height: 48,
                           child: FilledButton(
                             onPressed: (_lifecycleLoading || _saving || !_tour.isAdvancePaid) ? null : _startTour,
-                            style: FilledButton.styleFrom(backgroundColor: Colors.teal),
+                            style: FilledButton.styleFrom(backgroundColor: colors.brandText),
                             child: _lifecycleLoading
                                 ? const SizedBox(
                                     width: 22,
@@ -869,15 +868,16 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
               // Itinerary Card
               Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
                           const Text(
                             'Itinerary',
@@ -904,20 +904,22 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: colors.surfaceSunken,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300),
+                            border: Border.all(color: colors.border),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.lock_outline, size: 16, color: Colors.grey.shade700),
+                              Icon(Icons.lock_outline, size: 16, color: colors.fgMuted),
                               const SizedBox(width: 8),
-                              Text(
-                                'Tour completed — itinerary is read-only.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade800,
-                                  fontWeight: FontWeight.w500,
+                              Expanded(
+                                child: Text(
+                                  'Tour completed — itinerary is read-only.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: colors.fg,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
@@ -935,7 +937,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       ] else if (_itineraryErrorMessage != null) ...[
                         Text(
                           _itineraryErrorMessage!,
-                          style: TextStyle(color: Colors.red.shade700),
+                          style: TextStyle(color: colors.danger),
                         ),
                         const SizedBox(height: 8),
                         TextButton(
@@ -943,9 +945,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                           child: const Text('Retry'),
                         ),
                       ] else if (_itinerarySteps.isEmpty) ...[
-                        const Text(
+                        Text(
                           'No itinerary has been set for this trip yet.',
-                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                          style: TextStyle(color: colors.fgMuted, fontSize: 14),
                         ),
                       ] else ...[
                         _buildItineraryList(_itinerarySteps),

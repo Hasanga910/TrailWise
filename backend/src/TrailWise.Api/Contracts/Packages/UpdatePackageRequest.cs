@@ -21,4 +21,7 @@ public class UpdatePackageRequest
 
     [Required, MinLength(1)]
     public List<string> LocationNames { get; set; } = new();
+
+    /// <summary>Optional manual coordinates for some of <see cref="LocationNames"/>.</summary>
+    public List<LocationCoordinateRequest>? LocationCoordinates { get; set; }
 }

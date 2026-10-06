@@ -20,6 +20,24 @@ public class GuideAssignmentService : IGuideAssignmentService
         _logger = logger;
     }
 
+    public async Task<int> ReleaseGuideAsync(Guid bookingId, CancellationToken ct = default)
+    {
+        // Assignment creates (or takes over) one row per day with AssignedBookingId set and
+        // IsAvailable=false; with the (GuideId, Date) unique index, a missing row means available,
+        // so removing the booking's rows restores the guide's calendar.
+        var rows = await _db.GuideAvailabilities
+            .Where(a => a.AssignedBookingId == bookingId)
+            .ToListAsync(ct);
+
+        if (rows.Count > 0)
+        {
+            _db.GuideAvailabilities.RemoveRange(rows);
+            _logger.LogInformation("Released {Count} guide-availability rows for booking {BookingId}.", rows.Count, bookingId);
+        }
+
+        return rows.Count;
+    }
+
     public async Task<bool> AssignGuideAsync(
         Guid bookingId,
         Guid guideId,

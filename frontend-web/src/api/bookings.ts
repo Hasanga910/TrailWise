@@ -10,6 +10,8 @@ export type BookingStatus =
   | 'Cancelled'
   | 'NeedsManualReview';
 
+export type ApprovalType = 'LargeGroupOrCustomItinerary' | 'BudgetOverride' | 'RefundException';
+
 export interface CreateBookingInput {
   packageTierId: string;
   groupSize: number;
@@ -50,6 +52,11 @@ export interface BookingDto {
   tourStartedAt?: string | null;
   tourEndedAt?: string | null;
   createdAt?: string;
+  /** Note from the Operations Manager when a revision was requested. */
+  revisionNote?: string | null;
+  /** True while the booking waits for an Operations Manager decision. */
+  approvalPending?: boolean;
+  pendingApprovalType?: ApprovalType | null;
 }
 
 export interface PagedResult<T> {
@@ -156,6 +163,18 @@ export async function assignGuide(bookingId: string, guideId: string): Promise<A
   const response = await apiClient.post<AssignGuideResponse>(`/api/bookings/${bookingId}/assign-guide`, {
     guideId,
   });
+  return response.data;
+}
+
+export interface ReassignResourcesInput {
+  vehicleId?: string;
+  driverId?: string;
+  guideId?: string;
+  reason?: string;
+}
+
+export async function reassignResources(bookingId: string, input: ReassignResourcesInput): Promise<BookingDto> {
+  const response = await apiClient.put<BookingDto>(`/api/bookings/${bookingId}/reassign-resources`, input);
   return response.data;
 }
 

@@ -34,6 +34,7 @@ public class PaymentDeadlineTests
             var services = new ServiceCollection();
             services.AddDbContext<TrailWiseDbContext>(o => o.UseInMemoryDatabase(dbName));
             services.AddScoped<IAuditLogService, AuditLogService>();
+            services.AddScoped<IGuideAssignmentService, GuideAssignmentService>();
             services.AddLogging();
             var sp = services.BuildServiceProvider();
             ScopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
@@ -105,6 +106,45 @@ public class PaymentDeadlineTests
         await db.SaveChangesAsync();
 
         return (booking, package, travelerId);
+    }
+
+    [Fact]
+    public async Task ExpiredBooking_ReleasesItsGuideAvailabilityRows()
+    {
+        var fixture = new TestFixture();
+        var clock = new TestClock { UtcNow = new DateTimeOffset(2026, 9, 29, 10, 0, 0, TimeSpan.Zero) };
+        Guid bookingId;
+        Guid guideId;
+
+        using (var db = fixture.CreateDbContext())
+        {
+            var (booking, _, _) = await SeedBookingAsync(db, BookingStatus.Confirmed);
+            bookingId = booking.Id;
+            booking.PaymentDueAt = clock.UtcNow.AddMinutes(60);
+            var guide = new Guide { Name = "Held Guide", Specializations = new[] { "Test" }, Languages = new[] { "English" } };
+            db.GuideAvailabilities.Add(new GuideAvailability
+            {
+                Guide = guide,
+                Date = booking.StartDate,
+                IsAvailable = false,
+                AssignedBookingId = booking.Id
+            });
+            await db.SaveChangesAsync();
+            guideId = guide.Id;
+        }
+
+        clock.UtcNow = clock.UtcNow.AddMinutes(61);
+        var expiryService = new BookingPaymentExpiryService(
+            fixture.ScopeFactory,
+            clock,
+            LoggerFactory.CreateLogger<BookingPaymentExpiryService>());
+        Assert.Equal(1, await expiryService.ProcessExpiredBookingsAsync());
+
+        using (var db = fixture.CreateDbContext())
+        {
+            Assert.False(await db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == bookingId));
+            Assert.False(await db.GuideAvailabilities.AnyAsync(a => a.GuideId == guideId));
+        }
     }
 
     // 1. Requested -> Confirmed creates PaymentDueAt

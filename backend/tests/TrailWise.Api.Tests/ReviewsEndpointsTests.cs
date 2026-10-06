@@ -587,6 +587,61 @@ public class ReviewsEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         Assert.Contains(bookingId.ToString(), auditLog.Details);
     }
 
+    [Fact]
+    public async Task FeaturedReviews_Anonymous_OnlyIncludesHighRatedReviewsWithComments_AndHidesIdentity()
+    {
+        var packageId = await CreatePackageAsync("Featured Reviews Tour");
+        var (c3, b3, _, _) = await SetupBookingForPackageAsync(packageId, BookingStatus.Completed);
+        var (c4, b4, _, _) = await SetupBookingForPackageAsync(packageId, BookingStatus.Completed);
+        var (c5, b5, _, _) = await SetupBookingForPackageAsync(packageId, BookingStatus.Completed);
+        var (c5b, b5b, _, travelerId) = await SetupBookingForPackageAsync(packageId, BookingStatus.Completed);
+
+        await c3.PostAsJsonAsync($"/api/bookings/{b3}/reviews", new { Rating = 3, Comment = "featured-test-three-stars" });
+        await c4.PostAsJsonAsync($"/api/bookings/{b4}/reviews", new { Rating = 4, Comment = "featured-test-four-stars" });
+        await c5.PostAsJsonAsync($"/api/bookings/{b5}/reviews", new { Rating = 5, Comment = "featured-test-five-stars" });
+        await c5b.PostAsJsonAsync($"/api/bookings/{b5b}/reviews", new { Rating = 5, Comment = "" });
+
+        var response = await _factory.CreateClient().GetAsync("/api/reviews/featured?limit=12");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var json = await response.Content.ReadAsStringAsync();
+        var featured = JsonSerializer.Deserialize<List<FeaturedReviewDto>>(json, JsonOptions)!;
+
+        Assert.Contains(featured, f => f.Comment == "featured-test-four-stars" && f.Rating == 4);
+        Assert.Contains(featured, f => f.Comment == "featured-test-five-stars" && f.PackageName.StartsWith("Featured Reviews Tour") && f.PackageId == packageId);
+        Assert.DoesNotContain(featured, f => f.Comment == "featured-test-three-stars");
+        Assert.All(featured, f =>
+        {
+            Assert.True(f.Rating >= 4);
+            Assert.False(string.IsNullOrWhiteSpace(f.Comment));
+            Assert.Equal("Verified Traveler", f.ReviewerDisplayName);
+        });
+        Assert.DoesNotContain("bookingId", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("travelerId", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("email", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(travelerId.ToString(), json);
+    }
+
+    [Fact]
+    public async Task FeaturedReviews_AreNewestFirst_AndLimitIsClamped()
+    {
+        var packageId = await CreatePackageAsync("Featured Ordering Tour");
+        var (c1, b1, _, _) = await SetupBookingForPackageAsync(packageId, BookingStatus.Completed);
+        await c1.PostAsJsonAsync($"/api/bookings/{b1}/reviews", new { Rating = 5, Comment = "featured-order-first" });
+        await Task.Delay(20);
+        var (c2, b2, _, _) = await SetupBookingForPackageAsync(packageId, BookingStatus.Completed);
+        await c2.PostAsJsonAsync($"/api/bookings/{b2}/reviews", new { Rating = 5, Comment = "featured-order-second" });
+
+        var client = _factory.CreateClient();
+        var all = (await client.GetFromJsonAsync<List<FeaturedReviewDto>>("/api/reviews/featured?limit=12", JsonOptions))!;
+        Assert.Equal(
+            new[] { "featured-order-second", "featured-order-first" },
+            all.Where(f => f.Comment.StartsWith("featured-order-")).Select(f => f.Comment));
+
+        Assert.Single((await client.GetFromJsonAsync<List<FeaturedReviewDto>>("/api/reviews/featured?limit=1", JsonOptions))!);
+        Assert.Single((await client.GetFromJsonAsync<List<FeaturedReviewDto>>("/api/reviews/featured?limit=0", JsonOptions))!);
+        Assert.True((await client.GetFromJsonAsync<List<FeaturedReviewDto>>("/api/reviews/featured?limit=500", JsonOptions))!.Count <= 12);
+    }
+
     private async Task<Guid> CreatePackageAsync(string name)
     {
         using var scope = _factory.Services.CreateScope();

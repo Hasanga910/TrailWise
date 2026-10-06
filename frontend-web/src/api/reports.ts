@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import type { ApprovalCountsDto } from './approvals';
 
 export interface PackageOccupancyDto {
   tourPackageId: string;
@@ -34,7 +35,9 @@ export interface GuideUtilizationDto {
   guideName: string;
   assignedDays: number;
   availableDays: number;
+  /** Kept for older clients; equals windowDays. */
   recordedDays: number;
+  windowDays: number;
   utilizationPercentage: number;
 }
 
@@ -74,5 +77,73 @@ export async function exportAuditLogsCsv(from?: string, to?: string, entityType?
     },
     responseType: 'blob',
   });
+  return response.data;
+}
+
+// ---- Operations dashboard (design doc section 6) ----
+
+export interface UpcomingTourDto {
+  bookingId: string;
+  tourPackageName: string;
+  travelerName: string;
+  startDate: string;
+  endDate: string;
+  groupSize: number;
+  daysUntilStart: number;
+  guideName: string | null;
+  vehicleRegistration: string | null;
+  driverName: string | null;
+}
+
+export interface DashboardRefundExceptionDto {
+  approvalId: string;
+  bookingId: string;
+  tourPackageName: string;
+  travelerName: string;
+  startDate: string;
+  daysUntilStart: number;
+  /** The tour starts within `urgentWithinDays` days (or already has). */
+  urgent: boolean;
+  requestedAt: string;
+}
+
+export interface DashboardApprovalsDto {
+  counts: ApprovalCountsDto;
+  urgentWithinDays: number;
+  urgentCount: number;
+  refundExceptions: DashboardRefundExceptionDto[];
+}
+
+export interface UtilizationWindowDto {
+  from: string;
+  to: string;
+  days: number;
+}
+
+export interface VehicleUtilizationItemDto {
+  vehicleId: string;
+  registrationNumber: string;
+  type: string;
+  maintenanceStatus: string;
+  bookedDays: number;
+  utilizationPercentage: number;
+}
+
+export interface OpsDashboardDto {
+  generatedAt: string;
+  upcomingTours: UpcomingTourDto[];
+  approvals: DashboardApprovalsDto;
+  guideUtilization: { window: UtilizationWindowDto; overallPercentage: number; guides: GuideUtilizationDto[] };
+  vehicleUtilization: {
+    window: UtilizationWindowDto;
+    overallPercentage: number;
+    inServiceVehicles: number;
+    vehicles: VehicleUtilizationItemDto[];
+  };
+  workflows: { running: number; awaitingApproval: number; failed: number; bookingsNeedingManualReview: number };
+}
+
+export async function getOpsDashboard(): Promise<OpsDashboardDto> {
+  const response = await apiClient.get<OpsDashboardDto>('/api/reports/dashboard');
   return response.data;
 }

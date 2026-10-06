@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../models/itinerary_step.dart';
+import '../theme/app_theme.dart';
 
 class _EditableStepRow {
   _EditableStepRow({
@@ -125,6 +126,7 @@ class _GuideItineraryEditScreenState extends State<GuideItineraryEditScreen> {
   }
 
   Future<void> _save() async {
+    final colors = AppColors.of(context);
     if (_saving) return;
 
     if (_rows.isEmpty) {
@@ -181,9 +183,9 @@ class _GuideItineraryEditScreenState extends State<GuideItineraryEditScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Itinerary saved successfully'),
-          backgroundColor: Colors.green,
+          backgroundColor: colors.success,
         ),
       );
 
@@ -197,7 +199,7 @@ class _GuideItineraryEditScreenState extends State<GuideItineraryEditScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.message),
-          backgroundColor: Colors.red,
+          backgroundColor: colors.danger,
         ),
       );
     } catch (_) {
@@ -208,9 +210,9 @@ class _GuideItineraryEditScreenState extends State<GuideItineraryEditScreen> {
         _errorMessage = msg;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(msg),
-          backgroundColor: Colors.red,
+          backgroundColor: colors.danger,
         ),
       );
     }
@@ -218,6 +220,7 @@ class _GuideItineraryEditScreenState extends State<GuideItineraryEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.initialSteps.isEmpty ? 'Set Itinerary' : 'Edit Itinerary'),
@@ -239,18 +242,18 @@ class _GuideItineraryEditScreenState extends State<GuideItineraryEditScreen> {
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: colors.dangerSoft,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                    Icon(Icons.error_outline, color: colors.danger, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: TextStyle(color: Colors.red.shade800, fontSize: 14),
+                        style: TextStyle(color: colors.dangerFg, fontSize: 14),
                       ),
                     ),
                   ],
@@ -282,7 +285,7 @@ class _GuideItineraryEditScreenState extends State<GuideItineraryEditScreen> {
                           ),
                           IconButton(
                             key: ValueKey('deleteStep_$index'),
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            icon: Icon(Icons.delete_outline, color: colors.danger),
                             tooltip: 'Delete Step',
                             onPressed: _saving ? null : () => _removeStep(index),
                           ),

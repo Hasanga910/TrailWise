@@ -10,7 +10,9 @@ using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
+using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 using Xunit;
 
 namespace TrailWise.Api.Tests;
@@ -148,6 +150,69 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         var freshBooking = await db.Bookings.FindAsync(bookingId);
         Assert.NotNull(freshBooking);
         Assert.Equal(BookingStatus.NeedsManualReview, freshBooking.Status);
+    }
+
+    [Fact]
+    public async Task Decide_Approve_AutoAssignsOnlyGuidesPassingMatchingRules()
+    {
+        var theme = $"Theme-{Guid.NewGuid():N}";
+        var (_, bookingId, _) = await SetupBookingAsync(BookingStatus.PendingApproval, theme: theme, languagePreference: "French");
+        var matchingGuideId = await SeedGuideAndFleetAsync(bookingId, theme, "French");
+        // Available guides that fail the rules must never be picked, even if they sort first.
+        await SeedGuideAsync("A Wrong Theme Guide", "Unrelated", "French");
+        await SeedGuideAsync("A Wrong Language Guide", theme, "German");
+
+        var managerClient = await AuthenticatedOperationsManagerAsync();
+        var response = await managerClient.PatchAsJsonAsync($"/api/bookings/{bookingId}/decision", new
+        {
+            Decision = "Approve",
+            Notes = "Matching guide available."
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var assigned = await db.GuideAvailabilities
+            .Where(a => a.AssignedBookingId == bookingId)
+            .Select(a => a.GuideId)
+            .Distinct()
+            .ToListAsync();
+        Assert.Equal(new[] { matchingGuideId }, assigned);
+    }
+
+    [Theory]
+    [InlineData("Unrelated", "French")] // wrong specialization
+    [InlineData(null, "German")] // right specialization, wrong language
+    public async Task Decide_Approve_WhenOnlyNonMatchingGuidesAreAvailable_ReturnsConflict(string? guideTheme, string guideLanguage)
+    {
+        var theme = $"Theme-{Guid.NewGuid():N}";
+        var (_, bookingId, _) = await SetupBookingAsync(BookingStatus.PendingApproval, theme: theme, languagePreference: "French");
+        await SeedFleetAsync(bookingId);
+        var guideId = await SeedGuideAsync("Available But Not Matching", guideTheme ?? theme, guideLanguage);
+
+        var managerClient = await AuthenticatedOperationsManagerAsync();
+        var response = await managerClient.PatchAsJsonAsync($"/api/bookings/{bookingId}/decision", new
+        {
+            Decision = "Approve",
+            Notes = "Should not auto-assign a mismatched guide."
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains("Missing: Tour Guide", await response.Content.ReadAsStringAsync());
+
+        // An explicit guide choice goes through the same rules.
+        var explicitResponse = await managerClient.PatchAsJsonAsync($"/api/bookings/{bookingId}/decision", new
+        {
+            Decision = "Approve",
+            GuideId = guideId
+        });
+        Assert.Equal(HttpStatusCode.Conflict, explicitResponse.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.Equal(BookingStatus.PendingApproval, booking!.Status);
+        Assert.False(await db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == bookingId));
     }
 
     [Fact]
@@ -581,6 +646,82 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
     }
 
     [Fact]
+    public async Task Cancel_StoresTrimmedReasonOnBooking()
+    {
+        var (client, bookingId, _) = await SetupBookingAsync(BookingStatus.Requested);
+
+        var response = await client.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { Reason = "  Change of plans  " });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.Equal("Change of plans", booking!.CancellationReason);
+    }
+
+    [Fact]
+    public async Task Cancel_WithoutReason_LeavesCancellationReasonNull()
+    {
+        var (client, bookingId, _) = await SetupBookingAsync(BookingStatus.Requested);
+
+        var response = await client.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { Reason = "   " });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        Assert.Null((await db.Bookings.FindAsync(bookingId))!.CancellationReason);
+    }
+
+    [Theory]
+    [InlineData(false)] // traveler cancels
+    [InlineData(true)] // staff cancels
+    public async Task Cancel_ReleasesGuideAvailability_SoTheGuideCanBeMatchedAgain(bool cancelAsManager)
+    {
+        var theme = $"Theme-{Guid.NewGuid():N}";
+        var (travelerClient, bookingId, _) = await SetupBookingAsync(BookingStatus.Confirmed, theme: theme);
+        var guideId = await SeedGuideAsync("Released Guide", theme, "English");
+
+        // Another booking holds the same guide, so its availability rows must survive.
+        var (_, otherBookingId, _) = await SetupBookingAsync(BookingStatus.Confirmed, startDate: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(90)));
+
+        Guid[] bookingIds = { bookingId, otherBookingId };
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var assignment = scope.ServiceProvider.GetRequiredService<IGuideAssignmentService>();
+            foreach (var id in bookingIds)
+            {
+                Assert.True(await assignment.AssignGuideAsync(id, guideId));
+            }
+
+            // Prove the guide is blocked for the cancelled booking's dates before cancelling.
+            var booking = await db.Bookings.FindAsync(bookingId);
+            var availability = scope.ServiceProvider.GetRequiredService<IGuideAvailabilityService>();
+            Assert.False(await availability.IsGuideAvailableAsync(guideId, booking!.StartDate, booking.EndDate));
+        }
+
+        var client = cancelAsManager ? await AuthenticatedOperationsManagerAsync() : travelerClient;
+        var response = await client.PatchAsJsonAsync($"/api/bookings/{bookingId}/cancel", new { Reason = "Cancelled" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var cancelled = await verifyDb.Bookings.FindAsync(bookingId);
+        var freshAvailability = verifyScope.ServiceProvider.GetRequiredService<IGuideAvailabilityService>();
+
+        Assert.False(await verifyDb.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == bookingId));
+        Assert.True(await freshAvailability.IsGuideAvailableAsync(guideId, cancelled!.StartDate, cancelled.EndDate));
+        // The guide's other booking is untouched.
+        Assert.True(await verifyDb.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == otherBookingId));
+
+        var matchedAgain = await verifyScope.ServiceProvider.GetRequiredService<IGuideMatchingAgent>().MatchAsync(bookingId);
+        Assert.Equal(guideId, matchedAgain.GuideId);
+
+        var audit = await verifyDb.AuditLogs.SingleAsync(a => a.EntityId == bookingId && a.Action.StartsWith("BookingCancelledBy"));
+        Assert.Contains("releasedGuideDays", audit.Details, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Cancel_AsOwner_PastBooking_ReturnsConflict()
     {
         var (client, bookingId, _) = await SetupBookingAsync(
@@ -734,9 +875,67 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         Assert.All(paged.Items, b => Assert.Contains(b.Status, new[] { BookingStatus.Requested, BookingStatus.PlanProposed, BookingStatus.PendingApproval, BookingStatus.NeedsManualReview }));
     }
 
+    private async Task<Guid> SeedGuideAsync(string name, string specialization, string language)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var guide = new Guide
+        {
+            Name = name,
+            Specializations = new[] { specialization },
+            Languages = new[] { language },
+            ContactInfo = "guide@example.com"
+        };
+        db.Guides.Add(guide);
+        await db.SaveChangesAsync();
+        return guide.Id;
+    }
+
+    private async Task<Guid> SeedGuideAndFleetAsync(Guid bookingId, string specialization, string language)
+    {
+        await SeedFleetAsync(bookingId);
+        return await SeedGuideAsync("Zed Matching Guide", specialization, language);
+    }
+
+    /// <summary>Pre-assigns a vehicle and driver so approval only depends on the guide rules.</summary>
+    private async Task SeedFleetAsync(Guid bookingId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var booking = await db.Bookings.FindAsync(bookingId);
+        var vehicle = new Vehicle
+        {
+            Type = VehicleType.Van,
+            RegistrationNumber = $"REG-{Guid.NewGuid():N}"[..10],
+            Capacity = 8,
+            HasAC = true,
+            SeatConfiguration = "2-2-2-2",
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        };
+        var driver = new Driver
+        {
+            Name = "Rules Driver",
+            LicenseNumber = $"DL-{Guid.NewGuid():N}"[..10],
+            ContactInfo = "+94770000005"
+        };
+        db.Vehicles.Add(vehicle);
+        db.Drivers.Add(driver);
+        db.VehicleAssignments.Add(new VehicleAssignment
+        {
+            Vehicle = vehicle,
+            Driver = driver,
+            BookingId = bookingId,
+            StartDate = booking!.StartDate,
+            EndDate = booking.EndDate
+        });
+        await db.SaveChangesAsync();
+    }
+
     private async Task<(HttpClient Client, Guid BookingId, Guid TravelerId)> SetupBookingAsync(
         BookingStatus status,
-        DateOnly? startDate = null)
+        DateOnly? startDate = null,
+        string theme = "LifecycleTheme",
+        string? languagePreference = null)
     {
         var (client, travelerId) = await AuthenticatedTravelerWithIdAsync();
 
@@ -746,7 +945,7 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
         var package = new TourPackage
         {
             Name = $"Lifecycle Test Tour {Guid.NewGuid():N}",
-            Theme = "LifecycleTheme",
+            Theme = theme,
             DurationDays = 3,
             BasePricePerPerson = 200m,
             MaxGroupSize = 10
@@ -769,6 +968,7 @@ public class BookingLifecycleEndpointsTests : IClassFixture<TrailWiseWebApplicat
             StartDate = effectiveStartDate,
             EndDate = effectiveStartDate.AddDays(3),
             BudgetPerPerson = 500m,
+            LanguagePreference = languagePreference,
             Status = status
         };
 

@@ -12,20 +12,22 @@ import {
   type TicketStatus,
 } from '../../api/support';
 import { useAuth } from '../../auth/AuthContext';
+import { Badge, Button, Card, Input, Select, Skeleton, Textarea, type BadgeTone } from '../../components/ui';
+import { notify } from '../../components/ui/notify';
 
-const STATUS_BADGES: Record<TicketStatus, string> = {
-  Open: 'bg-blue-50 text-blue-700 border-blue-200',
-  InProgress: 'bg-purple-50 text-purple-700 border-purple-200',
-  WaitingForCustomer: 'bg-amber-50 text-amber-700 border-amber-200',
-  Resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Closed: 'bg-slate-100 text-slate-600 border-slate-200',
+const STATUS_TONES: Record<TicketStatus, BadgeTone> = {
+  Open: 'info',
+  InProgress: 'info',
+  WaitingForCustomer: 'warning',
+  Resolved: 'success',
+  Closed: 'neutral',
 };
 
-const PRIORITY_BADGES: Record<TicketPriority, string> = {
-  Low: 'bg-slate-100 text-slate-600',
-  Normal: 'bg-sky-50 text-sky-700',
-  High: 'bg-amber-50 text-amber-700',
-  Urgent: 'bg-red-50 text-red-700 font-semibold',
+const PRIORITY_TONES: Record<TicketPriority, BadgeTone> = {
+  Low: 'neutral',
+  Normal: 'info',
+  High: 'warning',
+  Urgent: 'danger',
 };
 
 function formatDateTime(isoString: string): string {
@@ -54,7 +56,6 @@ export function OpsTicketDetailPage() {
   // Reply form state
   const [replyMessage, setReplyMessage] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
-  const [replyError, setReplyError] = useState<string | null>(null);
 
   // Status update state
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -101,13 +102,12 @@ export function OpsTicketDetailPage() {
     if (!ticketId || !replyMessage.trim()) return;
 
     setSendingReply(true);
-    setReplyError(null);
     try {
       await sendSupportReply(ticketId, replyMessage.trim());
       setReplyMessage('');
       await fetchTicket();
     } catch (err) {
-      setReplyError(extractErrorMessage(err, 'Failed to send reply.'));
+      notify.error(extractErrorMessage(err, 'Failed to send reply.'));
     } finally {
       setSendingReply(false);
     }
@@ -160,20 +160,17 @@ export function OpsTicketDetailPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="h-8 w-48 animate-pulse rounded bg-slate-200" />
-        <div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-white" />
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 rounded-card border border-border bg-surface-raised" />
       </div>
     );
   }
 
   if (error || !ticket) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-        <p className="font-semibold text-red-700">{error || 'Ticket not found'}</p>
-        <Link
-          to={backPath}
-          className="mt-4 inline-block text-sm font-semibold text-brand-600 hover:text-brand-800"
-        >
+      <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
+        <p className="font-semibold text-danger-fg">{error || 'Ticket not found'}</p>
+        <Link to={backPath} className="mt-4 inline-block text-body font-semibold text-brand-text hover:text-brand-fg">
           &larr; Back to support tickets
         </Link>
       </div>
@@ -181,105 +178,67 @@ export function OpsTicketDetailPage() {
   }
 
   const isClosed = ticket.status === 'Closed';
+  const cardTitle = 'text-caption font-semibold uppercase tracking-wider text-fg-muted';
 
   return (
     <div className="space-y-6">
-      {/* Top Navigation & Header */}
       <div>
-        <Link
-          to={backPath}
-          className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-800"
-        >
+        <Link to={backPath} className="inline-flex items-center text-caption font-semibold text-fg-muted hover:text-fg">
           &larr; Back to all tickets
         </Link>
 
         <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                {ticket.category}
-              </span>
-              <span
-                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                  STATUS_BADGES[ticket.status]
-                }`}
-              >
-                {ticket.status}
-              </span>
-              <span
-                className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
-                  PRIORITY_BADGES[ticket.priority]
-                }`}
-              >
-                {ticket.priority} Priority
-              </span>
+              <Badge>{ticket.category}</Badge>
+              <Badge tone={STATUS_TONES[ticket.status]}>{ticket.status}</Badge>
+              <Badge tone={PRIORITY_TONES[ticket.priority]}>{ticket.priority} Priority</Badge>
             </div>
-            <h1 className="mt-2 font-heading text-2xl font-bold text-slate-900">{ticket.subject}</h1>
+            <h1 className="mt-2 font-heading text-h2 text-fg">{ticket.subject}</h1>
           </div>
 
-          <button
-            onClick={fetchTicket}
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
+          <Button variant="secondary" size="sm" onClick={fetchTicket}>
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Left 2 Cols: Details & Conversation */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Initial Ticket Details Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Initial Issue Description
-            </h3>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-              {ticket.description}
-            </p>
+          <Card>
+            <h3 className={cardTitle}>Initial Issue Description</h3>
+            <p className="mt-3 whitespace-pre-wrap text-body leading-relaxed text-fg">{ticket.description}</p>
 
             {ticket.packageName && (
-              <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
-                <span className="font-semibold text-slate-700">Linked Booking:</span>{' '}
-                {ticket.packageName} ({ticket.bookingId})
+              <div className="mt-4 rounded-input border border-border bg-surface-sunken p-3 text-caption text-fg-muted">
+                <span className="font-semibold text-fg">Linked Booking:</span> {ticket.packageName} ({ticket.bookingId})
               </div>
             )}
-          </div>
+          </Card>
 
-          {/* Messages Thread */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Conversation Thread ({ticket.messages.length})
-            </h3>
+          <Card>
+            <h3 className={`mb-4 ${cardTitle}`}>Conversation Thread ({ticket.messages.length})</h3>
 
             {ticket.messages.length === 0 ? (
-              <div className="py-8 text-center text-sm text-slate-400">
-                No replies in this thread yet.
-              </div>
+              <div className="py-8 text-center text-body text-fg-muted">No replies in this thread yet.</div>
             ) : (
               <div className="space-y-4">
                 {ticket.messages.map((msg) => {
                   const isStaff = msg.isStaff;
                   return (
-                    <div
-                      key={msg.id}
-                      className={`flex flex-col ${
-                        isStaff ? 'items-end' : 'items-start'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2 text-xs text-slate-500">
-                        <span className="font-semibold text-slate-800">
+                    <div key={msg.id} className={`flex flex-col ${isStaff ? 'items-end' : 'items-start'}`}>
+                      <div className="flex items-center gap-2 text-caption text-fg-muted">
+                        <span className="font-semibold text-fg">
                           {isStaff ? `${msg.senderDisplayName} (Staff)` : msg.senderDisplayName}
                         </span>
                         <span>·</span>
                         <span>{formatDateTime(msg.createdAt)}</span>
                       </div>
                       <div
-                        className={`mt-1.5 max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                        className={`mt-1.5 max-w-[85%] rounded-2xl px-4 py-3 text-body leading-relaxed shadow-soft ${
                           isStaff
-                            ? 'rounded-tr-none bg-brand-600 text-white'
-                            : 'rounded-tl-none border border-slate-200 bg-slate-50 text-slate-800'
+                            ? 'rounded-tr-none bg-brand-700 text-white dark:bg-brand-500 dark:text-brand-950'
+                            : 'rounded-tl-none border border-border bg-surface-sunken text-fg'
                         }`}
                       >
                         <p className="whitespace-pre-wrap">{msg.message}</p>
@@ -290,232 +249,169 @@ export function OpsTicketDetailPage() {
               </div>
             )}
 
-            {/* Staff Reply Box */}
-            <div className="mt-6 border-t border-slate-200 pt-5">
+            <div className="mt-6 border-t border-border pt-5">
               {isClosed ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-600">
+                <div className="rounded-input border border-border bg-surface-sunken p-4 text-center text-body text-fg-muted">
                   This support ticket is closed. Reopen the ticket to send a reply.
                 </div>
               ) : (
                 <form onSubmit={handleSendReply} className="space-y-3">
-                  <label htmlFor="staff-reply" className="block text-xs font-semibold text-slate-700">
-                    Send Reply as Staff
-                  </label>
-                  <textarea
+                  <Textarea
                     id="staff-reply"
+                    label="Send Reply as Staff"
                     rows={4}
                     placeholder="Type your response to the traveler..."
                     value={replyMessage}
                     onChange={(e) => setReplyMessage(e.target.value)}
                     disabled={sendingReply}
-                    className="block w-full rounded-lg border border-slate-300 p-3 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     required
                   />
 
-                  {replyError && (
-                    <p className="text-xs font-medium text-red-600">{replyError}</p>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-caption text-fg-muted">
                       Replies automatically transition ticket to Waiting for Customer.
                     </span>
-                    <button
-                      type="submit"
-                      disabled={sendingReply || !replyMessage.trim()}
-                      className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:opacity-50"
-                    >
+                    <Button type="submit" disabled={sendingReply || !replyMessage.trim()}>
                       {sendingReply ? 'Sending...' : 'Send Reply'}
-                    </button>
+                    </Button>
                   </div>
                 </form>
               )}
             </div>
-          </div>
+          </Card>
         </div>
 
-        {/* Right 1 Col: Management & Status Controls */}
         <div className="space-y-6">
-          {/* Status Controls Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Ticket Status
-            </h3>
+          <Card>
+            <h3 className={cardTitle}>Ticket Status</h3>
             <div className="mt-3">
-              <label htmlFor="status-select" className="text-xs text-slate-500">
-                Change Status
-              </label>
-              <select
+              <Select
                 id="status-select"
+                label="Change Status"
                 value={ticket.status}
                 disabled={updatingStatus}
                 onChange={(e) => handleStatusChange(e.target.value as TicketStatus)}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
               >
                 <option value="Open">Open</option>
                 <option value="InProgress">In Progress</option>
                 <option value="WaitingForCustomer">Waiting for Customer</option>
                 <option value="Resolved">Resolved</option>
                 <option value="Closed">Closed</option>
-              </select>
+              </Select>
             </div>
 
             {isClosed && (
               <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => handleStatusChange('InProgress')}
-                  disabled={updatingStatus}
-                  className="w-full rounded-lg border border-slate-300 bg-white py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
+                <Button variant="secondary" size="sm" className="w-full" onClick={() => handleStatusChange('InProgress')} disabled={updatingStatus}>
                   Reopen Ticket
-                </button>
+                </Button>
               </div>
             )}
 
             {ticket.resolvedAt && (
-              <div className="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-500">
+              <div className="mt-3 border-t border-border pt-2 text-caption text-fg-muted">
                 Resolved: {formatDateTime(ticket.resolvedAt)}
               </div>
             )}
             {ticket.closedAt && (
-              <div className="mt-1 text-xs text-slate-500">
-                Closed: {formatDateTime(ticket.closedAt)}
-              </div>
+              <div className="mt-1 text-caption text-fg-muted">Closed: {formatDateTime(ticket.closedAt)}</div>
             )}
-          </div>
+          </Card>
 
-          {/* Priority Controls Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Priority
-            </h3>
+          <Card>
+            <h3 className={cardTitle}>Priority</h3>
             <div className="mt-3">
-              <label htmlFor="priority-select" className="text-xs text-slate-500">
-                Change Priority
-              </label>
-              <select
+              <Select
                 id="priority-select"
+                label="Change Priority"
                 value={ticket.priority}
                 disabled={updatingPriority}
                 onChange={(e) => handlePriorityChange(e.target.value as TicketPriority)}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
               >
                 <option value="Low">Low</option>
                 <option value="Normal">Normal</option>
                 <option value="High">High</option>
                 <option value="Urgent">Urgent</option>
-              </select>
+              </Select>
             </div>
-          </div>
+          </Card>
 
-          {/* Assignment Controls Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Staff Assignment
-            </h3>
+          <Card>
+            <h3 className={cardTitle}>Staff Assignment</h3>
             <div className="mt-3">
-              <div className="text-sm font-semibold text-slate-800">
-                {ticket.assignedToName || 'Unassigned'}
-              </div>
-              {ticket.assignedToId && (
-                <div className="text-xs text-slate-400">ID: {ticket.assignedToId}</div>
-              )}
+              <div className="text-body font-semibold text-fg">{ticket.assignedToName || 'Unassigned'}</div>
+              {ticket.assignedToId && <div className="text-caption text-fg-muted">ID: {ticket.assignedToId}</div>}
             </div>
 
-            <div className="mt-4 flex flex-col space-y-2">
+            <div className="mt-4 flex flex-col gap-2">
               {user?.id && ticket.assignedToId !== user.id && (
-                <button
-                  type="button"
-                  onClick={() => handleAssignment(user.id)}
-                  disabled={updatingAssignment}
-                  className="rounded-lg bg-slate-800 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-900 disabled:opacity-50"
-                >
+                <Button size="sm" onClick={() => handleAssignment(user.id)} disabled={updatingAssignment}>
                   Assign to Me
-                </button>
+                </Button>
               )}
 
               {ticket.assignedToId && (
-                <button
-                  type="button"
-                  onClick={() => handleAssignment(null)}
-                  disabled={updatingAssignment}
-                  className="rounded-lg border border-slate-300 bg-white py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-                >
+                <Button variant="secondary" size="sm" onClick={() => handleAssignment(null)} disabled={updatingAssignment}>
                   Unassign
-                </button>
+                </Button>
               )}
 
               {!showCustomAssign ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCustomAssign(true)}
-                  className="text-xs font-semibold text-brand-600 hover:text-brand-800"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setShowCustomAssign(true)}>
                   Assign to specific Staff ID...
-                </button>
+                </Button>
               ) : (
-                <div className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                  <label htmlFor="custom-assign-id" className="block text-xs font-semibold text-slate-700">
-                    Staff User GUID
-                  </label>
-                  <input
+                <div className="mt-2 space-y-2 rounded-input border border-border bg-surface-sunken p-2.5">
+                  <Input
                     id="custom-assign-id"
                     type="text"
+                    label="Staff User GUID"
                     placeholder="Enter staff GUID..."
                     value={customAssignId}
                     onChange={(e) => setCustomAssignId(e.target.value)}
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
                   />
-                  <div className="flex space-x-2">
-                    <button
-                      type="button"
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
                       onClick={() => handleAssignment(customAssignId.trim() || null)}
                       disabled={updatingAssignment || !customAssignId.trim()}
-                      className="rounded bg-brand-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
                     >
                       Assign
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => {
                         setShowCustomAssign(false);
                         setCustomAssignId('');
                       }}
-                      className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </Card>
 
-          {/* Traveler & Audit Info Card */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-xs shadow-sm">
-            <h3 className="font-semibold uppercase tracking-wider text-slate-500">
-              Ticket Details
-            </h3>
-            <div className="mt-3 space-y-2 text-slate-600">
+          <Card className="text-caption">
+            <h3 className="font-semibold uppercase tracking-wider text-fg-muted">Ticket Details</h3>
+            <div className="mt-3 space-y-2 text-fg-muted">
               <div>
-                <span className="font-semibold text-slate-700">Traveler:</span>{' '}
-                {ticket.travelerDisplayName}
+                <span className="font-semibold text-fg">Traveler:</span> {ticket.travelerDisplayName}
               </div>
               <div>
-                <span className="font-semibold text-slate-700">Traveler ID:</span>{' '}
+                <span className="font-semibold text-fg">Traveler ID:</span>{' '}
                 <span className="font-mono">{ticket.travelerId}</span>
               </div>
               <div>
-                <span className="font-semibold text-slate-700">Created:</span>{' '}
-                {formatDateTime(ticket.createdAt)}
+                <span className="font-semibold text-fg">Created:</span> {formatDateTime(ticket.createdAt)}
               </div>
               <div>
-                <span className="font-semibold text-slate-700">Last Updated:</span>{' '}
-                {formatDateTime(ticket.updatedAt)}
+                <span className="font-semibold text-fg">Last Updated:</span> {formatDateTime(ticket.updatedAt)}
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>

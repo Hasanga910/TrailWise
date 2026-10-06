@@ -158,4 +158,27 @@ public class ReviewService : IReviewService
 
         return PackageReviewsResult.Success(packageId, averageRating, totalReviews, reviews);
     }
+
+    public async Task<IReadOnlyList<FeaturedReview>> GetFeaturedReviewsAsync(
+        int limit,
+        int minRating = 4,
+        CancellationToken ct = default)
+    {
+        var rows = await _db.Reviews
+            .AsNoTracking()
+            .Where(r => r.Rating >= minRating && r.Comment != null && r.Comment.Trim() != "")
+            .OrderByDescending(r => r.SubmittedAt)
+            .ThenByDescending(r => r.Id)
+            .Take(limit)
+            .Select(r => new FeaturedReview(
+                r.Id,
+                r.Rating,
+                r.Comment!,
+                r.SubmittedAt,
+                r.Booking.TourPackageId,
+                r.Booking.TourPackage.Name))
+            .ToListAsync(ct);
+
+        return rows;
+    }
 }

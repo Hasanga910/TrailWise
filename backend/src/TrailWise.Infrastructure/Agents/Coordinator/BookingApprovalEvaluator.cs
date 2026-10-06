@@ -30,6 +30,17 @@ public static class BookingApprovalEvaluator
 
     public readonly record struct Result(Decision Decision, IReadOnlyList<string> Reasons);
 
+    /// <summary>
+    /// Which of the doc 8.3 approval types a booking that needs approval belongs to. A large group
+    /// takes precedence; a budget overrun on a standard-size group is a budget override. The full
+    /// list of reasons is stored with the request, so a booking that trips both rules still shows
+    /// both to the Operations Manager.
+    /// </summary>
+    public static Domain.Enums.ApprovalType ClassifyApprovalType(int groupSize) =>
+        groupSize > LargeGroupThreshold
+            ? Domain.Enums.ApprovalType.LargeGroupOrCustomItinerary
+            : Domain.Enums.ApprovalType.BudgetOverride;
+
     public static Result Evaluate(Input input)
     {
         var reasons = new List<string>();

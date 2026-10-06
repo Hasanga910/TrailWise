@@ -16,15 +16,62 @@ public class GuideMatchingAgent : IGuideMatchingAgent
     private readonly TrailWiseDbContext _db;
     private readonly IGuideAvailabilityService _availabilityService;
     private readonly ILogger<GuideMatchingAgent> _logger;
+    private readonly IToolCallRecorder? _recorder;
 
     public GuideMatchingAgent(
         TrailWiseDbContext db,
         IGuideAvailabilityService availabilityService,
-        ILogger<GuideMatchingAgent> logger)
+        ILogger<GuideMatchingAgent> logger,
+        IToolCallRecorder? recorder = null)
     {
+        _recorder = recorder;
         _db = db;
         _availabilityService = availabilityService;
         _logger = logger;
+    }
+
+    public async Task<bool> IsQualifiedAsync(Guid bookingId, Guid guideId, CancellationToken ct = default)
+    {
+        if (guideId == Guid.Empty)
+        {
+            return false;
+        }
+
+        var booking = await _db.Bookings
+            .AsNoTracking()
+            .Include(b => b.TourPackage)
+            .FirstOrDefaultAsync(b => b.Id == bookingId, ct);
+        var theme = booking?.TourPackage?.Theme?.Trim();
+        if (booking is null || string.IsNullOrWhiteSpace(theme))
+        {
+            return false;
+        }
+
+        var guide = await _db.Guides.AsNoTracking().FirstOrDefaultAsync(g => g.Id == guideId, ct);
+        if (guide is null)
+        {
+            return false;
+        }
+
+        var hasSpecialization = guide.Specializations != null && guide.Specializations.Any(s =>
+            !string.IsNullOrWhiteSpace(s) && string.Equals(s.Trim(), theme, StringComparison.OrdinalIgnoreCase));
+        if (!hasSpecialization)
+        {
+            return false;
+        }
+
+        var languagePref = string.IsNullOrWhiteSpace(booking.LanguagePreference) ? null : booking.LanguagePreference.Trim();
+        if (languagePref != null)
+        {
+            var speaksLanguage = guide.Languages != null && guide.Languages.Any(l =>
+                !string.IsNullOrWhiteSpace(l) && string.Equals(l.Trim(), languagePref, StringComparison.OrdinalIgnoreCase));
+            if (!speaksLanguage)
+            {
+                return false;
+            }
+        }
+
+        return await _availabilityService.IsGuideAvailableAsync(guide.Id, booking.StartDate, booking.EndDate, ct);
     }
 
     public async Task<GuideMatchResult> MatchAsync(Guid bookingId, CancellationToken ct = default)
@@ -118,11 +165,11 @@ public class GuideMatchingAgent : IGuideMatchingAgent
             foreach (var guide in candidateGuides)
             {
                 // Must be available for the complete booking date range
-                var isAvailable = await _availabilityService.IsGuideAvailableAsync(
-                    guide.Id,
-                    booking.StartDate,
-                    booking.EndDate,
-                    ct);
+                var isAvailable = await _recorder.TrackAsync(
+                    AgentTools.GuideAvailabilityRead,
+                    $"guide {guide.Id}, {booking.StartDate:yyyy-MM-dd} to {booking.EndDate:yyyy-MM-dd}",
+                    () => _availabilityService.IsGuideAvailableAsync(guide.Id, booking.StartDate, booking.EndDate, ct),
+                    available => available ? "available for the full period" : "not available");
 
                 if (!isAvailable)
                 {

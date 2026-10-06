@@ -23,6 +23,9 @@ public class Booking : BaseEntity
     public DateTimeOffset? PaymentDueAt { get; set; }
     public DateTimeOffset? PaymentExpiredAt { get; set; }
     public string? CancellationReason { get; set; }
+
+    /// <summary>Note from the Operations Manager when a revision was requested (visible to the traveler).</summary>
+    public string? RevisionNote { get; set; }
     public DateTimeOffset? BalancePaymentDueAt { get; set; }
 
     public bool Attended { get; set; } = false;

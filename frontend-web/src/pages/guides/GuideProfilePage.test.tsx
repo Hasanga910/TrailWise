@@ -14,6 +14,11 @@ import { RequireRole } from '../../auth/RequireRole';
 import type { CurrentUser } from '../../auth/types';
 import { GuideProfilePage } from './GuideProfilePage';
 
+vi.mock('../../components/ui/notify', () => ({
+  notify: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+import { notify } from '../../components/ui/notify';
+
 vi.mock('../../api/guides', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/guides')>();
   return {
@@ -295,7 +300,7 @@ describe('GuideProfilePage', () => {
       });
     });
 
-    expect(screen.getByText('Profile updated successfully.')).toBeInTheDocument();
+    expect(notify.success).toHaveBeenCalledWith('Profile updated successfully.');
   });
 
   // Additional flow tests
@@ -349,9 +354,7 @@ describe('GuideProfilePage', () => {
     await user.click(saveButton);
 
     await waitFor(() => {
-      expect(
-        screen.getByText('A user with this email address already exists.'),
-      ).toBeInTheDocument();
+      expect(notify.error).toHaveBeenCalledWith('A user with this email address already exists.');
     });
   });
 
@@ -417,28 +420,6 @@ describe('GuideProfilePage', () => {
     });
   });
 
-  it('profile nav links are visible for TourGuide', async () => {
-    mockedGetMyGuideProfile.mockResolvedValue(sampleGuide);
-    renderPage();
-
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute(
-      'href',
-      '/guides/profile',
-    );
-    expect(screen.getByRole('link', { name: 'My Tours' })).toHaveAttribute(
-      'href',
-      '/guides/my-tours',
-    );
-    expect(screen.getByRole('link', { name: 'Guide Availability' })).toHaveAttribute(
-      'href',
-      '/guides/availability',
-    );
-  });
-
   it('profile route blocked for Traveler', () => {
     const travelerUser: CurrentUser = {
       id: 'traveler-1',
@@ -470,13 +451,13 @@ describe('GuideProfilePage', () => {
                 </RequireRole>
               }
             />
-            <Route path="/traveler" element={<div>Traveler Home Dashboard</div>} />
+            <Route path="/no-access" element={<div>No Access Page</div>} />
           </Routes>
         </AuthContext.Provider>
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Traveler Home Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('No Access Page')).toBeInTheDocument();
     expect(screen.queryByText('Tour Guide Profile & Settings')).not.toBeInTheDocument();
   });
 });

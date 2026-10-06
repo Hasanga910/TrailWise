@@ -6,6 +6,29 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="TrailWise — tour operations, booking, and travel management console." />
+    <script>
+      // Runs before first paint. Light by default; only an explicit saved "dark" turns dark on. The OS setting is ignored.
+      (function () {
+        var dark = false;
+        try {
+          dark = localStorage.getItem('trailwise_theme') === 'dark';
+        } catch (e) {}
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      })();
+    </script>
+    <script>
+      // The home hero image is the largest paint: start fetching it before the JS bundle has run.
+      if (location.pathname === '/') {
+        var l = document.createElement('link');
+        l.rel = 'preload';
+        l.as = 'image';
+        l.href = '/hero/mountain-ridge-hikers-800.webp';
+        l.setAttribute('imagesrcset', '/hero/mountain-ridge-hikers-800.webp 800w, /hero/mountain-ridge-hikers-1600.webp 1600w, /hero/mountain-ridge-hikers-1920.webp 1920w');
+        l.setAttribute('imagesizes', '100vw');
+        l.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(l);
+      }
+    </script>
     <title>TrailWise — Operations Console</title>
   </head>
   <body>

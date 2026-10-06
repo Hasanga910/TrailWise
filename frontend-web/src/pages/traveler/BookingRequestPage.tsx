@@ -3,11 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { extractErrorMessage, extractFieldErrors } from '../../api/apiClient';
 import { createBooking } from '../../api/bookings';
 import { getPackages, type TourPackage } from '../../api/packages';
-
-const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'text-xs font-semibold text-slate-600';
-const fieldErrorClass = 'mt-1 text-xs font-medium text-red-700';
+import { Button, Card, Input, PageHeader, Select, Textarea } from '../../components/ui';
+import { notify } from '../../components/ui/notify';
 
 interface TierOption {
   tierId: string;
@@ -29,6 +26,15 @@ function flattenTiers(packages: TourPackage[]): TierOption[] {
   );
 }
 
+function parsePositiveInt(value: string | null): number | null {
+  const n = value ? Number.parseInt(value, 10) : NaN;
+  return Number.isInteger(n) && n > 0 && n <= 1000 ? n : null;
+}
+
+function parseIsoDate(value: string | null): string | null {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : null;
+}
+
 export function BookingRequestPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -37,14 +43,14 @@ export function BookingRequestPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [packageTierId, setPackageTierId] = useState(searchParams.get('tier') ?? '');
-  const [groupSize, setGroupSize] = useState(1);
-  const [startDate, setStartDate] = useState('');
+  // Optional prefill from the public explorer: ?guests=4&start=2026-11-02
+  const [groupSize, setGroupSize] = useState(() => parsePositiveInt(searchParams.get('guests')) ?? 1);
+  const [startDate, setStartDate] = useState(() => parseIsoDate(searchParams.get('start')) ?? '');
   const [endDate, setEndDate] = useState('');
   const [budgetPerPerson, setBudgetPerPerson] = useState(0);
   const [specialRequests, setSpecialRequests] = useState('');
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -58,7 +64,6 @@ export function BookingRequestPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setFieldErrors({});
-    setSubmitError(null);
 
     if (!packageTierId) {
       setFieldErrors({ packageTierId: 'Please select a package tier.' });
@@ -80,7 +85,7 @@ export function BookingRequestPage() {
       const errors = extractFieldErrors(err);
       setFieldErrors(errors);
       if (Object.keys(errors).length === 0) {
-        setSubmitError(extractErrorMessage(err, 'Could not submit booking request.'));
+        notify.error(extractErrorMessage(err, 'Could not submit booking request.'));
       }
     } finally {
       setSubmitting(false);
@@ -89,35 +94,25 @@ export function BookingRequestPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-slate-900">Request a Booking</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Choose a package tier, your dates, group size, and budget per person.
-        </p>
-      </div>
+      <PageHeader
+        title="Request a Booking"
+        description="Choose a package tier, your dates, group size, and budget per person."
+      />
 
       {loadError && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <p role="alert" className="mb-4 rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
           {loadError}
         </p>
       )}
 
-      {submitError && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {submitError}
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6">
-        <div>
-          <label htmlFor="packageTierId" className={labelClass}>
-            Package tier
-          </label>
-          <select
+      <Card className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Select
             id="packageTierId"
+            label="Package tier"
             required
-            className={inputClass}
             value={packageTierId}
+            error={fieldErrors.packageTierId}
             onChange={(e) => setPackageTierId(e.target.value)}
           >
             <option value="" disabled>
@@ -128,99 +123,66 @@ export function BookingRequestPage() {
                 {option.packageName} — {option.classType} (${option.basePricePerPerson.toFixed(2)}/person)
               </option>
             ))}
-          </select>
-          {fieldErrors.packageTierId && <p className={fieldErrorClass}>{fieldErrors.packageTierId}</p>}
-        </div>
+          </Select>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="startDate" className={labelClass}>
-              Start date
-            </label>
-            <input
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
               id="startDate"
+              label="Start date"
               required
               type="date"
-              className={inputClass}
               value={startDate}
+              error={fieldErrors.startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
-            {fieldErrors.startDate && <p className={fieldErrorClass}>{fieldErrors.startDate}</p>}
-          </div>
-          <div>
-            <label htmlFor="endDate" className={labelClass}>
-              End date
-            </label>
-            <input
+            <Input
               id="endDate"
+              label="End date"
               required
               type="date"
-              className={inputClass}
               value={endDate}
+              error={fieldErrors.endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
-            {fieldErrors.endDate && <p className={fieldErrorClass}>{fieldErrors.endDate}</p>}
-          </div>
-          <div>
-            <label htmlFor="groupSize" className={labelClass}>
-              Group size
-            </label>
-            <input
+            <Input
               id="groupSize"
+              label="Group size"
               required
               type="number"
               min={1}
-              className={inputClass}
               value={groupSize}
+              error={fieldErrors.groupSize}
               onChange={(e) => setGroupSize(Number(e.target.value))}
             />
-            {fieldErrors.groupSize && <p className={fieldErrorClass}>{fieldErrors.groupSize}</p>}
-          </div>
-          <div>
-            <label htmlFor="budgetPerPerson" className={labelClass}>
-              Budget per person
-            </label>
-            <input
+            <Input
               id="budgetPerPerson"
+              label="Budget per person"
               required
               type="number"
               min={0.01}
               step="0.01"
-              className={inputClass}
               value={budgetPerPerson}
+              error={fieldErrors.budgetPerPerson}
               onChange={(e) => setBudgetPerPerson(Number(e.target.value))}
             />
-            {fieldErrors.budgetPerPerson && <p className={fieldErrorClass}>{fieldErrors.budgetPerPerson}</p>}
           </div>
-        </div>
 
-        <div>
-          <label htmlFor="specialRequests" className={labelClass}>
-            Special requests (optional)
-          </label>
-          <textarea
+          <Textarea
             id="specialRequests"
+            label="Special requests (optional)"
             rows={3}
             maxLength={1000}
-            className={inputClass}
             value={specialRequests}
+            hint="This note is processed by an AI service to help plan your trip. Avoid including sensitive personal or payment details."
+            error={fieldErrors.specialRequests}
             onChange={(e) => setSpecialRequests(e.target.value)}
           />
-          <p className="mt-1 text-xs text-slate-400">
-            This note is processed by an AI service to help plan your trip. Avoid including sensitive personal
-            or payment details.
-          </p>
-          {fieldErrors.specialRequests && <p className={fieldErrorClass}>{fieldErrors.specialRequests}</p>}
-        </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-        >
-          {submitting ? 'Submitting...' : 'Submit request'}
-        </button>
-      </form>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? 'Submitting...' : 'Submit request'}
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

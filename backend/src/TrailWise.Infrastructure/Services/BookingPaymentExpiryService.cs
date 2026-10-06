@@ -64,6 +64,7 @@ public class BookingPaymentExpiryService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
         var auditLogService = scope.ServiceProvider.GetRequiredService<IAuditLogService>();
+        var guideAssignmentService = scope.ServiceProvider.GetRequiredService<IGuideAssignmentService>();
 
         var now = _clock.UtcNow;
 
@@ -108,6 +109,7 @@ public class BookingPaymentExpiryService : BackgroundService
 
             try
             {
+                await guideAssignmentService.ReleaseGuideAsync(booking.Id, ct);
                 await db.SaveChangesAsync(ct);
 
                 await auditLogService.LogAsync(

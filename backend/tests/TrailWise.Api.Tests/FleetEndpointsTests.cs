@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Fleet;
@@ -236,7 +238,8 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.True(avail1.IsAvailable);
 
         // 3. Create a driver and a booking to assign
-        var driverRes = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
+        var driverRes = await coordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
         {
             Name = "John Perera",
             LicenseNumber = $"LIC-{Guid.NewGuid():N}",
@@ -245,29 +248,18 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var driver = await driverRes.Content.ReadFromJsonAsync<DriverDto>(JsonOptions);
 
         // Create booking
-        var travelerClient = await TravelerClientAsync();
+        var (travelerClient, travelerEmail) = await TravelerClientWithEmailAsync();
         var tierRes = await adminClient.GetAsync("/api/packages");
         var packages = await tierRes.Content.ReadFromJsonAsync<List<TourPackageDto>>(JsonOptions);
         var tier = packages![0].Tiers[0];
 
-        var bookingRes = await travelerClient.PostAsJsonAsync("/api/bookings", new
-        {
-            PackageTierId = tier.Id,
-            GroupSize = 2,
-            StartDate = d1,
-            EndDate = d5,
-            BudgetPerPerson = 500m
-        });
-        var bookingBody = await bookingRes.Content.ReadAsStringAsync();
-        Assert.True(bookingRes.IsSuccessStatusCode, $"Booking create failed: {bookingRes.StatusCode} - {bookingBody}");
-        var booking = await bookingRes.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
-        Assert.NotNull(booking);
+        var booking = await SeedBookingAsync(travelerEmail, tier.Id, groupSize: 2, d1, d5, budgetPerPerson: 500m);
 
         // Reserve vehicle for d2 to d4 (overlapping with d1..d5)
         var reserveRes = await adminClient.PostAsJsonAsync($"/api/vehicles/{vehicle.Id}/reservations", new ReserveVehicleRequest
         {
             DriverId = driver!.Id,
-            BookingId = booking!.Id,
+            BookingId = booking.Id,
             StartDate = d2,
             EndDate = d4
         });
@@ -298,9 +290,10 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     public async Task DriversEndpoints_SupportGetAllGetByIdAndCreate()
     {
         var adminClient = await AdminClientAsync();
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
         var license = $"B-{Guid.NewGuid():N}";
 
-        var createRes = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        var createRes = await coordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
         {
             Name = "Sunil Silva",
             LicenseNumber = license,
@@ -375,7 +368,8 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var vehicle = await vehicleRes.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
 
         // 2. Create driver
-        var driverRes = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
+        var driverRes = await coordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
         {
             Name = "Kamal Gunaratne",
             LicenseNumber = $"B-{Guid.NewGuid():N}",
@@ -384,23 +378,16 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var driver = await driverRes.Content.ReadFromJsonAsync<DriverDto>(JsonOptions);
 
         // 3. Create booking by traveler
-        var travelerClient = await TravelerClientAsync();
+        var (travelerClient, travelerEmail) = await TravelerClientWithEmailAsync();
         var pkgsRes = await adminClient.GetAsync("/api/packages");
         var packages = await pkgsRes.Content.ReadFromJsonAsync<List<TourPackageDto>>(JsonOptions);
         var tier = packages![0].Tiers[0];
 
-        var bookingRes = await travelerClient.PostAsJsonAsync("/api/bookings", new
-        {
-            PackageTierId = tier.Id,
-            GroupSize = 4,
-            StartDate = new DateOnly(2026, 11, 1),
-            EndDate = new DateOnly(2026, 11, 5),
-            BudgetPerPerson = 450m
-        });
-        var booking = await bookingRes.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+        var booking = await SeedBookingAsync(
+            travelerEmail, tier.Id, groupSize: 4, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 5), budgetPerPerson: 450m);
 
         // Before assignment: 404
-        var preRes = await travelerClient.GetAsync($"/api/vehicles/assignments/by-booking/{booking!.Id}");
+        var preRes = await travelerClient.GetAsync($"/api/vehicles/assignments/by-booking/{booking.Id}");
         Assert.Equal(HttpStatusCode.NotFound, preRes.StatusCode);
 
         // 4. Reserve vehicle as coordinator/admin
@@ -499,9 +486,10 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     public async Task CheckDriverAvailability_ReturnsTrue_AndFalseWhenConflicted()
     {
         var adminClient = await AdminClientAsync();
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
 
         // 1. Create a driver
-        var driverRes = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        var driverRes = await coordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
         {
             Name = "Bandara Silva",
             LicenseNumber = $"B-{Guid.NewGuid():N}"[..12],
@@ -573,7 +561,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     public async Task CancelBooking_ReleasesVehicleAssignment_RestoresVehicleAvailability()
     {
         var adminClient = await AdminClientAsync();
-        var travelerClient = await TravelerClientAsync();
+        var (travelerClient, travelerEmail) = await TravelerClientWithEmailAsync();
 
         // 1. Create a vehicle
         var regNum = NewRegistrationNumber();
@@ -590,7 +578,8 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.NotNull(vehicle);
 
         // 2. Create a driver
-        var driverRes = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
+        var driverRes = await coordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
         {
             Name = "Sunil Perera",
             LicenseNumber = $"B-{Guid.NewGuid():N}"[..12],
@@ -607,16 +596,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(40));
         var endDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(45));
 
-        var bookingRes = await travelerClient.PostAsJsonAsync("/api/bookings", new
-        {
-            PackageTierId = tier.Id,
-            GroupSize = 4,
-            StartDate = startDate,
-            EndDate = endDate,
-            BudgetPerPerson = 500m
-        });
-        var booking = await bookingRes.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
-        Assert.NotNull(booking);
+        var booking = await SeedBookingAsync(travelerEmail, tier.Id, groupSize: 4, startDate, endDate, budgetPerPerson: 500m);
 
         // 4. Reserve vehicle for the booking
         var reserveRes = await adminClient.PostAsJsonAsync($"/api/vehicles/{vehicle.Id}/reservations", new ReserveVehicleRequest
@@ -756,14 +736,14 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
     [Fact]
     public async Task CreateDriver_WithEmailAndPassword_ProvisionsUserAccountAndEnablesLogin()
     {
-        var adminClient = await AdminClientAsync();
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
 
-        // 1. Create a driver with email and password via coordinator/admin endpoint
+        // 1. Create a driver with email and password via coordinator endpoint
         var driverEmail = $"driver-{Guid.NewGuid():N}@trailwise.local";
         var driverPassword = "DriverPass123!";
         var driverName = "Dynamic Pro Driver";
 
-        var createDriverRes = await adminClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        var createDriverRes = await coordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
         {
             Name = driverName,
             ContactInfo = "+94770001122",
@@ -800,6 +780,137 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.Empty(myAssignments);
     }
 
+    [Fact]
+    public async Task ReassignResources_VehicleBreakdown_SuccessfullySwapsAndBlocksDoubleBooking()
+    {
+        var adminClient = await AdminClientAsync();
+        var coordinatorClient = await StaffClientWithRoleAsync(UserRole.FleetCoordinator);
+        var (travelerClient, travelerEmail) = await TravelerClientWithEmailAsync();
+
+        // 1. Create 2 vehicles (Vehicle A will 'break down', Vehicle B will be replacement)
+        var vehARes = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.SUV,
+            RegistrationNumber = NewRegistrationNumber(),
+            Capacity = 4,
+            HasAC = true,
+            SeatConfiguration = "2-2",
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        });
+        vehARes.EnsureSuccessStatusCode();
+        var vehicleA = await vehARes.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
+        Assert.NotNull(vehicleA);
+
+        var vehBRes = await adminClient.PostAsJsonAsync("/api/vehicles", new CreateVehicleRequest
+        {
+            Type = VehicleType.SUV,
+            RegistrationNumber = NewRegistrationNumber(),
+            Capacity = 4,
+            HasAC = true,
+            SeatConfiguration = "2-2",
+            MaintenanceStatus = VehicleMaintenanceStatus.Available
+        });
+        vehBRes.EnsureSuccessStatusCode();
+        var vehicleB = await vehBRes.Content.ReadFromJsonAsync<VehicleDto>(JsonOptions);
+        Assert.NotNull(vehicleB);
+
+        // 2. Create a Driver
+        var driverRes = await coordinatorClient.PostAsJsonAsync("/api/drivers", new CreateDriverRequest
+        {
+            Name = "Kamal Gunaratne",
+            LicenseNumber = $"B-{Guid.NewGuid():N}"[..12],
+            ContactInfo = "+94771234567"
+        });
+        driverRes.EnsureSuccessStatusCode();
+        var driver = await driverRes.Content.ReadFromJsonAsync<DriverDto>(JsonOptions);
+        Assert.NotNull(driver);
+
+        // 3. Setup dates and Confirmed booking with Vehicle A
+        var packagesRes = await travelerClient.GetAsync("/api/packages");
+        var packages = await packagesRes.Content.ReadFromJsonAsync<IReadOnlyList<TourPackageDto>>(JsonOptions);
+        var tier = packages![0].Tiers[0];
+
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(50));
+        var endDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(55));
+
+        var booking = await SeedBookingAsync(travelerEmail, tier.Id, groupSize: 2, startDate, endDate, budgetPerPerson: 600m);
+
+        // Transition booking to Confirmed and allocate Vehicle A
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var b = await db.Bookings.SingleAsync(x => x.Id == booking.Id);
+            b.Status = BookingStatus.Confirmed;
+            db.VehicleAssignments.Add(new VehicleAssignment
+            {
+                VehicleId = vehicleA.Id,
+                DriverId = driver.Id,
+                BookingId = booking.Id,
+                StartDate = startDate,
+                EndDate = endDate
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 4. Create another booking that books Vehicle B on the same dates
+        var (otherTraveler, otherEmail) = await TravelerClientWithEmailAsync();
+        var otherBooking = await SeedBookingAsync(otherEmail, tier.Id, groupSize: 2, startDate, endDate, budgetPerPerson: 600m);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            db.VehicleAssignments.Add(new VehicleAssignment
+            {
+                VehicleId = vehicleB.Id,
+                DriverId = driver.Id,
+                BookingId = otherBooking.Id,
+                StartDate = startDate,
+                EndDate = endDate
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 5. Attempt to reassign Booking to Vehicle B -> Expect 409 Conflict (Double booking prevention)
+        var conflictSwapRes = await coordinatorClient.PutAsJsonAsync($"/api/bookings/{booking.Id}/reassign-resources", new
+        {
+            VehicleId = vehicleB.Id,
+            Reason = "Vehicle A engine failure"
+        });
+        Assert.Equal(HttpStatusCode.Conflict, conflictSwapRes.StatusCode);
+
+        // 6. Free up Vehicle B by releasing otherBooking
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var otherAssign = await db.VehicleAssignments.FirstOrDefaultAsync(va => va.BookingId == otherBooking.Id);
+            if (otherAssign != null)
+            {
+                db.VehicleAssignments.Remove(otherAssign);
+                await db.SaveChangesAsync();
+            }
+        }
+
+        // 7. Reattempt reassignment to Vehicle B -> Expect 200 OK
+        var successfulSwapRes = await coordinatorClient.PutAsJsonAsync($"/api/bookings/{booking.Id}/reassign-resources", new
+        {
+            VehicleId = vehicleB.Id,
+            Reason = "Vehicle A flat tyre / breakdown"
+        });
+        Assert.Equal(HttpStatusCode.OK, successfulSwapRes.StatusCode);
+
+        // Verify assignment in DB
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var updatedAssign = await db.VehicleAssignments.FirstOrDefaultAsync(va => va.BookingId == booking.Id);
+            Assert.NotNull(updatedAssign);
+            Assert.Equal(vehicleB.Id, updatedAssign.VehicleId);
+
+            // Verify Audit Log recorded
+            var audit = await db.AuditLogs.FirstOrDefaultAsync(a => a.EntityId == booking.Id && a.Action == "ReassignResources");
+            Assert.NotNull(audit);
+        }
+    }
+
     private static string NewRegistrationNumber() => $"REG-{Guid.NewGuid():N}"[..12];
 
     private async Task<HttpClient> AdminClientAsync()
@@ -814,6 +925,12 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
 
     private async Task<HttpClient> TravelerClientAsync()
     {
+        var (client, _) = await TravelerClientWithEmailAsync();
+        return client;
+    }
+
+    private async Task<(HttpClient Client, string Email)> TravelerClientWithEmailAsync()
+    {
         var client = _factory.CreateClient();
         var email = $"traveler-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
@@ -822,7 +939,36 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "P@ssword123" });
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
-        return client;
+        return (client, email);
+    }
+
+    /// <summary>
+    /// Inserts a Requested booking directly instead of POSTing it. Creating a booking through the
+    /// API starts the coordinator workflow in the background, which can auto-assign a vehicle and
+    /// driver to the same dates and race the reservation the test performs.
+    /// </summary>
+    private async Task<Booking> SeedBookingAsync(
+        string email, Guid packageTierId, int groupSize, DateOnly start, DateOnly end, decimal budgetPerPerson)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+        var travelerId = await db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync();
+        var tier = await db.PackageTiers.SingleAsync(t => t.Id == packageTierId);
+
+        var booking = new Booking
+        {
+            TravelerId = travelerId,
+            TourPackageId = tier.TourPackageId,
+            PackageTierId = tier.Id,
+            GroupSize = groupSize,
+            StartDate = start,
+            EndDate = end,
+            BudgetPerPerson = budgetPerPerson,
+            Status = BookingStatus.Requested
+        };
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+        return booking;
     }
 
     private async Task<HttpClient> StaffClientWithRoleAsync(UserRole role)

@@ -1,4 +1,4 @@
-import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
+import { AppShell, type SidebarNavItem } from '../layout/AppShell';
 import { DashboardIcon, PackagesIcon, PaymentIcon, ProfileIcon, SupportIcon, UsersIcon } from './icons';
 
 const NAV_ITEMS: SidebarNavItem[] = [
@@ -58,5 +58,5 @@ function resolveAdminTitle(pathname: string): string {
 }
 
 export function AdminLayout() {
-  return <SidebarLayout navItems={NAV_ITEMS} pageTitles={resolveAdminTitle} />;
+  return <AppShell navItems={NAV_ITEMS} pageTitles={resolveAdminTitle} portalLabel="Admin Portal" />;
 }

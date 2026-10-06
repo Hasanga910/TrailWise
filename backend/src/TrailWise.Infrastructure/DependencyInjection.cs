@@ -22,6 +22,7 @@ public static class DependencyInjection
 
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<AdminSeedOptions>(configuration.GetSection(AdminSeedOptions.SectionName));
+        services.Configure<CancellationOptions>(configuration.GetSection(CancellationOptions.SectionName));
 
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();
@@ -32,6 +33,12 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.UserAgent.ParseAdd("TrailWise/1.0 (https://trailwise.local)");
         });
         services.AddScoped<ILocationSearchService, NominatimLocationSearchService>();
+
+        services.Configure<GeocodingOptions>(configuration.GetSection(GeocodingOptions.SectionName));
+        services.AddSingleton<IGeocodingDelay, TaskGeocodingDelay>();
+        services.AddSingleton<GeocodingThrottle>();
+        services.AddScoped<IPackageLocationGeocoder, PackageLocationGeocoder>();
+        services.AddScoped<IPackageLocationResolver, PackageLocationResolver>();
 
         var llmOptions = configuration.GetSection(LlmOptions.SectionName).Get<LlmOptions>() ?? new LlmOptions();
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
@@ -51,6 +58,7 @@ public static class DependencyInjection
                 sp.GetRequiredService<ILogger<GroqAgentClient>>())
             : new NullLlmClient());
 
+        services.AddScoped<IToolCallRecorder, ToolCallRecorder>();
         services.AddScoped<IPreferenceExtractionAgent, PreferenceExtractionAgent>();
         services.AddScoped<IProposalSummaryAgent, ProposalSummaryAgent>();
         services.AddScoped<IGuideMatchingAgent, GuideMatchingAgent>();
@@ -58,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IFleetReservationService, FleetReservationService>();
         services.AddScoped<IGuideAvailabilityService, GuideAvailabilityService>();
         services.AddScoped<IGuideAssignmentService, GuideAssignmentService>();
+        services.AddScoped<IApprovalService, ApprovalService>();
         services.AddScoped<IItineraryService, ItineraryService>();
         services.AddScoped<IPricingValidationAgent, PricingValidationAgent>();
         services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();

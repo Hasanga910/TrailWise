@@ -5,6 +5,10 @@ import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
 import '../auth/current_user.dart';
 import '../models/guide_profile.dart';
+import '../theme/app_theme.dart';
+import '../utils/validators.dart';
+import '../theme/theme_toggle_button.dart';
+import '../widgets/widgets.dart';
 
 const List<String> availableGuideLanguages = [
   'Afrikaans',
@@ -205,6 +209,7 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
   }
 
   Future<void> _showLanguageSelector() async {
+    final colors = AppColors.of(context);
     String searchQuery = '';
     await showModalBottomSheet<void>(
       context: context,
@@ -279,12 +284,12 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                     const Divider(),
                     Expanded(
                       child: filtered.isEmpty
-                          ? const Center(
+                          ? Center(
                               child: Padding(
                                 padding: EdgeInsets.all(20),
                                 child: Text(
                                   'No languages found',
-                                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                                  style: TextStyle(color: colors.fgMuted, fontSize: 14),
                                 ),
                               ),
                             )
@@ -485,6 +490,7 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
   }
 
   void _showDeleteConfirmDialog() {
+    final colors = AppColors.of(context);
     _deleteError = null;
     showDialog(
       context: context,
@@ -500,10 +506,10 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                 style: TextStyle(fontSize: 14),
               ),
               if (_deleteError != null) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Text(
                   _deleteError!,
-                  style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: colors.danger, fontSize: 13, fontWeight: FontWeight.bold),
                 ),
               ],
             ],
@@ -517,7 +523,7 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
               onPressed: _deletingProfile
                   ? null
                   : () => _handleDeleteProfile(setDialogState),
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(backgroundColor: colors.danger),
               child: _deletingProfile
                   ? const SizedBox(
                       width: 18,
@@ -537,47 +543,27 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tour Guide Profile & Settings'),
+        actions: const [ThemeToggleButton()],
       ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
+    final colors = AppColors.of(context);
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingView();
     }
 
     if (_loadError != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 12),
-              Text(
-                _loadError!,
-                style: const TextStyle(fontSize: 15),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _loadProfile,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
+      return ErrorState(message: _loadError!, onRetry: _loadProfile);
     }
 
     final guideName = _profile?.name ?? '';
     final guideEmail = _profile?.email ?? '';
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.page,
       children: [
         // Profile Card
         Card(
@@ -622,7 +608,7 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                         guideEmail,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade600,
+                          color: colors.fgMuted,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -632,16 +618,16 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.teal.shade50,
+                          color: colors.brandSoft,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.teal.shade200),
+                          border: Border.all(color: colors.border),
                         ),
-                        child: const Text(
+                        child: Text(
                           'ROLE: TOUR GUIDE',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Colors.teal,
+                            color: colors.brandText,
                           ),
                         ),
                       ),
@@ -700,21 +686,23 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                   prefixIcon: Icon(Icons.phone_outlined),
                   border: OutlineInputBorder(),
                 ),
+                validator: validateOptionalPhone,
               ),
               const SizedBox(height: 16),
               // Languages Section
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         'Languages',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: colors.fg,
                         ),
                       ),
                       TextButton.icon(
@@ -735,16 +723,16 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: colors.border),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.language_outlined, size: 20, color: Colors.grey.shade500),
+                            Icon(Icons.language_outlined, size: 20, color: colors.border),
                             const SizedBox(width: 8),
                             Text(
                               'Tap to select languages...',
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                              style: TextStyle(color: colors.fgMuted, fontSize: 13),
                             ),
                           ],
                         ),
@@ -759,24 +747,24 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                         return Chip(
                           key: Key('chip-lang-$lang'),
                           label: Text(lang),
-                          labelStyle: const TextStyle(
+                          labelStyle: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF0F766E),
+                            color: colors.brandText,
                           ),
-                          backgroundColor: const Color(0xFFF0FDFA),
-                          side: const BorderSide(color: Color(0xFF99F6E4)),
-                          deleteIcon: const Icon(Icons.close, size: 16, color: Color(0xFF0F766E)),
+                          backgroundColor: colors.brandSoft,
+                          side: BorderSide(color: colors.border),
+                          deleteIcon: Icon(Icons.close, size: 16, color: colors.brandText),
                           onDeleted: () => _removeLanguage(lang),
                         );
                       }).toList(),
                     ),
                   if (_languageError != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 4),
+                      padding: EdgeInsets.only(top: 4),
                       child: Text(
                         _languageError!,
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                        style: TextStyle(color: colors.danger, fontSize: 12),
                       ),
                     ),
                 ],
@@ -787,12 +775,12 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Specializations',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: colors.fg,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -807,14 +795,14 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                           return Chip(
                             key: Key('chip-spec-$spec'),
                             label: Text(spec),
-                            labelStyle: const TextStyle(
+                            labelStyle: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
+                              color: colors.fg,
                             ),
-                            backgroundColor: const Color(0xFFF1F5F9),
-                            side: const BorderSide(color: Color(0xFFCBD5E1)),
-                            deleteIcon: const Icon(Icons.close, size: 16, color: Color(0xFF64748B)),
+                            backgroundColor: colors.neutralSoft,
+                            side: BorderSide(color: colors.border),
+                            deleteIcon: Icon(Icons.close, size: 16, color: colors.fgMuted),
                             onDeleted: () => _removeSpecialization(spec),
                           );
                         }).toList(),
@@ -839,24 +827,24 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                   ),
                   if (_specializationError != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 4),
+                      padding: EdgeInsets.only(top: 4),
                       child: Text(
                         _specializationError!,
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                        style: TextStyle(color: colors.danger, fontSize: 12),
                       ),
                     ),
                 ],
               ),
               if (_profileError != null) ...[
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Text(_profileError!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+                    style: TextStyle(color: colors.danger, fontSize: 13)),
               ],
               if (_profileSuccess != null) ...[
                 const SizedBox(height: 10),
                 Text(_profileSuccess!,
-                    style: const TextStyle(
-                        color: Colors.teal,
+                    style: TextStyle(
+                        color: colors.brandText,
                         fontSize: 13,
                         fontWeight: FontWeight.bold)),
               ],
@@ -914,7 +902,7 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'New password is required';
-                  if (v.length < 6) return 'Minimum 6 characters required';
+                  if (v.length < 8) return 'Password must be at least 8 characters';
                   return null;
                 },
               ),
@@ -931,15 +919,15 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                     v == null || v.isEmpty ? 'Please confirm new password' : null,
               ),
               if (_passwordError != null) ...[
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Text(_passwordError!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+                    style: TextStyle(color: colors.danger, fontSize: 13)),
               ],
               if (_passwordSuccess != null) ...[
                 const SizedBox(height: 10),
                 Text(_passwordSuccess!,
-                    style: const TextStyle(
-                        color: Colors.teal,
+                    style: TextStyle(
+                        color: colors.brandText,
                         fontSize: 13,
                         fontWeight: FontWeight.bold)),
               ],
@@ -966,10 +954,10 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
         // Danger Zone Card
         Card(
           elevation: 0,
-          color: Colors.red.shade50,
+          color: colors.dangerSoft,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.red.shade200),
+            side: BorderSide(color: colors.border),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -981,13 +969,13 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.red.shade900,
+                    color: colors.dangerFg,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'This permanently removes your Tour Guide profile. You cannot delete your profile while tours are assigned to you.',
-                  style: TextStyle(fontSize: 13, color: Colors.red.shade800),
+                  style: TextStyle(fontSize: 13, color: colors.dangerFg),
                 ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
@@ -995,7 +983,7 @@ class _GuideProfileScreenState extends State<GuideProfileScreen> {
                   label: const Text('Delete Profile'),
                   onPressed: _showDeleteConfirmDialog,
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red.shade700,
+                    backgroundColor: colors.danger,
                   ),
                 ),
               ],

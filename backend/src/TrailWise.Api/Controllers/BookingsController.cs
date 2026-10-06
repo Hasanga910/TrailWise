@@ -43,6 +43,7 @@ public class BookingsController : ControllerBase
     private readonly IPaymentService _paymentService;
     private readonly IClock _clock;
     private readonly IBookingLifecycleService _bookingLifecycleService;
+    private readonly IApprovalService _approvalService;
 
     public BookingsController(
         TrailWiseDbContext db,
@@ -55,6 +56,7 @@ public class BookingsController : ControllerBase
         IGuideAvailabilityService guideAvailabilityService,
         ILogger<BookingsController> logger,
         IPaymentService paymentService,
+        IApprovalService approvalService,
         IClock? clock = null,
         IBookingLifecycleService? bookingLifecycleService = null,
         IBookingNotificationService? bookingNotificationService = null,
@@ -74,6 +76,7 @@ public class BookingsController : ControllerBase
         _clock = clock ?? new SystemClock();
         _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(_clock);
         _bookingNotificationService = bookingNotificationService;
+        _approvalService = approvalService;
     }
 
     [HttpPost]
@@ -354,6 +357,8 @@ public class BookingsController : ControllerBase
             isManagerOrAdmin: false,
             ct);
 
+        var pendingApprovals = await GetPendingApprovalTypesAsync(bookings.Select(b => b.Id), ct);
+
         var dtos = bookings.Select(b =>
         {
             statusMap.TryGetValue(b.Id, out var ps);
@@ -362,7 +367,8 @@ public class BookingsController : ControllerBase
                 paymentStatus: ps?.Succeeded == true ? ps.Status : null,
                 remainingAmount: ps?.Succeeded == true ? ps.RemainingAmount : null,
                 isFullyPaid: ps?.Succeeded == true && ps.Status == "FullyPaid",
-                hasPendingPayment: ps?.Succeeded == true && ps.HasPendingVerification);
+                hasPendingPayment: ps?.Succeeded == true && ps.HasPendingVerification)
+                .WithPendingApproval(pendingApprovals.TryGetValue(b.Id, out var type) ? type : null);
         }).ToList();
 
         return Ok(new PagedResult<BookingDto>(
@@ -411,7 +417,18 @@ public class BookingsController : ControllerBase
             isFullyPaid: paymentStatus?.Succeeded == true && paymentStatus.Status == "FullyPaid",
             hasPendingPayment: paymentStatus?.Succeeded == true && paymentStatus.HasPendingVerification);
 
-        return Ok(dto);
+        var pendingApprovals = await GetPendingApprovalTypesAsync(new[] { booking.Id }, ct);
+        return Ok(dto.WithPendingApproval(pendingApprovals.TryGetValue(booking.Id, out var pendingType) ? pendingType : null));
+    }
+
+    /// <summary>The type of the open approval request (if any) for each booking.</summary>
+    private async Task<Dictionary<Guid, ApprovalType>> GetPendingApprovalTypesAsync(IEnumerable<Guid> bookingIds, CancellationToken ct)
+    {
+        var ids = bookingIds.ToList();
+        return await _db.ApprovalRequests
+            .AsNoTracking()
+            .Where(a => ids.Contains(a.BookingId) && a.Status == ApprovalStatus.Pending)
+            .ToDictionaryAsync(a => a.BookingId, a => a.Type, ct);
     }
 
     [HttpPatch("{id:guid}/decision")]
@@ -419,286 +436,21 @@ public class BookingsController : ControllerBase
     [Authorize(Roles = ManagerRoles)]
     public async Task<ActionResult<BookingDto>> Decide(Guid id, BookingDecisionRequest request, CancellationToken ct)
     {
-        var booking = await _db.Bookings
-            .Include(b => b.TourPackage)
-            .Include(b => b.PackageTier)
-            .Include(b => b.GuideAvailabilities)
-                .ThenInclude(ga => ga.Guide)
-            .FirstOrDefaultAsync(b => b.Id == id, ct);
-
-        if (booking is null)
-        {
-            return NotFound();
-        }
-
-        if (!BookingStatusTransitions.CanDecide(booking.Status))
-        {
-            return Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: $"This booking is already {booking.Status} and cannot be decided again.");
-        }
-
         var performedBy = GetUserId();
         if (performedBy is null)
         {
             return Unauthorized();
         }
 
-        if (request.Decision != BookingDecision.Approve)
+        var decision = request.Decision == BookingDecision.Approve ? ApprovalDecision.Approve : ApprovalDecision.Reject;
+        var result = await _approvalService.DecideBookingAsync(id, decision, request.Notes, request.GuideId, performedBy.Value, ct);
+
+        return result.Outcome switch
         {
-            booking.Status = BookingStatus.Cancelled;
-        }
-
-        var run = await _db.AgentWorkflowRuns
-            .Where(r => r.BookingId == booking.Id)
-            .OrderByDescending(r => r.StartedAt)
-            .FirstOrDefaultAsync(ct);
-
-        await using var transaction = _db.Database.IsRelational()
-            ? await _db.Database.BeginTransactionAsync(ct)
-            : null;
-
-        try
-        {
-            if (run is not null)
-            {
-                // "Completed" here means the workflow run itself is finished, not that the
-                // booking was approved — both an approve and a reject conclude the run, they
-                // just leave the booking in different final statuses.
-                run.Status = "Completed";
-                run.CompletedAt = DateTimeOffset.UtcNow;
-
-                _db.AgentStepLogs.Add(new AgentStepLog
-                {
-                    WorkflowRunId = run.Id,
-                    AgentName = "manager_decision",
-                    InputJson = JsonSerializer.Serialize(
-                        new { decision = request.Decision.ToString(), request.Notes },
-                        AgentJsonOptions.Default),
-                    OutputJson = JsonSerializer.Serialize(
-                        new { newStatus = booking.Status.ToString() },
-                        AgentJsonOptions.Default),
-                    DurationMs = 0,
-                });
-            }
-
-            // Option 1: Auto-assign AI-matched vehicle and driver on approval if not already assigned
-            if (request.Decision == BookingDecision.Approve)
-            {
-                var alreadyAssigned = await _db.VehicleAssignments.AnyAsync(a => a.BookingId == booking.Id, ct);
-                if (!alreadyAssigned)
-                {
-                    Guid vehicleId = Guid.Empty;
-                    Guid driverId = Guid.Empty;
-
-                    if (run is not null)
-                    {
-                        var vehicleStepLog = await _db.AgentStepLogs
-                            .Where(s => s.WorkflowRunId == run.Id && s.AgentName == "FleetCapacityAgent")
-                            .OrderByDescending(s => s.CreatedAt)
-                            .FirstOrDefaultAsync(ct);
-
-                        if (vehicleStepLog != null && !string.IsNullOrWhiteSpace(vehicleStepLog.OutputJson))
-                        {
-                            try
-                            {
-                                using var doc = JsonDocument.Parse(vehicleStepLog.OutputJson);
-                                if (doc.RootElement.TryGetProperty("vehicleId", out var vProp) && vProp.TryGetGuid(out var vGuid))
-                                    vehicleId = vGuid;
-                                if (doc.RootElement.TryGetProperty("driverId", out var dProp) && dProp.TryGetGuid(out var dGuid))
-                                    driverId = dGuid;
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Failed to parse vehicleStepLog OutputJson for booking {BookingId}", booking.Id);
-                            }
-                        }
-                    }
-
-                    // Check if proposed vehicle and driver are still available
-                    bool isVehAvail = vehicleId != Guid.Empty && await _fleetReservationService.IsVehicleAvailableAsync(vehicleId, booking.StartDate, booking.EndDate, ct);
-                    bool isDrvAvail = driverId != Guid.Empty && await _fleetReservationService.IsDriverAvailableAsync(driverId, booking.StartDate, booking.EndDate, ct);
-
-                    // If neither was proposed or if either has been taken by an earlier approval, dynamically re-match against the currently available fleet
-                    if (!isVehAvail || !isDrvAvail)
-                    {
-                        if (vehicleId != Guid.Empty || driverId != Guid.Empty)
-                        {
-                            _logger.LogInformation("Originally proposed vehicle {VehicleId} or driver {DriverId} is no longer available for booking {BookingId}. Performing dynamic real-time re-match.",
-                                vehicleId, driverId, booking.Id);
-                        }
-
-                        var rematch = await _fleetAgent.MatchAsync(booking.Id, ct);
-                        if (!rematch.ConflictCheck && rematch.VehicleId != Guid.Empty && rematch.DriverId != Guid.Empty)
-                        {
-                            vehicleId = rematch.VehicleId;
-                            driverId = rematch.DriverId;
-                            isVehAvail = await _fleetReservationService.IsVehicleAvailableAsync(vehicleId, booking.StartDate, booking.EndDate, ct);
-                            isDrvAvail = await _fleetReservationService.IsDriverAvailableAsync(driverId, booking.StartDate, booking.EndDate, ct);
-                        }
-                    }
-
-                    if (isVehAvail && isDrvAvail)
-                    {
-                        var newAssignment = new VehicleAssignment
-                        {
-                            VehicleId = vehicleId,
-                            DriverId = driverId,
-                            BookingId = booking.Id,
-                            StartDate = booking.StartDate,
-                            EndDate = booking.EndDate
-                        };
-                        _db.VehicleAssignments.Add(newAssignment);
-                        _logger.LogInformation("Auto-assigned vehicle {VehicleId} and driver {DriverId} to approved booking {BookingId}",
-                            vehicleId, driverId, booking.Id);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("No suitable available vehicle or driver could be assigned to booking {BookingId} upon approval",
-                            booking.Id);
-                    }
-                }
-
-                // Auto-assign Guide if not already assigned
-                var alreadyHasGuide = await _db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == booking.Id, ct);
-                if (!alreadyHasGuide)
-                {
-                    Guid guideId = request.GuideId ?? Guid.Empty;
-
-                    if (guideId == Guid.Empty && run is not null)
-                    {
-                        var guideStepLog = await _db.AgentStepLogs
-                            .Where(s => s.WorkflowRunId == run.Id && s.AgentName == "GuideMatchingAgent")
-                            .OrderByDescending(s => s.CreatedAt)
-                            .FirstOrDefaultAsync(ct);
-
-                        if (guideStepLog != null && !string.IsNullOrWhiteSpace(guideStepLog.OutputJson))
-                        {
-                            try
-                            {
-                                using var gDoc = JsonDocument.Parse(guideStepLog.OutputJson);
-                                if (gDoc.RootElement.TryGetProperty("guideId", out var gProp) && gProp.TryGetGuid(out var gGuid))
-                                    guideId = gGuid;
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Failed to parse guideStepLog OutputJson for booking {BookingId}", booking.Id);
-                            }
-                        }
-                    }
-
-                    // Check guide availability or re-match if necessary
-                    bool isGuideAvail = guideId != Guid.Empty && await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
-
-                    if (!isGuideAvail && _guideMatchingAgent != null)
-                    {
-                        var rematchGuide = await _guideMatchingAgent.MatchAsync(booking.Id, ct);
-                        if (rematchGuide.GuideId != Guid.Empty)
-                        {
-                            guideId = rematchGuide.GuideId;
-                            isGuideAvail = await _guideAvailabilityService.IsGuideAvailableAsync(guideId, booking.StartDate, booking.EndDate, ct);
-                        }
-                    }
-
-                    // Fallback to any available guide in the system for these dates if still not matched
-                    if (!isGuideAvail || guideId == Guid.Empty)
-                    {
-                        var allGuides = await _db.Guides.Select(g => g.Id).ToListAsync(ct);
-                        foreach (var gId in allGuides)
-                        {
-                            if (await _guideAvailabilityService.IsGuideAvailableAsync(gId, booking.StartDate, booking.EndDate, ct))
-                            {
-                                guideId = gId;
-                                isGuideAvail = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (isGuideAvail && guideId != Guid.Empty)
-                    {
-                        await _guideAssignmentService.AssignGuideAsync(booking.Id, guideId, ct);
-                        _logger.LogInformation("Auto-assigned tour guide {GuideId} to approved booking {BookingId}", guideId, booking.Id);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("No available tour guide could be auto-assigned to booking {BookingId} upon approval", booking.Id);
-                    }
-                }
-
-                // Strictly verify all 3 resources before transitioning to Confirmed:
-                var hasAssignedGuide = _db.GuideAvailabilities.Local.Any(a => a.AssignedBookingId == booking.Id && a.GuideId != Guid.Empty) ||
-                    await _db.GuideAvailabilities.AnyAsync(a => a.AssignedBookingId == booking.Id && a.GuideId != Guid.Empty, ct);
-                var hasVehicleAndDriver = _db.VehicleAssignments.Local.Any(a => a.BookingId == booking.Id && a.VehicleId != Guid.Empty && a.DriverId != Guid.Empty) ||
-                    await _db.VehicleAssignments.AnyAsync(a => a.BookingId == booking.Id && a.VehicleId != Guid.Empty && a.DriverId != Guid.Empty, ct);
-
-                if (hasAssignedGuide && hasVehicleAndDriver)
-                {
-                    _bookingLifecycleService.TransitionToConfirmed(booking);
-                }
-                else
-                {
-                    var missingResources = new List<string>();
-                    if (!hasVehicleAndDriver) missingResources.Add("Vehicle & Driver");
-                    if (!hasAssignedGuide) missingResources.Add("Tour Guide");
-
-                    var message = $"A booking cannot be confirmed until all resources are allocated. Missing: {string.Join(", ", missingResources)}.";
-                    _logger.LogWarning("Decide conflict on booking {BookingId}: {Message}. hasAssignedGuide={HasGuide}, hasVehicleAndDriver={HasVehicleAndDriver}",
-                        booking.Id, message, hasAssignedGuide, hasVehicleAndDriver);
-                    if (transaction is not null)
-                    {
-                        await transaction.RollbackAsync(ct);
-                    }
-                    return Problem(
-                        statusCode: StatusCodes.Status409Conflict,
-                        title: message,
-                        detail: message);
-                }
-            }
-
-            await _db.SaveChangesAsync(ct);
-
-            await _auditLogService.LogAsync(
-                entityType: "Booking",
-                entityId: booking.Id,
-                action: request.Decision == BookingDecision.Approve ? "BookingApproved" : "BookingRejected",
-                performedBy: performedBy.Value,
-                details: new { decision = request.Decision.ToString(), request.Notes },
-                ct: ct);
-
-            if (transaction is not null)
-            {
-                await transaction.CommitAsync(ct);
-            }
-
-            if (request.Decision == BookingDecision.Approve)
-            {
-                var bookingId = booking.Id;
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        using var scope = _scopeFactory.CreateScope();
-                        var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
-                        await notificationService.SendBookingConfirmedNotificationsAsync(bookingId, CancellationToken.None);
-                    }
-                    catch (Exception notifEx)
-                    {
-                        _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", bookingId);
-                    }
-                });
-            }
-        }
-        catch
-        {
-            if (transaction is not null)
-            {
-                await transaction.RollbackAsync(ct);
-            }
-            throw;
-        }
-
-        return Ok(BookingDto.FromEntity(booking));
+            ApprovalOutcome.Success => Ok(BookingDto.FromEntity(result.Booking!)),
+            ApprovalOutcome.NotFound => NotFound(),
+            _ => Problem(statusCode: StatusCodes.Status409Conflict, title: result.Error, detail: result.Error)
+        };
     }
 
     [HttpPatch("{id:guid}/complete")]
@@ -875,7 +627,24 @@ public class BookingsController : ControllerBase
                 title: "This booking has already started or finished and cannot be self-cancelled.");
         }
 
+        // A traveler cancelling inside the refund window with an approved payment needs the
+        // Operations Manager's approval (refund exception); staff cancel directly.
+        if (!isManager && callerId.HasValue)
+        {
+            var approval = await _approvalService.TryRequestRefundExceptionAsync(booking.Id, request.Reason, callerId.Value, ct);
+            if (approval is not null)
+            {
+                return approval.Outcome switch
+                {
+                    ApprovalOutcome.Success => Ok(BookingDto.FromEntity(booking).WithPendingApproval(ApprovalType.RefundException)),
+                    ApprovalOutcome.NotFound => NotFound(),
+                    _ => Problem(statusCode: StatusCodes.Status409Conflict, title: approval.Error, detail: approval.Error)
+                };
+            }
+        }
+
         booking.Status = BookingStatus.Cancelled;
+        booking.CancellationReason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
 
         await using var transaction = _db.Database.IsRelational()
             ? await _db.Database.BeginTransactionAsync(ct)
@@ -883,6 +652,17 @@ public class BookingsController : ControllerBase
 
         try
         {
+            var releasedGuideDays = await _guideAssignmentService.ReleaseGuideAsync(booking.Id, ct);
+
+            // A cancelled booking must not stay in the approvals queue.
+            var openApprovals = await _db.ApprovalRequests
+                .Where(a => a.BookingId == booking.Id && a.Status == ApprovalStatus.Pending)
+                .ToListAsync(ct);
+            foreach (var open in openApprovals)
+            {
+                open.Status = ApprovalStatus.Superseded;
+            }
+
             var assignments = await _db.VehicleAssignments
                 .Where(a => a.BookingId == booking.Id)
                 .ToListAsync(ct);
@@ -900,7 +680,7 @@ public class BookingsController : ControllerBase
                 entityId: booking.Id,
                 action: isManager ? "BookingCancelledByStaff" : "BookingCancelledByTraveler",
                 performedBy: callerId,
-                details: new { request.Reason, ReleasedVehicleAssignments = assignments.Count },
+                details: new { request.Reason, ReleasedVehicleAssignments = assignments.Count, ReleasedGuideDays = releasedGuideDays },
                 ct: ct);
 
             if (transaction is not null)
@@ -1090,6 +870,49 @@ public class BookingsController : ControllerBase
             .ToList();
 
         return Ok(sorted);
+    }
+
+    [HttpPut("{id:guid}/reassign-resources")]
+    [Authorize(Roles = FleetCoordinatorOrAdmin)]
+    public async Task<ActionResult<BookingDto>> ReassignResources(
+        Guid id,
+        ReassignResourcesRequest request,
+        CancellationToken ct)
+    {
+        var performedBy = GetUserId() ?? Guid.Empty;
+
+        var result = await _fleetReservationService.ReassignResourcesAsync(
+            id,
+            request.VehicleId,
+            request.DriverId,
+            request.GuideId,
+            request.Reason,
+            performedBy,
+            ct);
+
+        if (!result.Succeeded)
+        {
+            return Conflict(new { error = result.Error });
+        }
+
+        var updatedBooking = await _db.Bookings
+            .Include(b => b.TourPackage)
+            .Include(b => b.PackageTier)
+            .Include(b => b.Traveler)
+            .Include(b => b.VehicleAssignments)
+                .ThenInclude(va => va.Vehicle)
+            .Include(b => b.VehicleAssignments)
+                .ThenInclude(va => va.Driver)
+            .Include(b => b.GuideAvailabilities)
+                .ThenInclude(ga => ga.Guide)
+            .FirstOrDefaultAsync(b => b.Id == id, ct);
+
+        if (updatedBooking is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(BookingDto.FromEntity(updatedBooking));
     }
 
     [HttpPatch("{id:guid}/guide-notes")]

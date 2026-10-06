@@ -39,6 +39,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
     private readonly IBookingLifecycleService _bookingLifecycleService;
     private readonly IClock _clock;
     private readonly IServiceScopeFactory? _scopeFactory;
+    private readonly IToolCallRecorder? _toolCalls;
 
     public CoordinatorAgentService(
         TrailWiseDbContext db,
@@ -52,8 +53,10 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         IBookingLifecycleService? bookingLifecycleService = null,
         IClock? clock = null,
         IFleetReservationService? fleetReservationService = null,
-        IServiceScopeFactory? scopeFactory = null)
+        IServiceScopeFactory? scopeFactory = null,
+        IToolCallRecorder? toolCalls = null)
     {
+        _toolCalls = toolCalls;
         _db = db;
         _preferenceAgent = preferenceAgent;
         _guideAgent = guideAgent;
@@ -79,6 +82,9 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             _logger.LogWarning("StartWorkflowAsync called for a booking that no longer exists: {BookingId}", bookingId);
             return;
         }
+
+        // A (re-)run replaces any approval still open from an earlier run.
+        await SupersedeOpenApprovalsAsync(bookingId, ct);
 
         var plan = new AgentWorkflowPlan
         {
@@ -161,6 +167,12 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         var decisionResult = BookingApprovalEvaluator.Evaluate(evaluatorInput);
         sw.Stop();
 
+        _toolCalls.RecordCall(
+            AgentTools.DeterministicRuleCheck,
+            $"group size {booking.GroupSize}, budget ceiling, AC match, vehicle conflict, guide match score",
+            $"{decisionResult.Decision}; {decisionResult.Reasons.Count} reason(s)",
+            sw.ElapsedMilliseconds);
+
         var validateStepLog = new AgentStepLog
         {
             WorkflowRunId = run.Id,
@@ -192,6 +204,11 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                         var hasAssignment = await _db.VehicleAssignments.AnyAsync(a => a.BookingId == bookingId, ct);
                         if (!hasAssignment)
                         {
+                            _toolCalls.RecordCall(
+                                AgentTools.VehicleAvailabilityWrite,
+                                $"reserve vehicle {vehicleResult.VehicleId} with driver {vehicleResult.DriverId}, {booking.StartDate:yyyy-MM-dd} to {booking.EndDate:yyyy-MM-dd}",
+                                "reserved (workflow auto-approved, the write is no longer gated)",
+                                0);
                             _db.VehicleAssignments.Add(new VehicleAssignment
                             {
                                 VehicleId = vehicleResult.VehicleId,
@@ -222,6 +239,15 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             case BookingApprovalEvaluator.Decision.NeedsApproval:
                 booking.Status = BookingStatus.PendingApproval;
                 run.Status = WorkflowRunStatus.AwaitingApproval;
+                _db.ApprovalRequests.Add(new ApprovalRequest
+                {
+                    BookingId = bookingId,
+                    Type = BookingApprovalEvaluator.ClassifyApprovalType(booking.GroupSize),
+                    Status = ApprovalStatus.Pending,
+                    PreviousBookingStatus = BookingStatus.Requested,
+                    ReasonsJson = Serialize(decisionResult.Reasons),
+                    RequestedAt = _clock.UtcNow,
+                });
                 // CompletedAt intentionally left null: this run is paused pending a future
                 // (out-of-scope) human-approval step, not finished.
                 break;
@@ -232,6 +258,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                 break;
         }
 
+        validateStepLog.ToolCallsJson = _toolCalls?.DrainJson();
         _db.AgentStepLogs.Add(validateStepLog);
 
         var isRelational = _db.Database.IsRelational();
@@ -308,6 +335,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                 AgentName = "ProposalSummaryAgent",
                 InputJson = Serialize(summaryInput),
                 OutputJson = Serialize(summary),
+                ToolCallsJson = _toolCalls?.DrainJson(),
                 DurationMs = summarySw.ElapsedMilliseconds,
             });
             MarkStepDone(plan, "summarize");
@@ -318,6 +346,28 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         {
             _logger.LogWarning(ex, "Proposal summary generation failed for booking {BookingId}; leaving SummaryText null.", bookingId);
         }
+    }
+
+    /// <summary>
+    /// Closes any still-open approval for the booking (a re-run of the workflow replaces it). Done
+    /// and saved up front, before the run mutates anything, so the one-open-request-per-booking
+    /// index can never see the new insert before the old request is closed.
+    /// </summary>
+    private async Task SupersedeOpenApprovalsAsync(Guid bookingId, CancellationToken ct)
+    {
+        var open = await _db.ApprovalRequests
+            .Where(a => a.BookingId == bookingId && a.Status == ApprovalStatus.Pending)
+            .ToListAsync(ct);
+        if (open.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var request in open)
+        {
+            request.Status = ApprovalStatus.Superseded;
+        }
+        await _db.SaveChangesAsync(ct);
     }
 
     private async Task<TResult> RunStepAsync<TResult>(
@@ -339,6 +389,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             AgentName = agentName,
             InputJson = Serialize(input),
             OutputJson = Serialize(result),
+            ToolCallsJson = _toolCalls?.DrainJson(),
             DurationMs = sw.ElapsedMilliseconds,
         });
 

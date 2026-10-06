@@ -6,5 +6,6 @@ public record GuideUtilizationDto(
     int AssignedDays,
     int AvailableDays,
     int RecordedDays,
-    double UtilizationPercentage
+    double UtilizationPercentage,
+    int WindowDays
 );

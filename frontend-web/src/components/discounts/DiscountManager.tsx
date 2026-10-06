@@ -11,9 +11,14 @@ import {
   type UpdateDiscountRequest,
 } from '../../api/discounts';
 
-const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500';
-const labelClass = 'text-xs font-semibold text-slate-600';
+import { Badge, Button, Card, Checkbox, EmptyState, Input, PageHeader, Skeleton, type BadgeTone } from '../ui';
+
+const STATUS_TONES: Record<DerivedStatus, BadgeTone> = {
+  Active: 'success',
+  Upcoming: 'info',
+  Expired: 'warning',
+  Inactive: 'neutral',
+};
 
 export type DerivedStatus = 'Active' | 'Inactive' | 'Upcoming' | 'Expired';
 
@@ -195,175 +200,101 @@ export function DiscountManager() {
     }
   }
 
-  function renderStatusBadge(status: DerivedStatus) {
-    switch (status) {
-      case 'Active':
-        return (
-          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-            Active
-          </span>
-        );
-      case 'Upcoming':
-        return (
-          <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-            Upcoming
-          </span>
-        );
-      case 'Expired':
-        return (
-          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-            Expired
-          </span>
-        );
-      case 'Inactive':
-        return (
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-            Inactive
-          </span>
-        );
-    }
-  }
-
   return (
     <>
-      <div className="mb-6">
-        <h2 className="font-heading text-xl font-bold text-slate-900">Discounts</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Group discounts applied automatically during pricing based on group size and validity.
-        </p>
-      </div>
+      <PageHeader
+        title="Discounts"
+        description="Group discounts applied automatically during pricing based on group size and validity."
+      />
 
-      <section className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card className="mb-8 p-6">
         <div className="flex items-center justify-between">
-          <h3 className="font-heading text-base font-bold text-slate-900">
-            {editingId ? 'Edit discount' : 'Add a discount'}
-          </h3>
+          <h3 className="font-heading text-h4 text-fg">{editingId ? 'Edit discount' : 'Add a discount'}</h3>
           {editingId && (
-            <button
-              type="button"
-              onClick={cancelEdit}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-800"
-            >
+            <Button variant="ghost" size="sm" onClick={cancelEdit}>
               Cancel Edit
-            </button>
+            </Button>
           )}
         </div>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="sm:col-span-1">
-              <label htmlFor="discount-description" className={labelClass}>
-                Description
-              </label>
-              <input
-                id="discount-description"
-                required
-                maxLength={200}
-                className={inputClass}
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label htmlFor="discount-percentage" className={labelClass}>
-                Percentage off
-              </label>
-              <input
-                id="discount-percentage"
-                required
-                type="number"
-                min={0.01}
-                max={100}
-                step={0.01}
-                className={inputClass}
-                value={form.percentageOff}
-                onChange={(e) => setForm((f) => ({ ...f, percentageOff: Number(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <label htmlFor="discount-min-group-size" className={labelClass}>
-                Minimum group size
-              </label>
-              <input
-                id="discount-min-group-size"
-                required
-                type="number"
-                min={1}
-                step={1}
-                className={inputClass}
-                value={form.minGroupSize}
-                onChange={(e) => setForm((f) => ({ ...f, minGroupSize: Number(e.target.value) }))}
-              />
-            </div>
+            <Input
+              id="discount-description"
+              label="Description"
+              required
+              maxLength={200}
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            />
+            <Input
+              id="discount-percentage"
+              label="Percentage off"
+              required
+              type="number"
+              min={0.01}
+              max={100}
+              step={0.01}
+              value={form.percentageOff}
+              onChange={(e) => setForm((f) => ({ ...f, percentageOff: Number(e.target.value) }))}
+            />
+            <Input
+              id="discount-min-group-size"
+              label="Minimum group size"
+              required
+              type="number"
+              min={1}
+              step={1}
+              value={form.minGroupSize}
+              onChange={(e) => setForm((f) => ({ ...f, minGroupSize: Number(e.target.value) }))}
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label htmlFor="discount-valid-from" className={labelClass}>
-                Valid from
-              </label>
-              <input
-                id="discount-valid-from"
-                type="datetime-local"
-                className={inputClass}
-                value={form.validFrom}
-                onChange={(e) => setForm((f) => ({ ...f, validFrom: e.target.value }))}
+            <Input
+              id="discount-valid-from"
+              label="Valid from"
+              type="datetime-local"
+              value={form.validFrom}
+              onChange={(e) => setForm((f) => ({ ...f, validFrom: e.target.value }))}
+            />
+            <Input
+              id="discount-valid-until"
+              label="Valid until"
+              type="datetime-local"
+              value={form.validUntil}
+              onChange={(e) => setForm((f) => ({ ...f, validUntil: e.target.value }))}
+            />
+            <div className="flex items-center pt-6">
+              <Checkbox
+                id="discount-is-active"
+                label="Is active"
+                checked={form.isActive}
+                onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
               />
-            </div>
-            <div>
-              <label htmlFor="discount-valid-until" className={labelClass}>
-                Valid until
-              </label>
-              <input
-                id="discount-valid-until"
-                type="datetime-local"
-                className={inputClass}
-                value={form.validUntil}
-                onChange={(e) => setForm((f) => ({ ...f, validUntil: e.target.value }))}
-              />
-            </div>
-            <div className="flex items-center pt-5">
-              <label className="flex cursor-pointer items-center space-x-2">
-                <input
-                  id="discount-is-active"
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                />
-                <span className="text-sm font-semibold text-slate-700">Is active</span>
-              </label>
             </div>
           </div>
 
           {formError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            <p role="alert" className="rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
               {formError}
             </p>
           )}
 
-          <div className="flex items-center space-x-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
-            >
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={saving}>
               {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Discount'}
-            </button>
+            </Button>
             {editingId && (
-              <button
-                type="button"
-                onClick={cancelEdit}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
+              <Button variant="secondary" onClick={cancelEdit}>
                 Cancel
-              </button>
+              </Button>
             )}
           </div>
         </form>
-      </section>
+      </Card>
 
       {listError && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <p role="alert" className="mb-4 rounded-input border border-danger/30 bg-danger-soft px-4 py-3 text-body font-medium text-danger-fg">
           {listError}
         </p>
       )}
@@ -371,22 +302,22 @@ export function DiscountManager() {
       {!listError && discounts === null && (
         <div className="space-y-2">
           {[0, 1].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl border border-slate-200 bg-white" />
+            <Skeleton key={i} className="h-14 rounded-card border border-border bg-surface-raised" />
           ))}
         </div>
       )}
 
       {!listError && discounts !== null && discounts.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-          <p className="font-medium text-slate-600">No discounts yet.</p>
-        </div>
+        <Card padded={false} className="border-dashed">
+          <EmptyState title="No discounts yet." />
+        </Card>
       )}
 
       {discounts && discounts.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full text-sm">
+        <Card padded={false} className="overflow-x-auto">
+          <table className="w-full text-body">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-border bg-surface-sunken text-left text-caption font-semibold uppercase tracking-wide text-fg-muted">
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Percentage off</th>
@@ -395,57 +326,51 @@ export function DiscountManager() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {discounts.map((discount) => {
                 const status = getDerivedStatus(discount);
                 return (
-                  <tr key={discount.id} className="transition hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">{discount.description}</td>
-                    <td className="px-4 py-3">{renderStatusBadge(status)}</td>
-                    <td className="px-4 py-3 text-slate-600">{discount.percentageOff}%</td>
-                    <td className="px-4 py-3 text-slate-600">{discount.minGroupSize}+</td>
-                    <td className="px-4 py-3 text-slate-600">
+                  <tr key={discount.id} className="transition hover:bg-surface-sunken">
+                    <td className="px-4 py-3 font-medium text-fg">{discount.description}</td>
+                    <td className="px-4 py-3">
+                      <Badge tone={STATUS_TONES[status]}>{status}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">{discount.percentageOff}%</td>
+                    <td className="px-4 py-3 text-fg-muted">{discount.minGroupSize}+</td>
+                    <td className="px-4 py-3 text-fg-muted">
                       {formatValidity(discount.validFrom, discount.validUntil)}
                     </td>
-                    <td className="px-4 py-3 text-right space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(discount)}
-                        className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={togglingId === discount.id}
-                        onClick={() => handleToggleActive(discount)}
-                        className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${
-                          discount.isActive
-                            ? 'border-amber-300 text-amber-700 hover:bg-amber-50'
-                            : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
-                        }`}
-                      >
-                        {togglingId === discount.id
-                          ? 'Updating...'
-                          : discount.isActive
-                            ? 'Deactivate'
-                            : 'Activate'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={deletingId === discount.id}
-                        onClick={() => handleDelete(discount.id)}
-                        className="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => startEdit(discount)}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={togglingId === discount.id}
+                          onClick={() => handleToggleActive(discount)}
+                          className={discount.isActive ? 'border-warning/30 text-warning-fg' : 'border-success/30 text-success-fg'}
+                        >
+                          {togglingId === discount.id ? 'Updating...' : discount.isActive ? 'Deactivate' : 'Activate'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="border-danger/30 text-danger-fg"
+                          disabled={deletingId === discount.id}
+                          onClick={() => handleDelete(discount.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </>
   );

@@ -1,3 +1,5 @@
+using TrailWise.Domain.Enums;
+
 namespace TrailWise.Infrastructure.Services;
 
 public record PackageOccupancyResult(
@@ -29,13 +31,24 @@ public record RevenueReportResult(
     IReadOnlyList<MonthlyRevenueResult> ByMonth
 );
 
+public record VehicleUtilizationResult(
+    Guid VehicleId,
+    string RegistrationNumber,
+    VehicleType Type,
+    VehicleMaintenanceStatus MaintenanceStatus,
+    int BookedDays,
+    int WindowDays,
+    double UtilizationPercentage
+);
+
 public record GuideUtilizationResult(
     Guid GuideId,
     string GuideName,
     int AssignedDays,
     int AvailableDays,
     int RecordedDays,
-    double UtilizationPercentage
+    double UtilizationPercentage,
+    int WindowDays
 );
 
 public interface IOperationsReportService
@@ -50,8 +63,22 @@ public interface IOperationsReportService
         DateOnly? to,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Days each vehicle is reserved for a non-cancelled booking inside [from, to], as a share of the
+    /// days in that window.
+    /// </summary>
+    Task<IReadOnlyList<VehicleUtilizationResult>> GetVehicleUtilizationReportAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Days each guide is assigned to a booking inside [from, to], as a share of the days in that window.
+    /// A day with no availability row counts as available. <c>RecordedDays</c> is kept for older clients
+    /// and equals <c>WindowDays</c>.
+    /// </summary>
     Task<IReadOnlyList<GuideUtilizationResult>> GetGuideUtilizationReportAsync(
-        DateOnly? from,
-        DateOnly? to,
+        DateOnly from,
+        DateOnly to,
         CancellationToken ct = default);
 }

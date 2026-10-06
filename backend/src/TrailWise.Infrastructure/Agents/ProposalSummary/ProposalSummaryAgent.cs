@@ -32,9 +32,11 @@ public class ProposalSummaryAgent : IProposalSummaryAgent
 
     private readonly ILlmClient _llmClient;
     private readonly LlmOptions _options;
+    private readonly IToolCallRecorder? _recorder;
 
-    public ProposalSummaryAgent(ILlmClient llmClient, IOptions<LlmOptions> options)
+    public ProposalSummaryAgent(ILlmClient llmClient, IOptions<LlmOptions> options, IToolCallRecorder? recorder = null)
     {
+        _recorder = recorder;
         _llmClient = llmClient;
         _options = options.Value;
     }
@@ -43,7 +45,11 @@ public class ProposalSummaryAgent : IProposalSummaryAgent
     {
         var userContent = $"<booking_data>\n{JsonSerializer.Serialize(input, AgentJsonOptions.Default)}\n</booking_data>";
 
-        return _llmClient.CallStructuredAsync<ProposalSummary>(
-            SystemPrompt, userContent, _options.SummaryModel, _options.MaxOutputTokens, ct);
+        return _recorder.TrackAsync(
+            AgentTools.StructuredOutputFormatter,
+            "booking proposal summary from finalized structured data; output must match {summaryText, advisoryFlags}",
+            () => _llmClient.CallStructuredAsync<ProposalSummary>(
+                SystemPrompt, userContent, _options.SummaryModel, _options.MaxOutputTokens, ct),
+            r => $"schema-valid; {r.AdvisoryFlags?.Count ?? 0} advisory flag(s)");
     }
 }

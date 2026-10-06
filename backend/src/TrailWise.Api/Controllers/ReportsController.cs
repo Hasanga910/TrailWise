@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Api.Contracts.Reports;
+using TrailWise.Api.Services;
 using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Api.Controllers;
@@ -14,14 +15,25 @@ public class ReportsController : ControllerBase
     private const int MaxPageSize = 100;
     private readonly IAuditReportService _auditReportService;
     private readonly IOperationsReportService _operationsReportService;
+    private readonly OpsDashboardService _dashboard;
 
     public ReportsController(
         IAuditReportService auditReportService,
-        IOperationsReportService operationsReportService)
+        IOperationsReportService operationsReportService,
+        OpsDashboardService dashboard)
     {
         _auditReportService = auditReportService;
         _operationsReportService = operationsReportService;
+        _dashboard = dashboard;
     }
+
+    /// <summary>
+    /// Ops dashboard: upcoming tours, pending approvals by type (with urgent refund exceptions),
+    /// guide and vehicle utilisation over the next 30 days, and workflow health.
+    /// </summary>
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<OpsDashboardDto>> GetDashboard(CancellationToken ct) =>
+        Ok(await _dashboard.GetAsync(ct));
 
     [HttpGet("audit")]
     public async Task<ActionResult<AuditReportResponse>> GetAuditLogs(
@@ -175,7 +187,11 @@ public class ReportsController : ControllerBase
             });
         }
 
-        var results = await _operationsReportService.GetGuideUtilizationReportAsync(from, to, ct);
+        // No dates: the last 30 days up to today, the same window the reports page opens with.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var windowTo = to ?? today;
+        var windowFrom = from ?? windowTo.AddDays(-30);
+        var results = await _operationsReportService.GetGuideUtilizationReportAsync(windowFrom, windowTo, ct);
 
         var dtos = results.Select(g => new GuideUtilizationDto(
             g.GuideId,
@@ -183,7 +199,8 @@ public class ReportsController : ControllerBase
             g.AssignedDays,
             g.AvailableDays,
             g.RecordedDays,
-            g.UtilizationPercentage
+            g.UtilizationPercentage,
+            g.WindowDays
         )).ToList();
 
         return Ok(dtos);

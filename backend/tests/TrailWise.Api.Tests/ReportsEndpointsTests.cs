@@ -441,14 +441,14 @@ public class ReportsEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         var guideAId = await SeedGuideAsync($"Guide A {Guid.NewGuid():N}");
         var guideBId = await SeedGuideAsync($"Guide B {Guid.NewGuid():N}");
 
-        // Guide A: 2 assigned days, 3 available days
+        // Guide A: 2 assigned days and 3 free recorded days; the other 5 days of the window have no row (available)
         await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 1), isAvailable: true, assignedBookingId: bookingId);
         await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 2), isAvailable: true, assignedBookingId: bookingId);
         await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 3), isAvailable: true, assignedBookingId: null);
         await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 4), isAvailable: true, assignedBookingId: null);
         await SeedGuideAvailabilityAsync(guideAId, new DateOnly(2026, 8, 5), isAvailable: true, assignedBookingId: null);
 
-        // Guide B: 0 recorded days in that range
+        // Guide B: no rows in that range, so every day counts as available
 
         var response = await client.GetAsync("/api/reports/guide-utilization?from=2026-08-01&to=2026-08-10");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -459,16 +459,85 @@ public class ReportsEndpointsTests : IClassFixture<TrailWiseWebApplicationFactor
         var utilA = report.FirstOrDefault(g => g.GuideId == guideAId);
         Assert.NotNull(utilA);
         Assert.Equal(2, utilA.AssignedDays);
-        Assert.Equal(3, utilA.AvailableDays);
-        Assert.Equal(5, utilA.RecordedDays);
-        Assert.Equal(40.0, utilA.UtilizationPercentage);
+        Assert.Equal(8, utilA.AvailableDays);
+        Assert.Equal(10, utilA.WindowDays);
+        Assert.Equal(10, utilA.RecordedDays);
+        Assert.Equal(20.0, utilA.UtilizationPercentage);
 
         var utilB = report.FirstOrDefault(g => g.GuideId == guideBId);
         Assert.NotNull(utilB);
         Assert.Equal(0, utilB.AssignedDays);
-        Assert.Equal(0, utilB.AvailableDays);
-        Assert.Equal(0, utilB.RecordedDays);
+        Assert.Equal(10, utilB.AvailableDays);
+        Assert.Equal(10, utilB.WindowDays);
         Assert.Equal(0.0, utilB.UtilizationPercentage);
+    }
+
+    [Fact]
+    public async Task GetGuideUtilizationReport_WithOnlyAssignmentRows_IsNotReportedAsFullyBusy()
+    {
+        var client = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+        var (packageId, tierId) = await SeedPackageWithTierAsync($"Only Assigned {Guid.NewGuid():N}", maxGroupSize: 10);
+        var bookingId = await SeedBookingAsync(packageId, tierId, Guid.NewGuid(), 2, BookingStatus.Confirmed, new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 3));
+        var guideId = await SeedGuideAsync($"Only Assigned Guide {Guid.NewGuid():N}");
+
+        // The old report divided by recorded rows and showed 100% here.
+        foreach (var day in new[] { 1, 2, 3 })
+        {
+            await SeedGuideAvailabilityAsync(guideId, new DateOnly(2026, 9, day), isAvailable: true, assignedBookingId: bookingId);
+        }
+
+        var report = await GetGuideUtilizationAsync(client, "2026-09-01", "2026-09-30");
+
+        var util = Assert.Single(report, g => g.GuideId == guideId);
+        Assert.Equal((3, 27, 30, 10.0), (util.AssignedDays, util.AvailableDays, util.WindowDays, util.UtilizationPercentage));
+    }
+
+    [Fact]
+    public async Task GetGuideUtilizationReport_BlockedDaysAreNotAvailable_AndOnlyTheWindowIsCounted()
+    {
+        var client = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+        var (packageId, tierId) = await SeedPackageWithTierAsync($"Blocked {Guid.NewGuid():N}", maxGroupSize: 10);
+        var bookingId = await SeedBookingAsync(packageId, tierId, Guid.NewGuid(), 2, BookingStatus.Confirmed, new DateOnly(2026, 10, 8), new DateOnly(2026, 10, 12));
+        var guideId = await SeedGuideAsync($"Blocked Guide {Guid.NewGuid():N}");
+
+        // Window 10-10 .. 10-19 (10 days). Assigned: 10-10, 10-11, 10-12 inside; 10-08 and 10-09 are outside it.
+        foreach (var day in new[] { 8, 9, 10, 11, 12 })
+        {
+            await SeedGuideAvailabilityAsync(guideId, new DateOnly(2026, 10, day), isAvailable: true, assignedBookingId: bookingId);
+        }
+        // Two blocked (unavailable, unassigned) days inside the window.
+        await SeedGuideAvailabilityAsync(guideId, new DateOnly(2026, 10, 15), isAvailable: false, assignedBookingId: null);
+        await SeedGuideAvailabilityAsync(guideId, new DateOnly(2026, 10, 16), isAvailable: false, assignedBookingId: null);
+
+        var report = await GetGuideUtilizationAsync(client, "2026-10-10", "2026-10-19");
+
+        var util = Assert.Single(report, g => g.GuideId == guideId);
+        Assert.Equal((3, 5, 10, 30.0), (util.AssignedDays, util.AvailableDays, util.WindowDays, util.UtilizationPercentage));
+    }
+
+    [Fact]
+    public async Task GetGuideUtilizationReport_WithoutDates_UsesTheLast30DaysAndNeverDividesByZero()
+    {
+        var client = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+        var guideId = await SeedGuideAsync($"No Dates Guide {Guid.NewGuid():N}");
+
+        var response = await client.GetAsync("/api/reports/guide-utilization");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var report = await response.Content.ReadFromJsonAsync<List<GuideUtilizationDto>>(JsonOptions);
+
+        var util = Assert.Single(report!, g => g.GuideId == guideId);
+        Assert.Equal((0, 31, 31, 0.0), (util.AssignedDays, util.AvailableDays, util.WindowDays, util.UtilizationPercentage));
+
+        // A single-day window is valid too.
+        var oneDay = await GetGuideUtilizationAsync(client, "2026-11-01", "2026-11-01");
+        Assert.All(oneDay, g => Assert.Equal(1, g.WindowDays));
+    }
+
+    private static async Task<List<GuideUtilizationDto>> GetGuideUtilizationAsync(HttpClient client, string from, string to)
+    {
+        var response = await client.GetAsync($"/api/reports/guide-utilization?from={from}&to={to}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<List<GuideUtilizationDto>>(JsonOptions))!;
     }
 
     [Fact]

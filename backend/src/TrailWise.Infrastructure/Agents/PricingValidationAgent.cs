@@ -19,18 +19,31 @@ public class PricingValidationAgent : IPricingValidationAgent
 
     private readonly TrailWiseDbContext _db;
     private readonly IClock _clock;
+    private readonly IToolCallRecorder? _recorder;
 
-    public PricingValidationAgent(TrailWiseDbContext db, IClock? clock = null)
+    public PricingValidationAgent(TrailWiseDbContext db, IClock? clock = null, IToolCallRecorder? recorder = null)
     {
+        _recorder = recorder;
         _db = db;
         _clock = clock ?? new SystemClock();
     }
 
-    public async Task<PricingResult> CalculateAsync(
+    public Task<PricingResult> CalculateAsync(
         Guid bookingId,
         GuideMatchResult guideResult,
         VehicleMatchResult vehicleResult,
-        CancellationToken ct = default)
+        CancellationToken ct = default) =>
+        _recorder.TrackAsync(
+            AgentTools.PricingCalculator,
+            $"booking {bookingId}: tier price, catering, add-ons, group discount, validation checks",
+            () => CalculateCoreAsync(bookingId, guideResult, vehicleResult, ct),
+            r => $"total {r.TotalCost:0.00}, validation {r.ValidationResult}");
+
+    private async Task<PricingResult> CalculateCoreAsync(
+        Guid bookingId,
+        GuideMatchResult guideResult,
+        VehicleMatchResult vehicleResult,
+        CancellationToken ct)
     {
         // 1. Safely load the Booking from DbContext using AsNoTracking for read-only calculation.
         // Include PackageTier, TourPackage (to access DurationDays), and BookingAddOns.
