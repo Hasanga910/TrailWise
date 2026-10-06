@@ -3,8 +3,12 @@ import 'package:provider/provider.dart';
 
 import '../api/api_client.dart';
 import '../auth/auth_provider.dart';
+import '../auth/current_user.dart';
+import '../models/active_discount.dart';
 import '../models/package_tier.dart';
 import '../models/tour_package.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
 
 class BookingRequestScreen extends StatefulWidget {
   const BookingRequestScreen({
@@ -12,11 +16,13 @@ class BookingRequestScreen extends StatefulWidget {
     required this.package,
     required this.tier,
     this.apiClient,
+    this.currentUser,
   });
 
   final TourPackage package;
   final PackageTier tier;
   final ApiClient? apiClient;
+  final CurrentUser? currentUser;
 
   @override
   State<BookingRequestScreen> createState() => _BookingRequestScreenState();
@@ -28,6 +34,36 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
   final _groupSizeController = TextEditingController(text: '1');
   final _budgetController = TextEditingController();
   final _specialRequestsController = TextEditingController();
+
+  List<ActiveDiscount> _activeDiscounts = [];
+  bool _loadingDiscounts = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveDiscounts();
+  }
+
+  Future<void> _loadActiveDiscounts() async {
+    try {
+      final res = await _apiClient.get('/api/discounts/active');
+      if (res is List && mounted) {
+        setState(() {
+          _activeDiscounts = res
+              .map((e) => ActiveDiscount.fromJson(e as Map<String, dynamic>))
+              .toList();
+        });
+      }
+    } catch (_) {
+      // ignore
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingDiscounts = false;
+        });
+      }
+    }
+  }
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -144,25 +180,50 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    CurrentUser? user = widget.currentUser;
+    if (user == null) {
+      try {
+        user = context.watch<AuthProvider>().user;
+      } catch (_) {
+        user = null;
+      }
+    }
+
+    if (user != null && user.role == 'TourGuide') {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Request a Booking')),
+        body: EmptyState(
+          icon: Icons.lock_outline,
+          title: 'Access Restricted',
+          message: 'Only travelers can request tour bookings.',
+          action: FilledButton.icon(
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Go Back'),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Request a Booking')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: AppSpacing.page,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   widget.package.name,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
                 Text(
                   '${widget.tier.classType} · \$${widget.tier.basePricePerPerson.toStringAsFixed(2)}/person',
-                  style: const TextStyle(color: Colors.grey),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xl),
                 InkWell(
                   onTap: _pickStartDate,
                   child: InputDecorator(
@@ -173,7 +234,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     child: Text(_startDate == null ? 'Select date' : _formatDate(_startDate!)),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 InkWell(
                   onTap: _pickEndDate,
                   child: InputDecorator(
@@ -184,7 +245,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     child: Text(_endDate == null ? 'Select date' : _formatDate(_endDate!)),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _groupSizeController,
                   keyboardType: TextInputType.number,
@@ -193,7 +254,9 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     errorText: _fieldErrors['groupSize'],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                _buildAvailableDiscountsSection(),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _budgetController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -202,35 +265,127 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
                     errorText: _fieldErrors['budgetPerPerson'],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _specialRequestsController,
                   maxLines: 3,
                   maxLength: 1000,
                   decoration: const InputDecoration(
                     labelText: 'Special requests (optional)',
+                    helperText: 'This note is processed by an AI service to help plan your trip. '
+                        'Avoid including sensitive personal or payment details.',
+                    helperMaxLines: 3,
                   ),
                 ),
                 const SizedBox(height: 16),
                 if (_submitError != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_submitError!, style: const TextStyle(color: Colors.red)),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: Text(_submitError!, style: TextStyle(color: AppColors.of(context).danger)),
                   ),
-                FilledButton(
+                AppButton(
+                  label: 'Submit request',
+                  expand: true,
+                  loading: _submitting,
                   onPressed: _submitting ? null : _submit,
-                  child: _submitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Submit request'),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAvailableDiscountsSection() {
+    final colors = AppColors.of(context);
+    if (_loadingDiscounts) {
+      return const SizedBox(
+        height: 24,
+        child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+
+    if (_activeDiscounts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.brandSoft,
+        borderRadius: BorderRadius.circular(AppRadius.input),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.local_offer, size: 16, color: colors.brandText),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Available Group Discounts',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: colors.brandFg,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ..._activeDiscounts.map((discount) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceRaised,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${discount.percentageOff.toStringAsFixed(0)}% off',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: colors.brandFg,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Groups of ${discount.minGroupSize} or more',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: colors.brandFg),
+                      ),
+                      Text(
+                        discount.formattedValidity,
+                        style: TextStyle(color: colors.fgMuted, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )),
+          const SizedBox(height: 4),
+          Text(
+            'Eligible discounts are applied automatically during pricing.',
+            style: TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: colors.fgMuted,
+            ),
+          ),
+        ],
       ),
     );
   }

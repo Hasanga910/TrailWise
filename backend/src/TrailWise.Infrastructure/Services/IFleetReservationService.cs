@@ -25,11 +25,25 @@ public interface IFleetReservationService
 {
     Task<bool> IsVehicleAvailableAsync(Guid vehicleId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default);
 
+    Task<bool> IsDriverAvailableAsync(Guid driverId, DateOnly startDate, DateOnly endDate, CancellationToken ct = default);
+
     Task<ReservationResult> ReserveVehicleAsync(
         Guid vehicleId,
         Guid driverId,
         Guid bookingId,
         DateOnly startDate,
         DateOnly endDate,
+        Guid? guideId = null,
         CancellationToken ct = default);
+
+    Task<ReservationResult> ReassignResourcesAsync(
+        Guid bookingId,
+        Guid? newVehicleId,
+        Guid? newDriverId,
+        Guid? newGuideId,
+        string? reason,
+        Guid performedBy,
+        CancellationToken ct = default);
+
+    Task<int> ReleaseBookingAssignmentsAsync(Guid bookingId, CancellationToken ct = default);
 }

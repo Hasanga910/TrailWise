@@ -1,4 +1,4 @@
-export type UserRole = 'Traveler' | 'TourGuide' | 'OperationsManager' | 'FleetCoordinator' | 'Admin';
+export type UserRole = 'Traveler' | 'TourGuide' | 'OperationsManager' | 'FleetCoordinator' | 'Driver' | 'Admin';
 
 export interface CurrentUser {
   id: string;

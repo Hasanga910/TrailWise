@@ -1,5 +1,5 @@
 import { BookingsIcon, DashboardIcon, PackagesIcon, ProfileIcon } from '../admin/icons';
-import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
+import { AppShell, type SidebarNavItem } from '../layout/AppShell';
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/traveler', label: 'Dashboard', icon: DashboardIcon, end: true },
@@ -17,5 +17,5 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export function TravelerLayout() {
-  return <SidebarLayout navItems={NAV_ITEMS} pageTitles={PAGE_TITLES} />;
+  return <AppShell navItems={NAV_ITEMS} pageTitles={PAGE_TITLES} portalLabel="Traveler Portal" />;
 }

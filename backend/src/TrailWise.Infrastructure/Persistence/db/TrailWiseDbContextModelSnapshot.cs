@@ -108,6 +108,66 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.ToTable("AgentWorkflowRuns");
                 });
 
+            modelBuilder.Entity("TrailWise.Domain.Entities.ApprovalRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PreviousBookingStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ReasonsJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RequesterNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 'Pending'");
+
+                    b.HasIndex("Status", "Type");
+
+                    b.ToTable("ApprovalRequests");
+                });
+
             modelBuilder.Entity("TrailWise.Domain.Entities.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -153,9 +213,26 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("Attended")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTimeOffset?>("BalancePaymentDueAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<decimal>("BudgetPerPerson")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("Completed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -166,8 +243,26 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Property<int>("GroupSize")
                         .HasColumnType("integer");
 
+                    b.Property<string>("GuideNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("LanguagePreference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<Guid>("PackageTierId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PaymentDueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("PaymentExpiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("SpecialRequests")
                         .HasMaxLength(1000)
@@ -181,8 +276,14 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<DateTimeOffset?>("TourEndedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("TourPackageId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("TourStartedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("TravelerId")
                         .HasColumnType("uuid");
@@ -192,7 +293,11 @@ namespace TrailWise.Infrastructure.Persistence.Db
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BalancePaymentDueAt");
+
                     b.HasIndex("PackageTierId");
+
+                    b.HasIndex("PaymentDueAt");
 
                     b.HasIndex("Status");
 
@@ -248,6 +353,11 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<int>("MinGroupSize")
                         .HasColumnType("integer");
 
@@ -258,7 +368,15 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("ValidFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ValidUntil")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("IsActive", "MinGroupSize");
 
                     b.ToTable("Discounts");
                 });
@@ -271,7 +389,8 @@ namespace TrailWise.Infrastructure.Persistence.Db
 
                     b.Property<string>("ContactInfo")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -289,7 +408,13 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("Drivers");
                 });
@@ -324,7 +449,13 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("Guides");
                 });
@@ -357,7 +488,8 @@ namespace TrailWise.Infrastructure.Persistence.Db
 
                     b.HasIndex("AssignedBookingId");
 
-                    b.HasIndex("GuideId", "Date");
+                    b.HasIndex("GuideId", "Date")
+                        .IsUnique();
 
                     b.ToTable("GuideAvailabilities");
                 });
@@ -480,6 +612,11 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
 
+                    b.Property<string>("BankSlipUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<Guid>("BookingId")
                         .HasColumnType("uuid");
 
@@ -494,10 +631,23 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Property<DateTimeOffset?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedBy")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -539,6 +689,111 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.HasIndex("BookingId");
 
                     b.ToTable("Reviews");
+                });
+
+            modelBuilder.Entity("TrailWise.Domain.Entities.SupportMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SupportTicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("SenderId");
+
+                    b.HasIndex("SupportTicketId");
+
+                    b.ToTable("SupportMessages");
+                });
+
+            modelBuilder.Entity("TrailWise.Domain.Entities.SupportTicket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedToId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TravelerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedToId");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("Category");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Priority");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TravelerId");
+
+                    b.ToTable("SupportTickets");
                 });
 
             modelBuilder.Entity("TrailWise.Domain.Entities.TourPackage", b =>
@@ -646,6 +901,11 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("RegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("SeatConfiguration")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -660,6 +920,9 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RegistrationNumber")
+                        .IsUnique();
 
                     b.ToTable("Vehicles");
                 });
@@ -724,6 +987,17 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Navigation("Booking");
                 });
 
+            modelBuilder.Entity("TrailWise.Domain.Entities.ApprovalRequest", b =>
+                {
+                    b.HasOne("TrailWise.Domain.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+                });
+
             modelBuilder.Entity("TrailWise.Domain.Entities.Booking", b =>
                 {
                     b.HasOne("TrailWise.Domain.Entities.PackageTier", "PackageTier")
@@ -760,6 +1034,26 @@ namespace TrailWise.Infrastructure.Persistence.Db
                         .IsRequired();
 
                     b.Navigation("Booking");
+                });
+
+            modelBuilder.Entity("TrailWise.Domain.Entities.Driver", b =>
+                {
+                    b.HasOne("TrailWise.Domain.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("TrailWise.Domain.Entities.Driver", "UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TrailWise.Domain.Entities.Guide", b =>
+                {
+                    b.HasOne("TrailWise.Domain.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("TrailWise.Domain.Entities.Guide", "UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("TrailWise.Domain.Entities.GuideAvailability", b =>
@@ -835,6 +1129,50 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Navigation("Booking");
                 });
 
+            modelBuilder.Entity("TrailWise.Domain.Entities.SupportMessage", b =>
+                {
+                    b.HasOne("TrailWise.Domain.Entities.User", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TrailWise.Domain.Entities.SupportTicket", "SupportTicket")
+                        .WithMany("Messages")
+                        .HasForeignKey("SupportTicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Sender");
+
+                    b.Navigation("SupportTicket");
+                });
+
+            modelBuilder.Entity("TrailWise.Domain.Entities.SupportTicket", b =>
+                {
+                    b.HasOne("TrailWise.Domain.Entities.User", "AssignedTo")
+                        .WithMany()
+                        .HasForeignKey("AssignedToId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TrailWise.Domain.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TrailWise.Domain.Entities.User", "Traveler")
+                        .WithMany()
+                        .HasForeignKey("TravelerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AssignedTo");
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Traveler");
+                });
+
             modelBuilder.Entity("TrailWise.Domain.Entities.VehicleAssignment", b =>
                 {
                     b.HasOne("TrailWise.Domain.Entities.Booking", "Booking")
@@ -897,6 +1235,11 @@ namespace TrailWise.Infrastructure.Persistence.Db
             modelBuilder.Entity("TrailWise.Domain.Entities.PackageTier", b =>
                 {
                     b.Navigation("Bookings");
+                });
+
+            modelBuilder.Entity("TrailWise.Domain.Entities.SupportTicket", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("TrailWise.Domain.Entities.TourPackage", b =>

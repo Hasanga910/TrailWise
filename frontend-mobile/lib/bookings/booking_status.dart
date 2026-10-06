@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/status_badge.dart';
+
 class BookingStatus {
   static const requested = 'Requested';
   static const planProposed = 'PlanProposed';
@@ -8,6 +10,7 @@ class BookingStatus {
   static const completed = 'Completed';
   static const cancelled = 'Cancelled';
   static const needsManualReview = 'NeedsManualReview';
+  static const pending = 'Pending';
 
   static const List<String> all = [
     requested,
@@ -19,24 +22,35 @@ class BookingStatus {
     needsManualReview,
   ];
 
+  static const List<String> filterOptions = [
+    cancelled,
+    completed,
+    confirmed,
+    pending,
+  ];
+
+  /// Accent colour per status, taken from the same tones as the web
+  /// StatusBadge (light-theme foreground colours).
   static Color color(String status) {
     switch (status) {
       case requested:
-        return Colors.grey;
       case planProposed:
-        return Colors.deepPurple;
+        return const Color(0xFF2563EB);
       case pendingApproval:
-        return Colors.orange;
+        return const Color(0xFFB45309);
       case confirmed:
-        return Colors.teal;
+        return const Color(0xFF0F6E63);
       case completed:
-        return Colors.green;
+        return const Color(0xFF15803D);
       case cancelled:
-        return Colors.red;
+        return const Color(0xFF475569);
       case needsManualReview:
-        return Colors.red;
+        return const Color(0xFF9A3412);
       default:
-        return Colors.grey;
+        return const Color(0xFF475569);
     }
   }
+
+  /// Readable label, e.g. "PendingApproval" -> "Pending Approval".
+  static String label(String status) => statusLabel(status);
 }

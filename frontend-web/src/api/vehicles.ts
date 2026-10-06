@@ -7,6 +7,7 @@ export type VehicleMaintenanceStatus = 'Available' | 'UnderMaintenance' | 'OutOf
 export interface VehicleDto {
   id: string;
   type: VehicleType;
+  registrationNumber: string;
   capacity: number;
   hasAC: boolean;
   seatConfiguration: string;
@@ -17,6 +18,7 @@ export interface VehicleDto {
 
 export interface CreateVehicleRequest {
   type: VehicleType;
+  registrationNumber: string;
   capacity: number;
   hasAC: boolean;
   seatConfiguration?: string;
@@ -35,11 +37,20 @@ export interface VehicleAvailabilityResponse {
   reason?: string | null;
 }
 
+export interface DriverAvailabilityResponse {
+  driverId: string;
+  from: string;
+  to: string;
+  isAvailable: boolean;
+  reason?: string | null;
+}
+
 export interface ReserveVehicleRequest {
   bookingId: string;
   driverId: string;
   startDate: string;
   endDate: string;
+  guideId?: string;
 }
 
 export interface VehicleAssignmentDto {
@@ -53,6 +64,37 @@ export interface VehicleAssignmentDto {
   updatedAt: string;
 }
 
+export interface VehicleAssignmentDetailDto {
+  id: string;
+  vehicleId: string;
+  vehicleName: string;
+  bookingId: string;
+  driverId: string;
+  driverName: string;
+  driverContact: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  updatedAt: string;
+  vehicleType?: VehicleType;
+  capacity?: number;
+  hasAC?: boolean;
+  registrationNumber?: string;
+  guideId?: string;
+  bookingStatus?: string;
+  travelerName?: string;
+  travelerContact?: string;
+  packageName?: string;
+  packageTier?: string;
+  itineraryHighlights?: string[];
+  driverLicenseNumber?: string;
+  guideName?: string;
+  guideContact?: string;
+  groupSize?: number;
+  specialRequests?: string;
+  languagePreference?: string;
+}
+
 export interface DriverDto {
   id: string;
   name: string;
@@ -60,12 +102,24 @@ export interface DriverDto {
   contactInfo: string;
   createdAt: string;
   updatedAt: string;
+  email?: string;
+  userId?: string;
 }
 
 export interface CreateDriverRequest {
   name: string;
   licenseNumber: string;
   contactInfo?: string;
+  email?: string;
+  password?: string;
+}
+
+export interface UpdateDriverRequest {
+  name: string;
+  licenseNumber: string;
+  contactInfo?: string;
+  email?: string;
+  password?: string;
 }
 
 export interface GetVehiclesFilter {
@@ -144,11 +198,77 @@ export async function getDrivers(): Promise<DriverDto[]> {
 }
 
 /**
+ * Check if a driver is available for a given date range
+ */
+export async function checkDriverAvailability(
+  id: string,
+  from: string,
+  to: string,
+): Promise<DriverAvailabilityResponse> {
+  const response = await apiClient.get<DriverAvailabilityResponse>(`/api/drivers/${id}/availability`, {
+    params: { from, to },
+  });
+  return response.data;
+}
+
+/**
+ * Fetch all vehicle assignments with related details
+ */
+export async function getVehicleAssignments(): Promise<VehicleAssignmentDetailDto[]> {
+  const response = await apiClient.get<VehicleAssignmentDetailDto[]>('/api/vehicles/assignments');
+  return response.data;
+}
+
+/**
+ * Fetch assigned tours and vehicle tasks for the authenticated driver
+ */
+export async function getMyDriverAssignments(): Promise<VehicleAssignmentDetailDto[]> {
+  const response = await apiClient.get<VehicleAssignmentDetailDto[]>('/api/drivers/me/assignments');
+  return response.data;
+}
+
+/**
+ * Fetch vehicle assignment for a specific booking
+ */
+export async function getAssignmentByBookingId(bookingId: string): Promise<VehicleAssignmentDetailDto | null> {
+  try {
+    const response = await apiClient.get<VehicleAssignmentDetailDto>(
+      `/api/vehicles/assignments/by-booking/${bookingId}`,
+      {
+        validateStatus: (status) => status < 400 || status === 404,
+      }
+    );
+    if (response.status === 404) {
+      return null;
+    }
+    return response.data;
+  } catch (err: any) {
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
  * Register a new driver
  */
 export async function createDriver(request: CreateDriverRequest): Promise<DriverDto> {
   const response = await apiClient.post<DriverDto>('/api/drivers', request);
   return response.data;
+}
+
+/**
+ * Update an existing driver
+ */
+export async function updateDriver(id: string, request: UpdateDriverRequest): Promise<DriverDto> {
+  const response = await apiClient.put<DriverDto>(`/api/drivers/${id}`, request);
+  return response.data;
+}
+
+/**
+ * Delete a driver from the roster
+ */
+export async function deleteDriver(id: string): Promise<void> {
+  await apiClient.delete(`/api/drivers/${id}`);
 }
 
 /**

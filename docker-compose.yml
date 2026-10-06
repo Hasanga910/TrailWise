@@ -35,8 +35,17 @@ services:
       AdminSeed__Email: ${ADMIN_SEED_EMAIL:-admin@trailwise.local}
       AdminSeed__Password: ${ADMIN_SEED_PASSWORD:-ChangeMe123!}
       Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN}
+      Cors__AllowedOrigins__1: ${CORS_ALLOWED_ORIGIN_FLUTTER:-http://localhost:5000}
       Llm__Enabled: ${LLM_ENABLED:-false}
       Llm__ApiKey: ${GROQ_API_KEY}
+      Llm__ExtractionModel: ${LLM_EXTRACTION_MODEL:-openai/gpt-oss-120b}
+      Llm__SummaryModel: ${LLM_SUMMARY_MODEL:-openai/gpt-oss-120b}
+      NOTIFY_LK_USER_ID: ${NOTIFY_LK_USER_ID}
+      NOTIFY_LK_API_KEY: ${NOTIFY_LK_API_KEY}
+      NOTIFY_LK_SENDER_ID: ${NOTIFY_LK_SENDER_ID:-NotifyDEMO}
+    volumes:
+      - trailwise_uploads:/app/wwwroot/uploads
+      - trailwise_private_uploads:/app/private_uploads
     ports:
       - "${BACKEND_PORT:-5080}:8080"
 
@@ -54,3 +63,5 @@ services:
 
 volumes:
   trailwise_pg_data:
+  trailwise_uploads:
+  trailwise_private_uploads:

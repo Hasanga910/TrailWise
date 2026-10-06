@@ -10,5 +10,13 @@ public class GuideConfiguration : IEntityTypeConfiguration<Guide>
     {
         builder.Property(g => g.Name).IsRequired().HasMaxLength(200);
         builder.Property(g => g.ContactInfo).HasMaxLength(200);
+
+        builder.HasOne(g => g.User)
+            .WithOne()
+            .HasForeignKey<Guide>(g => g.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(g => g.UserId)
+            .IsUnique();
     }
 }

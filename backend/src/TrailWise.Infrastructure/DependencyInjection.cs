@@ -22,6 +22,7 @@ public static class DependencyInjection
 
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<AdminSeedOptions>(configuration.GetSection(AdminSeedOptions.SectionName));
+        services.Configure<CancellationOptions>(configuration.GetSection(CancellationOptions.SectionName));
 
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();
@@ -32,6 +33,12 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.UserAgent.ParseAdd("TrailWise/1.0 (https://trailwise.local)");
         });
         services.AddScoped<ILocationSearchService, NominatimLocationSearchService>();
+
+        services.Configure<GeocodingOptions>(configuration.GetSection(GeocodingOptions.SectionName));
+        services.AddSingleton<IGeocodingDelay, TaskGeocodingDelay>();
+        services.AddSingleton<GeocodingThrottle>();
+        services.AddScoped<IPackageLocationGeocoder, PackageLocationGeocoder>();
+        services.AddScoped<IPackageLocationResolver, PackageLocationResolver>();
 
         var llmOptions = configuration.GetSection(LlmOptions.SectionName).Get<LlmOptions>() ?? new LlmOptions();
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
@@ -51,11 +58,16 @@ public static class DependencyInjection
                 sp.GetRequiredService<ILogger<GroqAgentClient>>())
             : new NullLlmClient());
 
+        services.AddScoped<IToolCallRecorder, ToolCallRecorder>();
         services.AddScoped<IPreferenceExtractionAgent, PreferenceExtractionAgent>();
         services.AddScoped<IProposalSummaryAgent, ProposalSummaryAgent>();
-        services.AddScoped<IGuideMatchingAgent, MockGuideMatchingAgent>();
+        services.AddScoped<IGuideMatchingAgent, GuideMatchingAgent>();
         services.AddScoped<IFleetCapacityAgent, FleetCapacityAgent>();
         services.AddScoped<IFleetReservationService, FleetReservationService>();
+        services.AddScoped<IGuideAvailabilityService, GuideAvailabilityService>();
+        services.AddScoped<IGuideAssignmentService, GuideAssignmentService>();
+        services.AddScoped<IApprovalService, ApprovalService>();
+        services.AddScoped<IItineraryService, ItineraryService>();
         services.AddScoped<IPricingValidationAgent, PricingValidationAgent>();
         services.AddScoped<ICoordinatorAgentService, CoordinatorAgentService>();
         services.AddScoped<IPaymentService, PaymentService>();
@@ -63,6 +75,34 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<IAuditReportService, AuditReportService>();
         services.AddScoped<IOperationsReportService, OperationsReportService>();
+        services.AddScoped<IDiscountService, DiscountService>();
+        services.AddScoped<IBankSlipStorageService, BankSlipStorageService>();
+        services.AddScoped<ISupportService, SupportService>();
+
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<IBookingLifecycleService, BookingLifecycleService>();
+        services.AddSingleton<BookingPaymentExpiryService>();
+        services.AddHostedService(sp => sp.GetRequiredService<BookingPaymentExpiryService>());
+
+        var notifyLkUserId = configuration["NOTIFY_LK_USER_ID"] ?? configuration["NotifyLk:UserId"] ?? string.Empty;
+        var notifyLkApiKey = configuration["NOTIFY_LK_API_KEY"] ?? configuration["NotifyLk:ApiKey"] ?? string.Empty;
+        var notifyLkSenderId = configuration["NOTIFY_LK_SENDER_ID"] ?? configuration["NotifyLk:SenderId"] ?? "NotifyDEMO";
+        var notifyLkEndpoint = configuration["NotifyLk:ApiEndpoint"] ?? "https://app.notify.lk/api/v1/send";
+
+        services.Configure<NotifyLkOptions>(options =>
+        {
+            options.UserId = notifyLkUserId;
+            options.ApiKey = notifyLkApiKey;
+            options.SenderId = notifyLkSenderId;
+            options.ApiEndpoint = notifyLkEndpoint;
+        });
+
+        services.AddHttpClient<ISmsService, NotifyLkSmsService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+
+        services.AddScoped<IBookingNotificationService, BookingNotificationService>();
 
         return services;
     }

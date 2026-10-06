@@ -3,10 +3,15 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Auth;
 using TrailWise.Api.Contracts.Bookings;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Api.Contracts.Packages;
+using TrailWise.Domain.Entities;
+using TrailWise.Domain.Enums;
+using TrailWise.Infrastructure.Persistence;
 using Xunit;
 
 namespace TrailWise.Api.Tests;
@@ -44,6 +49,44 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var created = await response.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
         Assert.Equal("Requested", created!.Status.ToString());
+    }
+
+    [Fact]
+    public async Task Create_WhenCalledByTourGuide_ReturnsForbidden()
+    {
+        var adminClient = _factory.CreateClient();
+        var adminLoginResponse = await adminClient.PostAsJsonAsync("/api/auth/login", new { Email = "admin@test.local", Password = "TestAdminPass123!" });
+        var adminAuth = await adminLoginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        adminClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminAuth!.Token);
+
+        var guideEmail = $"guide-{Guid.NewGuid():N}@example.com";
+        var createGuideRes = await adminClient.PostAsJsonAsync("/api/auth/admin/users", new
+        {
+            Name = "Tour Guide",
+            Email = guideEmail,
+            Password = "P@ssword123",
+            ContactNumber = "+14155550222",
+            Role = "TourGuide"
+        });
+        createGuideRes.EnsureSuccessStatusCode();
+
+        var guideClient = _factory.CreateClient();
+        var loginResponse = await guideClient.PostAsJsonAsync("/api/auth/login", new { Email = guideEmail, Password = "P@ssword123" });
+        var guideAuth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        guideClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", guideAuth!.Token);
+
+        var tier = await GetFirstTierAsync(guideClient);
+
+        var response = await guideClient.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -402,6 +445,55 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
     }
 
     [Fact]
+    public async Task Create_WithLanguagePreference_PersistsAndExposesInDto()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m,
+            LanguagePreference = "  French  "
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<BookingDto>(JsonOptions);
+        Assert.NotNull(created);
+        Assert.Equal("French", created.LanguagePreference);
+
+        // Fetch via GetById to verify persistence
+        var fetched = await client.GetFromJsonAsync<BookingDto>($"/api/bookings/{created.Id}", JsonOptions);
+        Assert.NotNull(fetched);
+        Assert.Equal("French", fetched.LanguagePreference);
+    }
+
+    [Fact]
+    public async Task Create_WithLanguagePreferenceExceedingMaxLength_ReturnsBadRequest()
+    {
+        var client = await AuthenticatedTravelerAsync();
+        var tier = await GetFirstTierAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = tier.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m,
+            LanguagePreference = new string('x', 101)
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var errors = body.GetProperty("errors");
+        Assert.Contains(errors.EnumerateArray(), e => e.GetProperty("field").GetString() == "languagePreference");
+    }
+
+    [Fact]
     public async Task GetAll_AsOperationsManager_ReturnsAllBookings()
     {
         var travelerAClient = await AuthenticatedTravelerAsync();
@@ -430,6 +522,170 @@ public class BookingsEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
         var response = await client.GetAsync("/api/bookings");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMine_And_GetById_ReturnSettlementFields_ForPendingAndDepositPaid()
+    {
+        var client = _factory.CreateClient();
+        var email = $"traveler-{Guid.NewGuid():N}@example.com";
+        await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { Name = "Traveler S", Email = email, Password = "P@ssword123", ContactNumber = "+14155550100" });
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "P@ssword123" });
+        var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
+        var travelerId = auth.User.Id;
+
+        Guid bookingId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var package = new TourPackage { Name = "Settlement Tour", Theme = "T", DurationDays = 3, BasePricePerPerson = 250m, MaxGroupSize = 10 };
+            var tier = new PackageTier { TourPackage = package, ClassType = ClassType.Normal, IncludesFood = false, BasePricePerPerson = 250m, RequiresAC = false };
+            var booking = new Booking
+            {
+                TravelerId = travelerId,
+                TourPackage = package,
+                PackageTier = tier,
+                GroupSize = 2,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
+                EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(13)),
+                BudgetPerPerson = 500m,
+                Status = BookingStatus.Confirmed
+            };
+            db.Bookings.Add(booking);
+
+            var run = new AgentWorkflowRun { Booking = booking, Objective = "Pricing", Status = "Completed", StartedAt = DateTimeOffset.UtcNow };
+            db.AgentWorkflowRuns.Add(run);
+            db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new { totalCost = 500m, breakdown = "{}", validationResult = "Valid" }),
+                DurationMs = 10
+            });
+
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = 250m,
+                Status = PaymentStatus.DepositPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-2),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-2),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/dep.jpg"
+            });
+
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = 250m,
+                Status = PaymentStatus.Pending,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-1),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/pending.jpg"
+            });
+
+            await db.SaveChangesAsync();
+            bookingId = booking.Id;
+        }
+
+        // Test GET /api/bookings/mine
+        var myBookingsRes = await client.GetFromJsonAsync<PagedResult<BookingDto>>("/api/bookings/mine", JsonOptions);
+        Assert.NotNull(myBookingsRes);
+        var bMine = myBookingsRes!.Items.FirstOrDefault(b => b.Id == bookingId);
+        Assert.NotNull(bMine);
+        Assert.Equal("DepositPaid", bMine.PaymentStatus);
+        Assert.Equal(250m, bMine.RemainingAmount);
+        Assert.False(bMine.IsFullyPaid);
+        Assert.True(bMine.HasPendingPayment);
+
+        // Test GET /api/bookings/{id}
+        var bGet = await client.GetFromJsonAsync<BookingDto>($"/api/bookings/{bookingId}", JsonOptions);
+        Assert.NotNull(bGet);
+        Assert.Equal("DepositPaid", bGet.PaymentStatus);
+        Assert.Equal(250m, bGet.RemainingAmount);
+        Assert.False(bGet.IsFullyPaid);
+        Assert.True(bGet.HasPendingPayment);
+    }
+
+    [Fact]
+    public async Task GetMine_And_GetById_ReturnSettlementFields_ForFullyPaid()
+    {
+        var client = _factory.CreateClient();
+        var email = $"traveler-{Guid.NewGuid():N}@example.com";
+        await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new { Name = "Traveler F", Email = email, Password = "P@ssword123", ContactNumber = "+14155550100" });
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password = "P@ssword123" });
+        var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>(JsonOptions);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
+        var travelerId = auth.User.Id;
+
+        Guid bookingId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var package = new TourPackage { Name = "Fully Paid Tour", Theme = "T", DurationDays = 3, BasePricePerPerson = 250m, MaxGroupSize = 10 };
+            var tier = new PackageTier { TourPackage = package, ClassType = ClassType.Normal, IncludesFood = false, BasePricePerPerson = 250m, RequiresAC = false };
+            var booking = new Booking
+            {
+                TravelerId = travelerId,
+                TourPackage = package,
+                PackageTier = tier,
+                GroupSize = 2,
+                StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
+                EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(13)),
+                BudgetPerPerson = 500m,
+                Status = BookingStatus.Completed
+            };
+            db.Bookings.Add(booking);
+
+            var run = new AgentWorkflowRun { Booking = booking, Objective = "Pricing", Status = "Completed", StartedAt = DateTimeOffset.UtcNow };
+            db.AgentWorkflowRuns.Add(run);
+            db.AgentStepLogs.Add(new AgentStepLog
+            {
+                WorkflowRun = run,
+                AgentName = "PricingValidationAgent",
+                InputJson = JsonSerializer.Serialize(new { bookingId = booking.Id }),
+                OutputJson = JsonSerializer.Serialize(new { totalCost = 500m, breakdown = "{}", validationResult = "Valid" }),
+                DurationMs = 10
+            });
+
+            db.Payments.Add(new Payment
+            {
+                Booking = booking,
+                Amount = 500m,
+                Status = PaymentStatus.FullyPaid,
+                SubmittedAt = DateTimeOffset.UtcNow.AddDays(-2),
+                PaidAt = DateTimeOffset.UtcNow.AddDays(-2),
+                Method = "BankTransfer",
+                BankSlipUrl = "slips/full.jpg"
+            });
+
+            await db.SaveChangesAsync();
+            bookingId = booking.Id;
+        }
+
+        // Test GET /api/bookings/mine
+        var myBookingsRes = await client.GetFromJsonAsync<PagedResult<BookingDto>>("/api/bookings/mine", JsonOptions);
+        Assert.NotNull(myBookingsRes);
+        var bMine = myBookingsRes!.Items.FirstOrDefault(b => b.Id == bookingId);
+        Assert.NotNull(bMine);
+        Assert.Equal("FullyPaid", bMine.PaymentStatus);
+        Assert.Equal(0m, bMine.RemainingAmount);
+        Assert.True(bMine.IsFullyPaid);
+        Assert.False(bMine.HasPendingPayment);
+
+        // Test GET /api/bookings/{id}
+        var bGet = await client.GetFromJsonAsync<BookingDto>($"/api/bookings/{bookingId}", JsonOptions);
+        Assert.NotNull(bGet);
+        Assert.Equal("FullyPaid", bGet.PaymentStatus);
+        Assert.Equal(0m, bGet.RemainingAmount);
+        Assert.True(bGet.IsFullyPaid);
+        Assert.False(bGet.HasPendingPayment);
     }
 
     private static async Task CreateBookingAsync(HttpClient client, Guid packageTierId, int startDaysFromNow)

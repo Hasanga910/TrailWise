@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TrailWise.Domain.Entities;
 using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 
 namespace TrailWise.Infrastructure.Agents;
 
@@ -30,8 +32,14 @@ public class CoordinatorAgentService : ICoordinatorAgentService
     private readonly IGuideMatchingAgent _guideAgent;
     private readonly IFleetCapacityAgent _fleetAgent;
     private readonly IPricingValidationAgent _pricingAgent;
+    private readonly IGuideAssignmentService _guideAssignmentService;
+    private readonly IFleetReservationService? _fleetReservationService;
     private readonly IProposalSummaryAgent _summaryAgent;
     private readonly ILogger<CoordinatorAgentService> _logger;
+    private readonly IBookingLifecycleService _bookingLifecycleService;
+    private readonly IClock _clock;
+    private readonly IServiceScopeFactory? _scopeFactory;
+    private readonly IToolCallRecorder? _toolCalls;
 
     public CoordinatorAgentService(
         TrailWiseDbContext db,
@@ -39,16 +47,28 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         IGuideMatchingAgent guideAgent,
         IFleetCapacityAgent fleetAgent,
         IPricingValidationAgent pricingAgent,
+        IGuideAssignmentService guideAssignmentService,
         IProposalSummaryAgent summaryAgent,
-        ILogger<CoordinatorAgentService> logger)
+        ILogger<CoordinatorAgentService> logger,
+        IBookingLifecycleService? bookingLifecycleService = null,
+        IClock? clock = null,
+        IFleetReservationService? fleetReservationService = null,
+        IServiceScopeFactory? scopeFactory = null,
+        IToolCallRecorder? toolCalls = null)
     {
+        _toolCalls = toolCalls;
         _db = db;
         _preferenceAgent = preferenceAgent;
         _guideAgent = guideAgent;
         _fleetAgent = fleetAgent;
         _pricingAgent = pricingAgent;
+        _guideAssignmentService = guideAssignmentService;
         _summaryAgent = summaryAgent;
         _logger = logger;
+        _fleetReservationService = fleetReservationService;
+        _clock = clock ?? new SystemClock();
+        _bookingLifecycleService = bookingLifecycleService ?? new BookingLifecycleService(_clock);
+        _scopeFactory = scopeFactory;
     }
 
     public async Task StartWorkflowAsync(Guid bookingId, CancellationToken ct = default)
@@ -62,6 +82,9 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             _logger.LogWarning("StartWorkflowAsync called for a booking that no longer exists: {BookingId}", bookingId);
             return;
         }
+
+        // A (re-)run replaces any approval still open from an earlier run.
+        await SupersedeOpenApprovalsAsync(bookingId, ct);
 
         var plan = new AgentWorkflowPlan
         {
@@ -144,6 +167,12 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         var decisionResult = BookingApprovalEvaluator.Evaluate(evaluatorInput);
         sw.Stop();
 
+        _toolCalls.RecordCall(
+            AgentTools.DeterministicRuleCheck,
+            $"group size {booking.GroupSize}, budget ceiling, AC match, vehicle conflict, guide match score",
+            $"{decisionResult.Decision}; {decisionResult.Reasons.Count} reason(s)",
+            sw.ElapsedMilliseconds);
+
         var validateStepLog = new AgentStepLog
         {
             WorkflowRunId = run.Id,
@@ -156,26 +185,80 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         MarkStepDone(plan, "validate");
         run.PlanJson = Serialize(plan);
 
+        var assignmentSucceeded = false;
         switch (decisionResult.Decision)
         {
             case BookingApprovalEvaluator.Decision.Approved:
-                booking.Status = BookingStatus.Confirmed;
-                run.Status = WorkflowRunStatus.Completed;
-                run.CompletedAt = DateTimeOffset.UtcNow;
+                assignmentSucceeded = false;
+                if (guideResult.GuideId != Guid.Empty)
+                {
+                    assignmentSucceeded = await _guideAssignmentService.AssignGuideAsync(bookingId, guideResult.GuideId, ct);
+                }
+
+                if (_fleetReservationService != null && vehicleResult.VehicleId != Guid.Empty && vehicleResult.DriverId != Guid.Empty)
+                {
+                    var isVehAvail = await _fleetReservationService.IsVehicleAvailableAsync(vehicleResult.VehicleId, booking.StartDate, booking.EndDate, ct);
+                    var isDrvAvail = await _fleetReservationService.IsDriverAvailableAsync(vehicleResult.DriverId, booking.StartDate, booking.EndDate, ct);
+                    if (isVehAvail && isDrvAvail)
+                    {
+                        var hasAssignment = await _db.VehicleAssignments.AnyAsync(a => a.BookingId == bookingId, ct);
+                        if (!hasAssignment)
+                        {
+                            _toolCalls.RecordCall(
+                                AgentTools.VehicleAvailabilityWrite,
+                                $"reserve vehicle {vehicleResult.VehicleId} with driver {vehicleResult.DriverId}, {booking.StartDate:yyyy-MM-dd} to {booking.EndDate:yyyy-MM-dd}",
+                                "reserved (workflow auto-approved, the write is no longer gated)",
+                                0);
+                            _db.VehicleAssignments.Add(new VehicleAssignment
+                            {
+                                VehicleId = vehicleResult.VehicleId,
+                                DriverId = vehicleResult.DriverId,
+                                BookingId = bookingId,
+                                StartDate = booking.StartDate,
+                                EndDate = booking.EndDate
+                            });
+                        }
+                    }
+                }
+
+                if (assignmentSucceeded)
+                {
+                    _bookingLifecycleService.TransitionToConfirmed(booking);
+                    run.Status = WorkflowRunStatus.Completed;
+                    run.CompletedAt = _clock.UtcNow;
+                }
+                else
+                {
+                    _logger.LogWarning("Guide assignment failed for approved booking {BookingId} with guide {GuideId}. Marking booking for manual review.",
+                        bookingId, guideResult.GuideId);
+                    booking.Status = BookingStatus.NeedsManualReview;
+                    run.Status = WorkflowRunStatus.Failed;
+                    run.CompletedAt = _clock.UtcNow;
+                }
                 break;
             case BookingApprovalEvaluator.Decision.NeedsApproval:
                 booking.Status = BookingStatus.PendingApproval;
                 run.Status = WorkflowRunStatus.AwaitingApproval;
+                _db.ApprovalRequests.Add(new ApprovalRequest
+                {
+                    BookingId = bookingId,
+                    Type = BookingApprovalEvaluator.ClassifyApprovalType(booking.GroupSize),
+                    Status = ApprovalStatus.Pending,
+                    PreviousBookingStatus = BookingStatus.Requested,
+                    ReasonsJson = Serialize(decisionResult.Reasons),
+                    RequestedAt = _clock.UtcNow,
+                });
                 // CompletedAt intentionally left null: this run is paused pending a future
                 // (out-of-scope) human-approval step, not finished.
                 break;
             case BookingApprovalEvaluator.Decision.ValidationFailed:
                 booking.Status = BookingStatus.NeedsManualReview;
                 run.Status = WorkflowRunStatus.Failed;
-                run.CompletedAt = DateTimeOffset.UtcNow;
+                run.CompletedAt = _clock.UtcNow;
                 break;
         }
 
+        validateStepLog.ToolCallsJson = _toolCalls?.DrainJson();
         _db.AgentStepLogs.Add(validateStepLog);
 
         var isRelational = _db.Database.IsRelational();
@@ -186,6 +269,23 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             if (transaction is not null)
             {
                 await transaction.CommitAsync(ct);
+            }
+
+            if (assignmentSucceeded && _scopeFactory is not null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var notificationService = scope.ServiceProvider.GetRequiredService<IBookingNotificationService>();
+                        await notificationService.SendBookingConfirmedNotificationsAsync(bookingId, CancellationToken.None);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        _logger.LogError(notifEx, "Failed to dispatch confirmation SMS notifications for Booking {BookingId}", bookingId);
+                    }
+                });
             }
         }
         catch
@@ -235,6 +335,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
                 AgentName = "ProposalSummaryAgent",
                 InputJson = Serialize(summaryInput),
                 OutputJson = Serialize(summary),
+                ToolCallsJson = _toolCalls?.DrainJson(),
                 DurationMs = summarySw.ElapsedMilliseconds,
             });
             MarkStepDone(plan, "summarize");
@@ -245,6 +346,28 @@ public class CoordinatorAgentService : ICoordinatorAgentService
         {
             _logger.LogWarning(ex, "Proposal summary generation failed for booking {BookingId}; leaving SummaryText null.", bookingId);
         }
+    }
+
+    /// <summary>
+    /// Closes any still-open approval for the booking (a re-run of the workflow replaces it). Done
+    /// and saved up front, before the run mutates anything, so the one-open-request-per-booking
+    /// index can never see the new insert before the old request is closed.
+    /// </summary>
+    private async Task SupersedeOpenApprovalsAsync(Guid bookingId, CancellationToken ct)
+    {
+        var open = await _db.ApprovalRequests
+            .Where(a => a.BookingId == bookingId && a.Status == ApprovalStatus.Pending)
+            .ToListAsync(ct);
+        if (open.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var request in open)
+        {
+            request.Status = ApprovalStatus.Superseded;
+        }
+        await _db.SaveChangesAsync(ct);
     }
 
     private async Task<TResult> RunStepAsync<TResult>(
@@ -266,6 +389,7 @@ public class CoordinatorAgentService : ICoordinatorAgentService
             AgentName = agentName,
             InputJson = Serialize(input),
             OutputJson = Serialize(result),
+            ToolCallsJson = _toolCalls?.DrainJson(),
             DurationMs = sw.ElapsedMilliseconds,
         });
 

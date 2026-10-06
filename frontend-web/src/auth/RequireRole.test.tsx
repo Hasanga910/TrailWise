@@ -44,7 +44,7 @@ function renderApp(initialPath: string, role: UserRole) {
               </RequireRole>
             }
           />
-          <Route path="/portal" element={<div>Portal Fallback</div>} />
+          <Route path="/no-access" element={<div>No Access Page</div>} />
         </Routes>
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -57,18 +57,19 @@ describe('RequireRole', () => {
     expect(screen.getByText('Admin Home')).toBeInTheDocument();
   });
 
-  it("redirects an OperationsManager away from the Admin console to their own home", () => {
+  it('sends an OperationsManager to /no-access for the Admin console', () => {
     renderApp('/admin', 'OperationsManager');
-    expect(screen.getByText('Ops Home')).toBeInTheDocument();
+    expect(screen.getByText('No Access Page')).toBeInTheDocument();
+    expect(screen.queryByText('Admin Home')).not.toBeInTheDocument();
   });
 
-  it("redirects a Traveler away from the Ops console to their own home", () => {
+  it('sends a Traveler to /no-access for the Ops console', () => {
     renderApp('/ops', 'Traveler');
-    expect(screen.getByText('Traveler Home')).toBeInTheDocument();
+    expect(screen.getByText('No Access Page')).toBeInTheDocument();
   });
 
-  it('redirects a role with no dedicated console (TourGuide) to the portal fallback', () => {
+  it('sends a TourGuide to /no-access for the Admin console', () => {
     renderApp('/admin', 'TourGuide');
-    expect(screen.getByText('Portal Fallback')).toBeInTheDocument();
+    expect(screen.getByText('No Access Page')).toBeInTheDocument();
   });
 });

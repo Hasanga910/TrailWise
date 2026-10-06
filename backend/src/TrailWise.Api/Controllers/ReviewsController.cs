@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TrailWise.Api.Contracts.Common;
 using TrailWise.Api.Contracts.Reviews;
 using TrailWise.Infrastructure.Services;
@@ -52,8 +53,20 @@ public class ReviewsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, dto);
     }
 
+    /// <summary>Newest well-rated reviews across packages, for the public home page.</summary>
+    [HttpGet("api/reviews/featured")]
+    [AllowAnonymous]
+    [EnableRateLimiting("PublicReadLimiter")]
+    public async Task<ActionResult<IReadOnlyList<FeaturedReviewDto>>> GetFeatured([FromQuery] int limit = 6, CancellationToken ct = default)
+    {
+        var clamped = Math.Clamp(limit, 1, 12);
+        var reviews = await _reviewService.GetFeaturedReviewsAsync(clamped, ct: ct);
+        return Ok(reviews.Select(FeaturedReviewDto.FromModel).ToList());
+    }
+
     [HttpGet("api/packages/{id:guid}/reviews")]
     [AllowAnonymous]
+    [EnableRateLimiting("PublicReadLimiter")]
     public async Task<ActionResult<PackageReviewsDto>> GetPackageReviews(Guid id, CancellationToken ct)
     {
         var result = await _reviewService.GetPackageReviewsAsync(id, ct);
@@ -67,7 +80,7 @@ public class ReviewsController : ControllerBase
             };
         }
 
-        var reviewDtos = result.Reviews.Select(ReviewDto.FromEntity).ToList();
+        var reviewDtos = result.Reviews.Select(PublicReviewDto.FromEntity).ToList();
 
         return Ok(new PackageReviewsDto(
             result.TourPackageId,

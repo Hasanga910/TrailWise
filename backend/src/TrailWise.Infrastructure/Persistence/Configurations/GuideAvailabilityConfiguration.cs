@@ -13,6 +13,6 @@ public class GuideAvailabilityConfiguration : IEntityTypeConfiguration<GuideAvai
             .HasForeignKey(g => g.GuideId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(g => new { g.GuideId, g.Date });
+        builder.HasIndex(g => new { g.GuideId, g.Date }).IsUnique();
     }
 }

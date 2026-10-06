@@ -37,9 +37,12 @@ public class PreferenceExtractionAgent : IPreferenceExtractionAgent
     private readonly ILlmClient _llmClient;
     private readonly LlmOptions _options;
     private readonly ILogger<PreferenceExtractionAgent> _logger;
+    private readonly IToolCallRecorder? _recorder;
 
-    public PreferenceExtractionAgent(ILlmClient llmClient, IOptions<LlmOptions> options, ILogger<PreferenceExtractionAgent> logger)
+    public PreferenceExtractionAgent(
+        ILlmClient llmClient, IOptions<LlmOptions> options, ILogger<PreferenceExtractionAgent> logger, IToolCallRecorder? recorder = null)
     {
+        _recorder = recorder;
         _llmClient = llmClient;
         _options = options.Value;
         _logger = logger;
@@ -56,8 +59,13 @@ public class PreferenceExtractionAgent : IPreferenceExtractionAgent
 
         try
         {
-            var result = await _llmClient.CallStructuredAsync<TravelerPreferences>(
-                SystemPrompt, userContent, _options.ExtractionModel, _options.MaxOutputTokens, ct);
+            // The traveler's free text is untrusted: it is never copied into the recorded summary.
+            var result = await _recorder.TrackAsync(
+                AgentTools.StructuredOutputFormatter,
+                $"special requests ({specialRequests.Length} characters, treated as untrusted data); output must match the preferences schema",
+                () => _llmClient.CallStructuredAsync<TravelerPreferences>(
+                    SystemPrompt, userContent, _options.ExtractionModel, _options.MaxOutputTokens, ct),
+                r => $"schema-valid; suspicious instructions flagged: {r.ContainedSuspiciousInstructions}");
 
             return Normalize(result);
         }

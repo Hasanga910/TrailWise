@@ -1,38 +1,79 @@
+import { Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { OpsLayout } from './components/ops/OpsLayout';
 import { TravelerLayout } from './components/traveler/TravelerLayout';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { RequireRole } from './auth/RequireRole';
-import { HomePage } from './pages/HomePage';
-import { LoginPage } from './pages/LoginPage';
-import { PortalFallbackPage } from './pages/PortalFallbackPage';
-import { RegisterPage } from './pages/RegisterPage';
-import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
-import { AdminProfileSettingsPage } from './pages/admin/AdminProfileSettingsPage';
-import { PackageManagementPage } from './pages/admin/PackageManagementPage';
-import { PackagesOverviewPage } from './pages/admin/PackagesOverviewPage';
-import { StaffRolePage } from './pages/admin/StaffRolePage';
-import { UserManagementIndexPage } from './pages/admin/UserManagementIndexPage';
-import { AgentWorkflowPage } from './pages/ops/AgentWorkflowPage';
-import { OpsBookingsPage } from './pages/ops/OpsBookingsPage';
-import { OpsDashboardPage } from './pages/ops/OpsDashboardPage';
-import { OpsPackagesPage } from './pages/ops/OpsPackagesPage';
-import { OpsProfileSettingsPage } from './pages/ops/OpsProfileSettingsPage';
-import { OpsReportsPage } from './pages/ops/OpsReportsPage';
-import { BookingRequestPage } from './pages/traveler/BookingRequestPage';
-import { MyBookingsPage } from './pages/traveler/MyBookingsPage';
-import { PackagesBrowsePage } from './pages/traveler/PackagesBrowsePage';
 import { FleetLayout } from './components/fleet/FleetLayout';
-import { FleetManagementPage } from './pages/admin/FleetManagementPage';
-import { FleetProfileSettingsPage } from './pages/fleet/FleetProfileSettingsPage';
-import { TravelerDashboardPage } from './pages/traveler/TravelerDashboardPage';
-import { TravelerProfileSettingsPage } from './pages/traveler/TravelerProfileSettingsPage';
+import { GuideLayout } from './components/guides/GuideLayout';
+import { DriverLayout } from './components/driver/DriverLayout';
+import { RoleLayout } from './components/layout/RoleLayout';
+import { lazyNamed } from './components/layout/lazyNamed';
+import { PageSkeleton } from './components/ui/Skeleton';
+import { PublicLayout } from './components/public/PublicLayout';
+// The landing page is the entry route for most visitors: bundling it avoids a second round trip before first paint.
+import { HomePage } from './pages/HomePage';
+import { PortalRedirect } from './pages/PortalRedirect';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { NoAccessPage } from './pages/NoAccessPage';
+
+const UiGalleryPage = import.meta.env.DEV ? lazyNamed(() => import('./pages/dev/UiGalleryPage'), 'UiGalleryPage') : null;
+const ExplorerPage = lazyNamed(() => import('./pages/public/ExplorerPage'), 'ExplorerPage');
+const PackageDetailPage = lazyNamed(() => import('./pages/public/PackageDetailPage'), 'PackageDetailPage');
+const LoginPage = lazyNamed(() => import('./pages/LoginPage'), 'LoginPage');
+const RegisterPage = lazyNamed(() => import('./pages/RegisterPage'), 'RegisterPage');
+const AdminOverviewPage = lazyNamed(() => import('./pages/admin/AdminOverviewPage'), 'AdminOverviewPage');
+const AdminProfileSettingsPage = lazyNamed(() => import('./pages/admin/AdminProfileSettingsPage'), 'AdminProfileSettingsPage');
+const PackageManagementPage = lazyNamed(() => import('./pages/admin/PackageManagementPage'), 'PackageManagementPage');
+const PackagesOverviewPage = lazyNamed(() => import('./pages/admin/PackagesOverviewPage'), 'PackagesOverviewPage');
+const StaffRolePage = lazyNamed(() => import('./pages/admin/StaffRolePage'), 'StaffRolePage');
+const UserManagementIndexPage = lazyNamed(() => import('./pages/admin/UserManagementIndexPage'), 'UserManagementIndexPage');
+const OpsApprovalsPage = lazyNamed(() => import('./pages/ops/OpsApprovalsPage'), 'OpsApprovalsPage');
+const OpsWorkflowsPage = lazyNamed(() => import('./pages/ops/OpsWorkflowsPage'), 'OpsWorkflowsPage');
+const AgentWorkflowPage = lazyNamed(() => import('./pages/ops/AgentWorkflowPage'), 'AgentWorkflowPage');
+const OpsBookingsPage = lazyNamed(() => import('./pages/ops/OpsBookingsPage'), 'OpsBookingsPage');
+const OpsDashboardPage = lazyNamed(() => import('./pages/ops/OpsDashboardPage'), 'OpsDashboardPage');
+const OpsDiscountsPage = lazyNamed(() => import('./pages/ops/OpsDiscountsPage'), 'OpsDiscountsPage');
+const OpsPackagesPage = lazyNamed(() => import('./pages/ops/OpsPackagesPage'), 'OpsPackagesPage');
+const OpsPaymentsPage = lazyNamed(() => import('./pages/ops/OpsPaymentsPage'), 'OpsPaymentsPage');
+const OpsProfileSettingsPage = lazyNamed(() => import('./pages/ops/OpsProfileSettingsPage'), 'OpsProfileSettingsPage');
+const OpsReportsPage = lazyNamed(() => import('./pages/ops/OpsReportsPage'), 'OpsReportsPage');
+const OpsSupportPage = lazyNamed(() => import('./pages/ops/OpsSupportPage'), 'OpsSupportPage');
+const OpsTicketDetailPage = lazyNamed(() => import('./pages/ops/OpsTicketDetailPage'), 'OpsTicketDetailPage');
+const BookingRequestPage = lazyNamed(() => import('./pages/traveler/BookingRequestPage'), 'BookingRequestPage');
+const MyBookingsPage = lazyNamed(() => import('./pages/traveler/MyBookingsPage'), 'MyBookingsPage');
+const PackagesBrowsePage = lazyNamed(() => import('./pages/traveler/PackagesBrowsePage'), 'PackagesBrowsePage');
+const FleetOverviewPage = lazyNamed(() => import('./pages/fleet/FleetOverviewPage'), 'FleetOverviewPage');
+const FleetProfileSettingsPage = lazyNamed(() => import('./pages/fleet/FleetProfileSettingsPage'), 'FleetProfileSettingsPage');
+const FleetDriversPage = lazyNamed(() => import('./pages/fleet/FleetDriversPage'), 'FleetDriversPage');
+const FleetVehiclesPage = lazyNamed(() => import('./pages/fleet/FleetVehiclesPage'), 'FleetVehiclesPage');
+const FleetAssignmentsPage = lazyNamed(() => import('./pages/fleet/FleetAssignmentsPage'), 'FleetAssignmentsPage');
+const TravelerDashboardPage = lazyNamed(() => import('./pages/traveler/TravelerDashboardPage'), 'TravelerDashboardPage');
+const TravelerProfileSettingsPage = lazyNamed(() => import('./pages/traveler/TravelerProfileSettingsPage'), 'TravelerProfileSettingsPage');
+const GuideAvailabilityPage = lazyNamed(() => import('./pages/guides/GuideAvailabilityPage'), 'GuideAvailabilityPage');
+const AssignedToursPage = lazyNamed(() => import('./pages/guides/AssignedToursPage'), 'AssignedToursPage');
+const TourDetailPage = lazyNamed(() => import('./pages/guides/TourDetailPage'), 'TourDetailPage');
+const GuideProfilePage = lazyNamed(() => import('./pages/guides/GuideProfilePage'), 'GuideProfilePage');
+const DriverDashboardPage = lazyNamed(() => import('./pages/driver/DriverDashboardPage'), 'DriverDashboardPage');
+const DriverProfileSettingsPage = lazyNamed(() => import('./pages/driver/DriverProfileSettingsPage'), 'DriverProfileSettingsPage');
+const GuideDashboardPage = lazyNamed(() => import('./pages/guides/GuideDashboardPage'), 'GuideDashboardPage');
 
 function App() {
   return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-5xl p-8">
+          <PageSkeleton />
+        </div>
+      }
+    >
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/explore" element={<ExplorerPage />} />
+        <Route path="/explore/:packageId" element={<PackageDetailPage />} />
+      </Route>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
@@ -40,10 +81,49 @@ function App() {
         path="/portal"
         element={
           <ProtectedRoute>
-            <PortalFallbackPage />
+            <PortalRedirect />
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/guides"
+        element={
+          <RequireRole allowedRoles={['TourGuide']}>
+            <GuideLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<GuideDashboardPage />} />
+        <Route path="dashboard" element={<GuideDashboardPage />} />
+        <Route path="my-tours" element={<AssignedToursPage />} />
+        <Route path="my-tours/:bookingId" element={<TourDetailPage />} />
+        <Route path="profile" element={<GuideProfilePage />} />
+      </Route>
+
+      {/* Shared page: rendered inside the viewer's own portal shell. */}
+      <Route
+        path="/guides/availability"
+        element={
+          <RequireRole allowedRoles={['OperationsManager', 'FleetCoordinator', 'TourGuide']}>
+            <RoleLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<GuideAvailabilityPage />} />
+      </Route>
+
+      <Route
+        path="/driver"
+        element={
+          <RequireRole allowedRoles={['Driver']}>
+            <DriverLayout />
+          </RequireRole>
+        }
+      >
+        <Route path="dashboard" element={<DriverDashboardPage />} />
+        <Route path="profile" element={<DriverProfileSettingsPage />} />
+      </Route>
 
       <Route
         path="/traveler"
@@ -63,16 +143,22 @@ function App() {
       <Route
         path="/ops"
         element={
-          <RequireRole allowedRoles={['OperationsManager']}>
+          <RequireRole allowedRoles={['OperationsManager', 'Admin']}>
             <OpsLayout />
           </RequireRole>
         }
       >
         <Route index element={<OpsDashboardPage />} />
         <Route path="packages" element={<OpsPackagesPage />} />
+        <Route path="discounts" element={<OpsDiscountsPage />} />
+        <Route path="payments" element={<OpsPaymentsPage />} />
         <Route path="reports" element={<OpsReportsPage />} />
+        <Route path="approvals" element={<OpsApprovalsPage />} />
+        <Route path="workflows" element={<OpsWorkflowsPage />} />
         <Route path="bookings" element={<OpsBookingsPage />} />
         <Route path="bookings/:bookingId/workflow" element={<AgentWorkflowPage />} />
+        <Route path="support" element={<OpsSupportPage />} />
+        <Route path="support/:ticketId" element={<OpsTicketDetailPage />} />
         <Route path="profile" element={<OpsProfileSettingsPage />} />
       </Route>
 
@@ -84,7 +170,10 @@ function App() {
           </RequireRole>
         }
       >
-        <Route index element={<FleetManagementPage />} />
+        <Route index element={<FleetOverviewPage />} />
+        <Route path="vehicles" element={<FleetVehiclesPage />} />
+        <Route path="drivers" element={<FleetDriversPage />} />
+        <Route path="assignments" element={<FleetAssignmentsPage />} />
         <Route path="profile" element={<FleetProfileSettingsPage />} />
       </Route>
 
@@ -99,7 +188,9 @@ function App() {
         <Route index element={<AdminOverviewPage />} />
         <Route path="packages" element={<PackagesOverviewPage />} />
         <Route path="packages/manage" element={<PackageManagementPage />} />
-        <Route path="fleet" element={<FleetManagementPage />} />
+        <Route path="payments" element={<OpsPaymentsPage />} />
+        <Route path="support" element={<OpsSupportPage />} />
+        <Route path="support/:ticketId" element={<OpsTicketDetailPage />} />
         <Route path="staff" element={<UserManagementIndexPage />} />
         <Route path="staff/tour-guides" element={<StaffRolePage role="TourGuide" roleLabel="Tour Guide" />} />
         <Route
@@ -112,7 +203,12 @@ function App() {
         />
         <Route path="profile" element={<AdminProfileSettingsPage />} />
       </Route>
+
+      {UiGalleryPage && <Route path="/dev/ui" element={<UiGalleryPage />} />}
+      <Route path="/no-access" element={<NoAccessPage />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </Suspense>
   );
 }
 

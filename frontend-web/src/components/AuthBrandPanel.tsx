@@ -1,51 +1,52 @@
+import { Compass, ShieldCheck, Star } from 'lucide-react';
+import sigiriya from '../assets/hero/sigiriya-rock-fortress-1024.webp';
+import { Link } from 'react-router-dom';
 import { Logo } from './Logo';
+
+const BENEFITS = [
+  { Icon: Compass, text: 'Handpicked tours across Sri Lanka' },
+  { Icon: ShieldCheck, text: 'Guide and vehicle confirmed before you pay' },
+  { Icon: Star, text: 'Reviews from travelers who completed the trip' },
+];
 
 export function AuthBrandPanel({ tagline }: { tagline: string }) {
   return (
-    <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-600 via-brand-700 to-brand-950 p-10 text-white lg:flex">
-      <div className="absolute -right-16 -top-16 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
-      <div className="absolute -bottom-24 -left-10 h-80 w-80 rounded-full bg-accent-500/20 blur-3xl" />
+    <div className="relative hidden flex-col justify-between overflow-hidden bg-brand-950 p-10 text-white lg:flex">
+      <img
+        src={sigiriya}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover opacity-45"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-brand-950 via-brand-950/60 to-brand-950/30" />
 
       <div className="relative z-10">
-        <Logo onDark className="h-8 w-auto" />
+        <Link
+          to="/"
+          aria-label="TrailWise home"
+          className="inline-block cursor-pointer rounded-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-950"
+        >
+          <Logo onDark className="h-8 w-auto" />
+        </Link>
       </div>
 
       <div className="relative z-10 max-w-md">
         <h2 className="font-heading text-3xl font-bold leading-tight">{tagline}</h2>
-        <p className="mt-3 text-white/75">
-          One console for operations, guides, and travelers.
-        </p>
-
-        <div className="mt-10 flex gap-6 text-white/85">
-          <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 21c-4-4.5-7-8.2-7-11.5A7 7 0 0 1 19 9.5C19 12.8 16 16.5 12 21Z"
-            />
-            <circle cx="12" cy="9.5" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="m14.5 9.5-1.8 4.7a1 1 0 0 1-.5.5l-4.7 1.8 1.8-4.7a1 1 0 0 1 .5-.5l4.7-1.8Z"
-            />
-          </svg>
-          <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="m3 19 5.5-9 4 6.2L15.5 11 21 19H3Z"
-            />
-          </svg>
-        </div>
+        <ul className="mt-8 space-y-4">
+          {BENEFITS.map(({ Icon, text }) => (
+            <li key={text} className="flex items-center gap-3 text-white/90">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 backdrop-blur">
+                <Icon className="h-4 w-4" aria-hidden />
+              </span>
+              {text}
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <p className="relative z-10 text-sm text-white/60">
-        &copy; {new Date().getFullYear()} TrailWise. Built for tour operations.
-      </p>
+      <p className="relative z-10 text-sm text-white/70">&copy; {new Date().getFullYear()} TrailWise</p>
     </div>
   );
 }

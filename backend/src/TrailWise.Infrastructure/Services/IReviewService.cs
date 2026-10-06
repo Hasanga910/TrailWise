@@ -52,6 +52,15 @@ public class PackageReviewsResult
     };
 }
 
+/// <summary>A highly rated review with its package, for public testimonials.</summary>
+public record FeaturedReview(
+    Guid Id,
+    int Rating,
+    string Comment,
+    DateTimeOffset SubmittedAt,
+    Guid PackageId,
+    string PackageName);
+
 public interface IReviewService
 {
     Task<SubmitReviewResult> SubmitReviewAsync(
@@ -63,5 +72,11 @@ public interface IReviewService
 
     Task<PackageReviewsResult> GetPackageReviewsAsync(
         Guid packageId,
+        CancellationToken ct = default);
+
+    /// <summary>Newest reviews rated at least <paramref name="minRating"/> that have a comment.</summary>
+    Task<IReadOnlyList<FeaturedReview>> GetFeaturedReviewsAsync(
+        int limit,
+        int minRating = 4,
         CancellationToken ct = default);
 }

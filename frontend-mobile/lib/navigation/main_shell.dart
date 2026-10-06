@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../auth/auth_provider.dart';
 import '../bookings/my_bookings_screen.dart';
+import '../drivers/driver_profile_screen.dart';
+import '../drivers/driver_tasks_screen.dart';
+import '../guides/assigned_tours_screen.dart';
+import '../guides/guide_profile_screen.dart';
 import '../home/home_screen.dart';
 import '../packages/packages_screen.dart';
+import '../support/support_tickets_screen.dart';
+import '../theme/app_theme.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -14,36 +22,105 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  static const _tabs = <Widget>[
-    HomeScreen(),
-    PackagesScreen(),
-    MyBookingsScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    final isTourGuide = user?.role == 'TourGuide';
+    final isDriver = user?.role == 'Driver';
+
+    void selectTab(int i) => setState(() => _selectedIndex = i);
+
+    final tabs = isTourGuide
+        ? <Widget>[
+            HomeScreen(onSelectTab: selectTab),
+            const AssignedToursScreen(),
+            const GuideProfileScreen(),
+          ]
+        : isDriver
+            ? <Widget>[
+                HomeScreen(onSelectTab: selectTab),
+                const DriverTasksScreen(),
+                const DriverProfileScreen(),
+              ]
+            : <Widget>[
+                HomeScreen(onSelectTab: selectTab),
+                const PackagesScreen(),
+                const MyBookingsScreen(),
+                const SupportTicketsScreen(),
+              ];
+
+    final destinations = isTourGuide
+        ? const <NavigationDestination>[
+            NavigationDestination(
+              icon: Icon(Icons.space_dashboard_outlined),
+              selectedIcon: Icon(Icons.space_dashboard),
+              label: 'Dashboard',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.assignment_outlined),
+              selectedIcon: Icon(Icons.assignment),
+              label: 'Assigned Tours',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ]
+        : isDriver
+            ? const <NavigationDestination>[
+                NavigationDestination(
+                  icon: Icon(Icons.space_dashboard_outlined),
+                  selectedIcon: Icon(Icons.space_dashboard),
+                  label: 'Dashboard',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.directions_car_outlined),
+                  selectedIcon: Icon(Icons.directions_car),
+                  label: 'Driving Tasks',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
+              ]
+            : const <NavigationDestination>[
+                NavigationDestination(
+                  icon: Icon(Icons.space_dashboard_outlined),
+                  selectedIcon: Icon(Icons.space_dashboard),
+                  label: 'Dashboard',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.inventory_2_outlined),
+                  selectedIcon: Icon(Icons.inventory_2),
+                  label: 'Packages',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.event_note_outlined),
+                  selectedIcon: Icon(Icons.event_note),
+                  label: 'My Bookings',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.support_outlined),
+                  selectedIcon: Icon(Icons.support),
+                  label: 'Support',
+                ),
+              ];
+
+    final selectedIndex = _selectedIndex >= destinations.length ? 0 : _selectedIndex;
+
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _tabs),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.card_travel_outlined),
-            selectedIcon: Icon(Icons.card_travel),
-            label: 'Packages',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.event_note_outlined),
-            selectedIcon: Icon(Icons.event_note),
-            label: 'My Bookings',
-          ),
-        ],
+      body: IndexedStack(index: selectedIndex, children: tabs),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.of(context).border)),
+        ),
+        child: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+          destinations: destinations,
+        ),
       ),
     );
   }

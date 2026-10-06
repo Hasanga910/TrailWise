@@ -33,9 +33,9 @@ const SAMPLE_PACKAGES: TourPackage[] = [
   },
 ];
 
-function renderPage() {
+function renderPage(initialPath = '/traveler/bookings/new') {
   render(
-    <MemoryRouter initialEntries={['/traveler/bookings/new']}>
+    <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/traveler/bookings/new" element={<BookingRequestPage />} />
         <Route path="/traveler/bookings" element={<div>My Bookings Page</div>} />
@@ -56,6 +56,22 @@ describe('BookingRequestPage', () => {
   beforeEach(() => {
     mockedGetPackages.mockResolvedValue(SAMPLE_PACKAGES);
     mockedCreateBooking.mockReset();
+  });
+
+  it('prefills tier, guests and start date from the explorer deep link', async () => {
+    renderPage('/traveler/bookings/new?tier=tier-1&guests=4&start=2030-02-03');
+
+    expect(await screen.findByRole('option', { name: /cultural triangle explorer/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/package tier/i)).toHaveValue('tier-1');
+    expect(screen.getByLabelText(/group size/i)).toHaveValue(4);
+    expect(screen.getByLabelText(/start date/i)).toHaveValue('2030-02-03');
+  });
+
+  it('ignores malformed guests and start values', async () => {
+    renderPage('/traveler/bookings/new?guests=lots&start=tomorrow');
+
+    expect(await screen.findByLabelText(/group size/i)).toHaveValue(1);
+    expect(screen.getByLabelText(/start date/i)).toHaveValue('');
   });
 
   it('does not call createBooking when budget is left at 0', async () => {

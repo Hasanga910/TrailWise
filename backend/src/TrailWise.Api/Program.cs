@@ -1,16 +1,32 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Threading.RateLimiting;
 using TrailWise.Infrastructure;
 using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
-const string CorsPolicyName = "TrailWiseClients";
+// Hosts such as Render tell the app which port to bind through PORT; otherwise ASPNETCORE_URLS / 8080 applies.
+var hostPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(hostPort))
+{
+    builder.WebHost.UseUrls($"http://+:{hostPort}");
+}
 
+const string CorsPolicyName = "TrailWiseClients";
+const string LoginRateLimiterPolicy = "LoginRateLimiter";
+const string PublicReadRateLimiterPolicy = "PublicReadLimiter";
+
+builder.Services.AddHealthChecks().AddCheck<TrailWise.Api.DatabaseHealthCheck>("database");
+builder.Services.AddScoped<TrailWise.Api.Services.ApprovalQueueService>();
+builder.Services.AddScoped<TrailWise.Api.Services.AgentWorkflowQueryService>();
+builder.Services.AddScoped<TrailWise.Api.Services.OpsDashboardService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -72,20 +88,77 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        var policyName = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            title = policyName == LoginRateLimiterPolicy
+                ? "Too many login attempts. Please wait a minute and try again."
+                : "Too many requests. Please slow down and try again shortly."
+        }, ct);
+    };
+
+    // Configurable so integration tests (which log in far more than 5 times a minute against a
+    // shared in-memory TestServer "client") can raise the limit via appsettings, without weakening
+    // the real default used in Development/Production.
+    var loginPermitLimit = builder.Configuration.GetValue("RateLimiting:LoginPermitLimit", 5);
+    var loginWindowSeconds = builder.Configuration.GetValue("RateLimiting:LoginWindowSeconds", 60);
+
+    // Anonymous catalogue reads (packages, facets, reviews, discounts): per-IP fixed window.
+    // Behind a reverse proxy the client IP is the proxy's unless forwarded headers are configured.
+    var publicPermitLimit = builder.Configuration.GetValue("RateLimiting:PublicReadPermitLimit", 120);
+    var publicWindowSeconds = builder.Configuration.GetValue("RateLimiting:PublicReadWindowSeconds", 60);
+
+    options.AddPolicy(PublicReadRateLimiterPolicy, context =>
+    {
+        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = publicPermitLimit,
+            Window = TimeSpan.FromSeconds(publicWindowSeconds),
+            QueueLimit = 0
+        });
+    });
+
+    options.AddPolicy(LoginRateLimiterPolicy, context =>
+    {
+        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = loginPermitLimit,
+            Window = TimeSpan.FromSeconds(loginWindowSeconds),
+            QueueLimit = 0
+        });
+    });
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicyName, policy =>
     {
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-            ?? new[] { "http://localhost:5173" };
-
-        policy.WithOrigins(allowedOrigins)
+        policy.WithOrigins(TrailWise.Api.CorsOrigins.Read(builder.Configuration))
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
 
 var app = builder.Build();
+
+// Behind a TLS-terminating proxy (Render, Vercel rewrites, Docker): trust the last proxy hop so the
+// rate limiter sees the real client IP instead of the proxy's.
+var forwardedHeaders = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto,
+    ForwardLimit = 1,
+};
+forwardedHeaders.KnownNetworks.Clear();
+forwardedHeaders.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeaders);
 
 app.UseExceptionHandler(errorApp =>
 {
@@ -105,27 +178,70 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Swagger stays on in every environment (the project report links to it).
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseCors(CorsPolicyName);
 
-Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "uploads", "packages"));
+var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "packages"));
+
+var privateSlipsDir = Path.Combine(app.Environment.ContentRootPath, "private_uploads", "slips");
+Directory.CreateDirectory(privateSlipsDir);
+
+// Legacy migration: Move existing bank slips out of wwwroot into private storage
+var legacySlipsDir = Path.Combine(webRoot, "uploads", "slips");
+if (Directory.Exists(legacySlipsDir))
+{
+    try
+    {
+        foreach (var file in Directory.GetFiles(legacySlipsDir))
+        {
+            var fileName = Path.GetFileName(file);
+            if (fileName.Equals(".gitkeep", StringComparison.OrdinalIgnoreCase)) continue;
+            var destFile = Path.Combine(privateSlipsDir, fileName);
+            if (!File.Exists(destFile))
+            {
+                File.Move(file, destFile);
+            }
+            else
+            {
+                File.Delete(file);
+            }
+        }
+    }
+    catch
+    {
+        // Ignore startup migration errors to prevent startup crash
+    }
+}
+
+// Security Hardening: Ensure bank slips are NEVER served statically
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/uploads/slips", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+    await next();
+});
+
 app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
+app.MapHealthChecks("/health").AllowAnonymous();
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
     var adminOptions = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AdminSeedOptions>>();
-    await DbSeeder.SeedAsync(db, adminOptions);
+    await DbSeeder.SeedAsync(db, adminOptions, logger: app.Logger);
 }
 
 app.Run();

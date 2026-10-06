@@ -1,5 +1,5 @@
-import { SidebarLayout, type SidebarNavItem } from '../layout/SidebarLayout';
-import { DashboardIcon, PackagesIcon, ProfileIcon, TruckIcon, UsersIcon } from './icons';
+import { AppShell, type SidebarNavItem } from '../layout/AppShell';
+import { DashboardIcon, PackagesIcon, PaymentIcon, ProfileIcon, SupportIcon, UsersIcon } from './icons';
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: DashboardIcon, end: true },
@@ -13,9 +13,14 @@ const NAV_ITEMS: SidebarNavItem[] = [
     ],
   },
   {
-    to: '/admin/fleet',
-    label: 'Fleet Management',
-    icon: TruckIcon,
+    to: '/admin/payments',
+    label: 'Payment Verification',
+    icon: PaymentIcon,
+  },
+  {
+    to: '/admin/support',
+    label: 'Support Tickets',
+    icon: SupportIcon,
   },
   {
     to: '/admin/staff',
@@ -34,7 +39,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin': 'Dashboard',
   '/admin/packages': 'Packages Overview',
   '/admin/packages/manage': 'Package Management',
-  '/admin/fleet': 'Fleet & Transport Management',
+  '/admin/payments': 'Payment Verification',
+  '/admin/support': 'Support Tickets',
   '/admin/staff': 'User Management',
   '/admin/staff/tour-guides': 'Tour Guides',
   '/admin/staff/operations-managers': 'Operations Managers',
@@ -42,6 +48,15 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/profile': 'Profile Settings',
 };
 
+const SUPPORT_DETAIL_ROUTE_PATTERN = /^\/admin\/support\/[^/]+$/;
+
+function resolveAdminTitle(pathname: string): string {
+  if (SUPPORT_DETAIL_ROUTE_PATTERN.test(pathname)) {
+    return 'Ticket Details';
+  }
+  return PAGE_TITLES[pathname] ?? 'Dashboard';
+}
+
 export function AdminLayout() {
-  return <SidebarLayout navItems={NAV_ITEMS} pageTitles={PAGE_TITLES} />;
+  return <AppShell navItems={NAV_ITEMS} pageTitles={resolveAdminTitle} portalLabel="Admin Portal" />;
 }

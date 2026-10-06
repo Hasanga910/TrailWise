@@ -15,4 +15,6 @@ public class ReserveVehicleRequest
 
     [Required]
     public DateOnly EndDate { get; set; }
+
+    public Guid? GuideId { get; set; }
 }

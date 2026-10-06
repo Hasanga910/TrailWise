@@ -11,6 +11,8 @@ class TourPackage {
   final String? photoUrl;
   final List<PackageTier> tiers;
   final List<PackageLocation> locations;
+  final double averageRating;
+  final int reviewCount;
 
   TourPackage({
     required this.id,
@@ -22,6 +24,8 @@ class TourPackage {
     required this.photoUrl,
     required this.tiers,
     required this.locations,
+    this.averageRating = 0.0,
+    this.reviewCount = 0,
   });
 
   factory TourPackage.fromJson(Map<String, dynamic> json) => TourPackage(
@@ -38,5 +42,7 @@ class TourPackage {
         locations: (json['locations'] as List)
             .map((l) => PackageLocation.fromJson(l as Map<String, dynamic>))
             .toList(),
+        averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0.0,
+        reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       );
 }

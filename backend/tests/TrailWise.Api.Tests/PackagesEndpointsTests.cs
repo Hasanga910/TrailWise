@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using TrailWise.Api.Contracts.Auth;
+using Microsoft.Extensions.DependencyInjection;
 using TrailWise.Api.Contracts.Packages;
 using Xunit;
 
@@ -235,6 +236,182 @@ public class PackagesEndpointsTests : IClassFixture<TrailWiseWebApplicationFacto
         var response = await client.DeleteAsync($"/api/packages/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // ---------------------------------------------------------------- tier configuration
+
+    private async Task<(HttpClient Manager, TourPackageDto Package)> CreatePackageWithTierAsync()
+    {
+        var manager = await AuthenticatedOperationsManagerAsync(_factory.CreateClient());
+        var response = await manager.PostAsJsonAsync("/api/packages", NewPackagePayload());
+        var created = await response.Content.ReadFromJsonAsync<TourPackageDto>(JsonOptions);
+        return (manager, created!);
+    }
+
+    private static object TierPayload(string classType, decimal price = 150m, bool food = false, bool ac = false) =>
+        new { ClassType = classType, IncludesFood = food, BasePricePerPerson = price, RequiresAC = ac };
+
+    [Fact]
+    public async Task UpdateTier_ChangesTheTierAndWritesAnAuditEntry()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync();
+        var tierId = package.Tiers[0].Id;
+
+        var response = await manager.PutAsJsonAsync($"/api/packages/{package.Id}/tiers/{tierId}", TierPayload("First", 320m, food: true, ac: true));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<TourPackageDto>(JsonOptions);
+        var tier = Assert.Single(updated!.Tiers);
+        Assert.Equal((tierId, "First", 320m, true, true), (tier.Id, tier.ClassType.ToString(), tier.BasePricePerPerson, tier.IncludesFood, tier.RequiresAC));
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWise.Infrastructure.Persistence.TrailWiseDbContext>();
+        Assert.Contains(db.AuditLogs, a => a.EntityType == "PackageTier" && a.EntityId == tierId && a.Action == "PackageTierUpdated" && a.PerformedBy != null);
+    }
+
+    [Fact]
+    public async Task UpdateTier_ToAClassAndFoodComboTheOtherTierAlreadyHas_ReturnsConflict()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync(); // Normal, without food
+        var add = await manager.PostAsJsonAsync($"/api/packages/{package.Id}/tiers", TierPayload("First", 260m, true, true));
+        var withTwo = await add.Content.ReadFromJsonAsync<TourPackageDto>(JsonOptions);
+        var first = withTwo!.Tiers.Single(t => t.ClassType.ToString() == "First");
+
+        var response = await manager.PutAsJsonAsync($"/api/packages/{package.Id}/tiers/{first.Id}", TierPayload("Normal", food: false));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTier_ToTheSameClassWithDifferentFood_IsAllowed()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync(); // Normal, without food
+        var add = await manager.PostAsJsonAsync($"/api/packages/{package.Id}/tiers", TierPayload("First", 260m, true, true));
+        var withTwo = await add.Content.ReadFromJsonAsync<TourPackageDto>(JsonOptions);
+        var first = withTwo!.Tiers.Single(t => t.ClassType.ToString() == "First");
+
+        var response = await manager.PutAsJsonAsync($"/api/packages/{package.Id}/tiers/{first.Id}", TierPayload("Normal", 180m, food: true));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTier_KeepingItsOwnClass_IsAllowed()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync();
+
+        var response = await manager.PutAsJsonAsync($"/api/packages/{package.Id}/tiers/{package.Tiers[0].Id}", TierPayload("Normal", 199m));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTier_WithAPriceOfZero_ReturnsValidationError()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync();
+
+        var response = await manager.PutAsJsonAsync($"/api/packages/{package.Id}/tiers/{package.Tiers[0].Id}", TierPayload("Normal", 0m));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddTier_WithAClassAndFoodComboThePackageAlreadyHas_ReturnsConflict()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync(); // Normal, without food
+
+        var response = await manager.PostAsJsonAsync($"/api/packages/{package.Id}/tiers", TierPayload("Normal", food: false));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddTier_WithTheSameClassButDifferentFood_IsAllowed()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync(); // Normal, without food
+
+        var response = await manager.PostAsJsonAsync($"/api/packages/{package.Id}/tiers", TierPayload("Normal", 140m, food: true));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<TourPackageDto>(JsonOptions);
+        Assert.Equal(2, updated!.Tiers.Count(t => t.ClassType.ToString() == "Normal"));
+    }
+
+    [Fact]
+    public async Task UpdateAndDeleteTier_WithUnknownIds_ReturnNotFound()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync();
+
+        var unknownTier = await manager.PutAsJsonAsync($"/api/packages/{package.Id}/tiers/{Guid.NewGuid()}", TierPayload("Normal"));
+        var unknownPackage = await manager.DeleteAsync($"/api/packages/{Guid.NewGuid()}/tiers/{package.Tiers[0].Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, unknownTier.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownPackage.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTier_RemovesAnUnusedTier_AndAuditsIt()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync();
+        var add = await manager.PostAsJsonAsync($"/api/packages/{package.Id}/tiers", TierPayload("Second", 180m));
+        var withTwo = await add.Content.ReadFromJsonAsync<TourPackageDto>(JsonOptions);
+        var second = withTwo!.Tiers.Single(t => t.ClassType.ToString() == "Second");
+
+        var response = await manager.DeleteAsync($"/api/packages/{package.Id}/tiers/{second.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var remaining = await response.Content.ReadFromJsonAsync<TourPackageDto>(JsonOptions);
+        Assert.DoesNotContain(remaining!.Tiers, t => t.Id == second.Id);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TrailWise.Infrastructure.Persistence.TrailWiseDbContext>();
+        Assert.Contains(db.AuditLogs, a => a.EntityId == second.Id && a.Action == "PackageTierDeleted");
+    }
+
+    [Fact]
+    public async Task DeleteTier_TheLastTier_ReturnsConflict()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync();
+
+        var response = await manager.DeleteAsync($"/api/packages/{package.Id}/tiers/{package.Tiers[0].Id}");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteTier_WithExistingBookings_ReturnsConflict()
+    {
+        var (manager, package) = await CreatePackageWithTierAsync();
+        var add = await manager.PostAsJsonAsync($"/api/packages/{package.Id}/tiers", TierPayload("First", 260m, true, true));
+        var withTwo = await add.Content.ReadFromJsonAsync<TourPackageDto>(JsonOptions);
+        var first = withTwo!.Tiers.Single(t => t.ClassType.ToString() == "First");
+
+        var traveler = await AuthenticatedTravelerAsync(_factory.CreateClient());
+        (await traveler.PostAsJsonAsync("/api/bookings", new
+        {
+            PackageTierId = first.Id,
+            GroupSize = 2,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+            EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(33)),
+            BudgetPerPerson = 500m
+        })).EnsureSuccessStatusCode();
+
+        var response = await manager.DeleteAsync($"/api/packages/{package.Id}/tiers/{first.Id}");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TierEdits_WithTravelerToken_ReturnForbidden()
+    {
+        var (_, package) = await CreatePackageWithTierAsync();
+        var traveler = await AuthenticatedTravelerAsync(_factory.CreateClient());
+
+        var put = await traveler.PutAsJsonAsync($"/api/packages/{package.Id}/tiers/{package.Tiers[0].Id}", TierPayload("Normal"));
+        var delete = await traveler.DeleteAsync($"/api/packages/{package.Id}/tiers/{package.Tiers[0].Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, put.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
     }
 
     private static object NewPackagePayload() => new

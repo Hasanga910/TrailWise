@@ -1,14 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAgentWorkflow, type AgentWorkflowDto } from '../../api/agentWorkflows';
+import * as agentWorkflowsApi from '../../api/agentWorkflows';
+import type { AgentWorkflowDto } from '../../api/agentWorkflows';
+import * as bookingsApi from '../../api/bookings';
+import type { BookingDto } from '../../api/bookings';
 import { AgentWorkflowPage } from './AgentWorkflowPage';
-
-vi.mock('../../api/agentWorkflows', () => ({
-  getAgentWorkflow: vi.fn(),
-}));
-
-const mockedGetAgentWorkflow = vi.mocked(getAgentWorkflow);
 
 function sampleWorkflow(overrides: Partial<AgentWorkflowDto> = {}): AgentWorkflowDto {
   return {
@@ -26,6 +24,29 @@ function sampleWorkflow(overrides: Partial<AgentWorkflowDto> = {}): AgentWorkflo
   };
 }
 
+function sampleBooking(overrides: Partial<BookingDto> = {}): BookingDto {
+  return {
+    id: 'booking-1',
+    travelerId: 'traveler-1',
+    tourPackageId: 'package-1',
+    tourPackageName: 'Cultural Triangle Explorer',
+    packageTier: {
+      id: 'tier-1',
+      classType: 'Normal',
+      includesFood: false,
+      basePricePerPerson: 200,
+      requiresAC: false,
+    },
+    groupSize: 2,
+    startDate: '2030-02-01',
+    endDate: '2030-02-04',
+    budgetPerPerson: 500,
+    status: 'Confirmed',
+    isLargeGroup: false,
+    ...overrides,
+  };
+}
+
 function renderPage() {
   render(
     <MemoryRouter initialEntries={['/ops/bookings/booking-1/workflow']}>
@@ -38,11 +59,12 @@ function renderPage() {
 
 describe('AgentWorkflowPage', () => {
   beforeEach(() => {
-    mockedGetAgentWorkflow.mockReset();
+    vi.restoreAllMocks();
+    vi.spyOn(bookingsApi, 'getBookingById').mockResolvedValue(sampleBooking());
   });
 
   it('renders the summary card and steps in order', async () => {
-    mockedGetAgentWorkflow.mockResolvedValue(sampleWorkflow());
+    vi.spyOn(agentWorkflowsApi, 'getAgentWorkflow').mockResolvedValue(sampleWorkflow());
 
     renderPage();
 
@@ -54,7 +76,9 @@ describe('AgentWorkflowPage', () => {
   });
 
   it('shows a placeholder when summaryText is null', async () => {
-    mockedGetAgentWorkflow.mockResolvedValue(sampleWorkflow({ summaryText: null, advisoryFlags: [] }));
+    vi.spyOn(agentWorkflowsApi, 'getAgentWorkflow').mockResolvedValue(
+      sampleWorkflow({ summaryText: null, advisoryFlags: [] }),
+    );
 
     renderPage();
 
@@ -63,7 +87,7 @@ describe('AgentWorkflowPage', () => {
 
   it('shows a "no agent activity" message on a 404', async () => {
     const notFoundError = { isAxiosError: true, response: { status: 404, data: {} } };
-    mockedGetAgentWorkflow.mockRejectedValue(notFoundError);
+    vi.spyOn(agentWorkflowsApi, 'getAgentWorkflow').mockRejectedValue(notFoundError);
 
     renderPage();
 
@@ -71,10 +95,51 @@ describe('AgentWorkflowPage', () => {
   });
 
   it('shows an error banner with a retry button on other failures', async () => {
-    mockedGetAgentWorkflow.mockRejectedValue(new Error('network error'));
+    vi.spyOn(agentWorkflowsApi, 'getAgentWorkflow').mockRejectedValue(new Error('network error'));
 
     renderPage();
 
     expect(await screen.findByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+
+  it('does not show Approve/Reject for a Confirmed booking', async () => {
+    vi.spyOn(agentWorkflowsApi, 'getAgentWorkflow').mockResolvedValue(sampleWorkflow());
+
+    renderPage();
+
+    await screen.findByText('This booking looks good.');
+    expect(screen.queryByRole('button', { name: /^approve$/i })).not.toBeInTheDocument();
+  });
+
+  it('shows Approve/Reject for a PendingApproval booking and approves it', async () => {
+    vi.spyOn(bookingsApi, 'getBookingById').mockResolvedValue(
+      sampleBooking({ status: 'PendingApproval' }),
+    );
+    vi.spyOn(agentWorkflowsApi, 'getAgentWorkflow').mockResolvedValue(
+      sampleWorkflow({ status: 'AwaitingApproval' }),
+    );
+    const decideSpy = vi.spyOn(bookingsApi, 'decideBooking').mockResolvedValue(sampleBooking({ status: 'Confirmed' }));
+
+    renderPage();
+    await screen.findByRole('button', { name: /^approve$/i });
+
+    await userEvent.click(screen.getByRole('button', { name: /^approve$/i }));
+
+    await waitFor(() => expect(decideSpy).toHaveBeenCalledWith('booking-1', { decision: 'Approve' }));
+  });
+
+  it('shows Reject but NOT Approve for a NeedsManualReview booking', async () => {
+    vi.spyOn(bookingsApi, 'getBookingById').mockResolvedValue(
+      sampleBooking({ status: 'NeedsManualReview' }),
+    );
+    vi.spyOn(agentWorkflowsApi, 'getAgentWorkflow').mockResolvedValue(
+      sampleWorkflow({ status: 'Failed' }),
+    );
+
+    renderPage();
+    await screen.findByRole('button', { name: /^reject$/i });
+
+    expect(screen.queryByRole('button', { name: /^approve$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^reject$/i })).toBeInTheDocument();
   });
 });

@@ -132,50 +132,91 @@ public class OperationsReportService : IOperationsReportService
         return new RevenueReportResult(totalRevenue, byPackage, byMonth);
     }
 
-    // Utilization is based only on recorded GuideAvailability rows because
-    // Person 2's reservation flow does not yet populate every calendar day.
-    public async Task<IReadOnlyList<GuideUtilizationResult>> GetGuideUtilizationReportAsync(
-        DateOnly? from,
-        DateOnly? to,
+    public async Task<IReadOnlyList<VehicleUtilizationResult>> GetVehicleUtilizationReportAsync(
+        DateOnly from,
+        DateOnly to,
         CancellationToken ct = default)
     {
+        var windowDays = Math.Max(0, to.DayNumber - from.DayNumber + 1);
+
+        var vehicles = await _db.Vehicles.AsNoTracking().OrderBy(v => v.RegistrationNumber).ToListAsync(ct);
+        var assignments = await _db.VehicleAssignments
+            .AsNoTracking()
+            .Where(a => a.StartDate <= to && a.EndDate >= from && a.Booking.Status != BookingStatus.Cancelled)
+            .Select(a => new { a.VehicleId, a.StartDate, a.EndDate })
+            .ToListAsync(ct);
+
+        var daysByVehicle = assignments
+            .GroupBy(a => a.VehicleId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var days = new HashSet<int>();
+                    foreach (var a in g)
+                    {
+                        var start = Math.Max(a.StartDate.DayNumber, from.DayNumber);
+                        var end = Math.Min(a.EndDate.DayNumber, to.DayNumber);
+                        for (var d = start; d <= end; d++)
+                        {
+                            days.Add(d);
+                        }
+                    }
+                    return days.Count;
+                });
+
+        return vehicles
+            .Select(v =>
+            {
+                var booked = daysByVehicle.TryGetValue(v.Id, out var count) ? count : 0;
+                var percentage = windowDays > 0 ? Math.Round((double)booked / windowDays * 100.0, 2) : 0.0;
+                return new VehicleUtilizationResult(
+                    v.Id, v.RegistrationNumber, v.Type, v.MaintenanceStatus, booked, windowDays, percentage);
+            })
+            .ToList();
+    }
+
+    // Utilisation is assigned days divided by the days in the window. A day with no GuideAvailability row
+    // counts as available, so a guide with only assignment rows is not reported as 100% busy.
+    public async Task<IReadOnlyList<GuideUtilizationResult>> GetGuideUtilizationReportAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default)
+    {
+        var windowDays = Math.Max(0, to.DayNumber - from.DayNumber + 1);
+
         var guides = await _db.Guides
             .AsNoTracking()
             .OrderBy(g => g.Name)
             .ToListAsync(ct);
 
-        var availabilityQuery = _db.GuideAvailabilities.AsNoTracking();
+        var rows = await _db.GuideAvailabilities
+            .AsNoTracking()
+            .Where(a => a.Date >= from && a.Date <= to)
+            .Select(a => new { a.GuideId, a.Date, a.IsAvailable, a.AssignedBookingId })
+            .ToListAsync(ct);
 
-        if (from.HasValue)
-        {
-            availabilityQuery = availabilityQuery.Where(a => a.Date >= from.Value);
-        }
-
-        if (to.HasValue)
-        {
-            availabilityQuery = availabilityQuery.Where(a => a.Date <= to.Value);
-        }
-
-        var availabilities = await availabilityQuery.ToListAsync(ct);
-
-        var availabilitiesByGuide = availabilities
-            .GroupBy(a => a.GuideId)
+        var rowsByGuide = rows
+            .GroupBy(r => r.GuideId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         var results = new List<GuideUtilizationResult>();
 
         foreach (var guide in guides)
         {
-            var rows = availabilitiesByGuide.TryGetValue(guide.Id, out var list)
-                ? list
-                : new List<GuideAvailability>();
+            var guideRows = rowsByGuide.TryGetValue(guide.Id, out var list) ? list : [];
 
-            var assignedDays = rows.Count(a => a.AssignedBookingId != null);
-            var availableDays = rows.Count(a => a.IsAvailable && a.AssignedBookingId == null);
-            var recordedDays = assignedDays + availableDays;
+            var assignedDates = guideRows.Where(r => r.AssignedBookingId != null).Select(r => r.Date).ToHashSet();
+            var blockedDates = guideRows
+                .Where(r => !r.IsAvailable && r.AssignedBookingId == null)
+                .Select(r => r.Date)
+                .ToHashSet();
+            blockedDates.ExceptWith(assignedDates);
 
-            var utilizationPercentage = recordedDays > 0
-                ? Math.Round(((double)assignedDays / recordedDays) * 100.0, 2)
+            var assignedDays = assignedDates.Count;
+            var availableDays = windowDays - assignedDays - blockedDates.Count;
+            var utilizationPercentage = windowDays > 0
+                ? Math.Round((double)assignedDays / windowDays * 100.0, 2)
                 : 0.0;
 
             results.Add(new GuideUtilizationResult(
@@ -183,14 +224,15 @@ public class OperationsReportService : IOperationsReportService
                 guide.Name,
                 assignedDays,
                 availableDays,
-                recordedDays,
-                utilizationPercentage
-            ));
+                windowDays,
+                utilizationPercentage,
+                windowDays));
         }
 
         _logger.LogInformation(
-            "Computed guide utilization report for {GuideCount} guides",
-            results.Count);
+            "Computed guide utilization report for {GuideCount} guides over {WindowDays} days",
+            results.Count,
+            windowDays);
 
         return results;
     }

@@ -8,6 +8,10 @@ public class CreateVehicleRequest
     [Required]
     public VehicleType Type { get; set; }
 
+    [Required]
+    [MaxLength(20)]
+    public string RegistrationNumber { get; set; } = string.Empty;
+
     [Range(1, 100)]
     public int Capacity { get; set; }
 

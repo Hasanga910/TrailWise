@@ -54,6 +54,7 @@ const sampleGuides: GuideUtilizationDto[] = [
     assignedDays: 8,
     availableDays: 12,
     recordedDays: 20,
+    windowDays: 20,
     utilizationPercentage: 40.0,
   },
 ];

@@ -10,6 +10,8 @@ export type BookingStatus =
   | 'Cancelled'
   | 'NeedsManualReview';
 
+export type ApprovalType = 'LargeGroupOrCustomItinerary' | 'BudgetOverride' | 'RefundException';
+
 export interface CreateBookingInput {
   packageTierId: string;
   groupSize: number;
@@ -17,6 +19,14 @@ export interface CreateBookingInput {
   endDate: string;
   budgetPerPerson: number;
   specialRequests?: string;
+}
+
+export interface AssignedGuideDto {
+  id: string;
+  name: string;
+  contactInfo?: string | null;
+  languages: string[];
+  specializations: string[];
 }
 
 export interface BookingDto {
@@ -32,6 +42,21 @@ export interface BookingDto {
   specialRequests?: string | null;
   status: BookingStatus;
   isLargeGroup: boolean;
+  languagePreference?: string | null;
+  assignedGuide?: AssignedGuideDto | null;
+  hasReview?: boolean;
+  paymentStatus?: string | null;
+  remainingAmount?: number | null;
+  isFullyPaid?: boolean;
+  hasPendingPayment?: boolean;
+  tourStartedAt?: string | null;
+  tourEndedAt?: string | null;
+  createdAt?: string;
+  /** Note from the Operations Manager when a revision was requested. */
+  revisionNote?: string | null;
+  /** True while the booking waits for an Operations Manager decision. */
+  approvalPending?: boolean;
+  pendingApprovalType?: ApprovalType | null;
 }
 
 export interface PagedResult<T> {
@@ -42,7 +67,7 @@ export interface PagedResult<T> {
 }
 
 export interface GetMyBookingsParams {
-  status?: BookingStatus;
+  status?: BookingStatus | 'Pending';
   from?: string;
   to?: string;
   page?: number;
@@ -56,7 +81,27 @@ export interface BookingSummaryDto {
   status: BookingStatus;
   createdAt: string;
   startDate: string;
+  endDate?: string;
   groupSize: number;
+  languagePreference?: string | null;
+  assignedGuide?: AssignedGuideDto | null;
+}
+
+export interface AvailableGuideDto {
+  guideId: string;
+  name: string;
+  languages: string[];
+  specializations: string[];
+  contactInfo: string;
+  matchesSpecialization: boolean;
+  matchesLanguage: boolean;
+  notes?: string | null;
+}
+
+export interface AssignGuideResponse {
+  bookingId: string;
+  guideId: string;
+  status: BookingStatus;
 }
 
 export async function createBooking(input: CreateBookingInput): Promise<BookingDto> {
@@ -69,6 +114,11 @@ export async function getMyBookings(params: GetMyBookingsParams = {}): Promise<P
   return response.data;
 }
 
+export async function getPagedBookings(params: GetMyBookingsParams = {}): Promise<PagedResult<BookingDto>> {
+  const response = await apiClient.get<PagedResult<BookingDto>>('/api/bookings/paged', { params });
+  return response.data;
+}
+
 export async function getBookingById(id: string): Promise<BookingDto> {
   const response = await apiClient.get<BookingDto>(`/api/bookings/${id}`);
   return response.data;
@@ -78,3 +128,53 @@ export async function getAllBookings(): Promise<BookingSummaryDto[]> {
   const response = await apiClient.get<BookingSummaryDto[]>('/api/bookings');
   return response.data;
 }
+
+export type BookingDecision = 'Approve' | 'Reject';
+
+export interface DecideBookingInput {
+  decision: BookingDecision;
+  notes?: string;
+  vehicleId?: string;
+  driverId?: string;
+  guideId?: string;
+}
+
+export async function decideBooking(id: string, input: DecideBookingInput): Promise<BookingDto> {
+  const response = await apiClient.patch<BookingDto>(`/api/bookings/${id}/decision`, input);
+  return response.data;
+}
+
+export async function completeBooking(id: string): Promise<BookingDto> {
+  const response = await apiClient.patch<BookingDto>(`/api/bookings/${id}/complete`, {});
+  return response.data;
+}
+
+export async function cancelBooking(id: string, reason?: string): Promise<BookingDto> {
+  const response = await apiClient.patch<BookingDto>(`/api/bookings/${id}/cancel`, { reason });
+  return response.data;
+}
+
+export async function getAvailableGuidesForBooking(bookingId: string): Promise<AvailableGuideDto[]> {
+  const response = await apiClient.get<AvailableGuideDto[]>(`/api/bookings/${bookingId}/available-guides`);
+  return response.data;
+}
+
+export async function assignGuide(bookingId: string, guideId: string): Promise<AssignGuideResponse> {
+  const response = await apiClient.post<AssignGuideResponse>(`/api/bookings/${bookingId}/assign-guide`, {
+    guideId,
+  });
+  return response.data;
+}
+
+export interface ReassignResourcesInput {
+  vehicleId?: string;
+  driverId?: string;
+  guideId?: string;
+  reason?: string;
+}
+
+export async function reassignResources(bookingId: string, input: ReassignResourcesInput): Promise<BookingDto> {
+  const response = await apiClient.put<BookingDto>(`/api/bookings/${bookingId}/reassign-resources`, input);
+  return response.data;
+}
+

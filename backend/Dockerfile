@@ -13,6 +13,7 @@ RUN dotnet publish src/TrailWise.Api/TrailWise.Api.csproj -c Release -o /app/pub
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
+# Default port; a host-provided PORT (Render) overrides it in Program.cs.
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 COPY --from=build /app/publish .

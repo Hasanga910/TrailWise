@@ -1,111 +1,111 @@
-import { useState, type FormEvent } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { getHomeRouteForRole } from '../auth/roleHome';
-import { AuthBrandPanel } from '../components/AuthBrandPanel';
-import { Logo } from '../components/Logo';
+import { clearReturnTo, pickReturnTo, resolvePostAuthRoute } from '../auth/returnTo';
+import { AuthShell } from '../components/auth/AuthShell';
+import { PasswordStrength } from '../components/auth/PasswordStrength';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { PasswordInput } from '../components/ui/PasswordInput';
+import { registerSchema, type RegisterValues } from '../forms/authSchemas';
+import { zodResolver } from '../forms/zodResolver';
+import { usePageTitle } from '../hooks/usePageTitle';
+
+const FIELD_KEYS: (keyof RegisterValues)[] = ['name', 'email', 'contactNumber', 'password'];
 
 export function RegisterPage() {
-  const { register, status, error, user } = useAuth();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [contactNumber, setContactNumber] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { register: registerAccount, status, error, fieldErrors, clearError, user } = useAuth();
+  const location = useLocation();
+  usePageTitle('Create your account');
+
+  // Read once on arrival: the stored copy is cleared after a successful sign-in, and the redirect must not lose it.
+  const [from] = useState(() => pickReturnTo((location.state as { from?: unknown } | null)?.from));
+  const continuingBooking = from?.startsWith('/traveler/bookings/new') ?? false;
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterValues>({
+    resolver: zodResolver(registerSchema),
+    mode: 'onBlur',
+    defaultValues: { name: '', email: '', contactNumber: '', password: '' },
+  });
+  const password = useWatch({ control, name: 'password' });
+
+  useEffect(() => {
+    clearError?.();
+  }, [clearError]);
+
+  useEffect(() => {
+    if (status === 'authenticated') clearReturnTo();
+  }, [status]);
+
+  // Show server-side field messages (for example "email already registered") next to the field.
+  useEffect(() => {
+    if (!fieldErrors) return;
+    for (const [field, message] of Object.entries(fieldErrors)) {
+      const key = (field.charAt(0).toLowerCase() + field.slice(1)) as keyof RegisterValues;
+      if (FIELD_KEYS.includes(key)) setError(key, { type: 'server', message });
+    }
+  }, [fieldErrors, setError]);
 
   if (status === 'authenticated') {
-    return <Navigate to={user ? getHomeRouteForRole(user.role) : '/login'} replace />;
+    return <Navigate to={user ? resolvePostAuthRoute(user, from) : '/login'} replace />;
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    await register(name, email, password, contactNumber);
-    setSubmitting(false);
+  async function onSubmit(values: RegisterValues) {
+    await registerAccount(values.name, values.email, values.password, values.contactNumber);
   }
 
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <AuthBrandPanel tagline="Join the platform built for modern tour operators." />
+    <AuthShell
+      tagline="Join TrailWise and book your Sri Lankan tour."
+      title="Create your account"
+      subtitle={continuingBooking ? 'One quick step, then we will take you straight back to your booking.' : 'Free for travelers. Browse, book and track your trips in one place.'}
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to="/login" state={location.state} className="font-semibold text-brand-text hover:underline">
+            Log in
+          </Link>
+        </>
+      }
+    >
+      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <Input label="Full name" autoComplete="name" error={errors.name?.message} {...register('name')} />
+        <Input label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
+        <Input
+          label="Contact number"
+          type="tel"
+          autoComplete="tel"
+          hint="Include your country code, e.g. +94 77 123 4567"
+          error={errors.contactNumber?.message}
+          {...register('contactNumber')}
+        />
+        <div>
+          <PasswordInput
+            label="Password"
+            autoComplete="new-password"
+            error={errors.password?.message}
+            {...register('password')}
+          />
+          <PasswordStrength password={password ?? ''} className="mt-2" />
+        </div>
 
-      <div className="flex min-w-0 items-center justify-center bg-white px-6 py-12">
-        <form className="w-full min-w-0 max-w-sm space-y-6" onSubmit={handleSubmit}>
-          <div>
-            <Logo className="mb-4 h-8 w-auto lg:hidden" />
-            <h1 className="font-heading text-2xl font-bold text-slate-900">
-              Create a Traveler Account
-            </h1>
-            <p className="mt-1.5 text-sm text-slate-500">
-              Sign up to browse and book tour packages.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-slate-700">Full name</span>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base text-slate-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-slate-700">Email</span>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base text-slate-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-slate-700">Contact number</span>
-              <input
-                type="tel"
-                value={contactNumber}
-                onChange={(e) => setContactNumber(e.target.value)}
-                required
-                className="block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base text-slate-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15"
-              />
-            </label>
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-slate-700">Password</span>
-              <input
-                type="password"
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base text-slate-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15"
-              />
-            </label>
-          </div>
-
-          {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-medium text-red-700">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white shadow-sm shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {submitting ? 'Creating account...' : 'Register'}
-          </button>
-
-          <p className="text-sm text-slate-500">
-            Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
-              Log in
-            </Link>
+        {error && (
+          <p role="alert" className="rounded-input border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-body font-medium text-danger-fg">
+            {error}
           </p>
-        </form>
-      </div>
-    </div>
+        )}
+
+        <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>
+          {isSubmitting ? 'Creating account…' : 'Create account'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

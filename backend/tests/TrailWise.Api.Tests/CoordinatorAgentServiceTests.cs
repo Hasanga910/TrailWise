@@ -5,6 +5,7 @@ using TrailWise.Domain.Enums;
 using TrailWise.Infrastructure.Agents;
 using TrailWise.Infrastructure.Options;
 using TrailWise.Infrastructure.Persistence;
+using TrailWise.Infrastructure.Services;
 using Xunit;
 
 namespace TrailWise.Api.Tests;
@@ -21,13 +22,17 @@ public class CoordinatorAgentServiceTests
     private static CoordinatorAgentService CreateSut(
         TrailWiseDbContext db,
         IPreferenceExtractionAgent? preferenceAgent = null,
+        IGuideMatchingAgent? guideAgent = null,
+        IFleetCapacityAgent? fleetAgent = null,
+        IGuideAssignmentService? guideAssignmentService = null,
         IProposalSummaryAgent? summaryAgent = null) =>
         new(
             db,
             preferenceAgent ?? new PreferenceExtractionAgent(new NullLlmClient(), Options.Create(new LlmOptions()), NullLogger<PreferenceExtractionAgent>.Instance),
-            new MockGuideMatchingAgent(),
-            new MockFleetCapacityAgent(),
+            guideAgent ?? new MockGuideMatchingAgent(),
+            fleetAgent ?? new MockFleetCapacityAgent(),
             new MockPricingValidationAgent(db),
+            guideAssignmentService ?? new FakeGuideAssignmentService(),
             summaryAgent ?? new ProposalSummaryAgent(new FakeLlmClient { ResultToReturn = DefaultSummary }, Options.Create(new LlmOptions())),
             NullLogger<CoordinatorAgentService>.Instance);
 
@@ -262,6 +267,76 @@ public class CoordinatorAgentServiceTests
     }
 
     [Fact]
+    public async Task StartWorkflowAsync_LargeGroup_CreatesALargeGroupApprovalRequestWithReasons()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 11, budgetPerPerson: 500m, basePricePerPerson: 100m);
+
+        await CreateSut(db).StartWorkflowAsync(bookingId);
+
+        var approval = Assert.Single(db.ApprovalRequests, a => a.BookingId == bookingId);
+        Assert.Equal(ApprovalType.LargeGroupOrCustomItinerary, approval.Type);
+        Assert.Equal(ApprovalStatus.Pending, approval.Status);
+        Assert.Equal(BookingStatus.Requested, approval.PreviousBookingStatus);
+        Assert.Contains("large-group threshold", approval.ReasonsJson);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_OverBudget_CreatesABudgetOverrideApprovalRequest()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 100m, basePricePerPerson: 300m);
+
+        await CreateSut(db).StartWorkflowAsync(bookingId);
+
+        var approval = Assert.Single(db.ApprovalRequests, a => a.BookingId == bookingId);
+        Assert.Equal(ApprovalType.BudgetOverride, approval.Type);
+        Assert.Contains("budget ceiling", approval.ReasonsJson);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_LargeGroupOverBudget_IsALargeGroupRequestListingBothReasons()
+    {
+        var db = TestDbContextFactory.Create();
+        // 11 people at a 300 base price against a 100 budget trips both rules.
+        var bookingId = SeedBooking(db, groupSize: 11, budgetPerPerson: 100m, basePricePerPerson: 300m);
+
+        await CreateSut(db).StartWorkflowAsync(bookingId);
+
+        var approval = Assert.Single(db.ApprovalRequests, a => a.BookingId == bookingId);
+        Assert.Equal(ApprovalType.LargeGroupOrCustomItinerary, approval.Type);
+        Assert.Contains("large-group threshold", approval.ReasonsJson);
+        Assert.Contains("budget ceiling", approval.ReasonsJson);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_AutoConfirmedBooking_CreatesNoApprovalRequest()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+
+        await CreateSut(db).StartWorkflowAsync(bookingId);
+
+        Assert.DoesNotContain(db.ApprovalRequests, a => a.BookingId == bookingId);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_RunAgain_SupersedesTheOpenApprovalRequest()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 11, budgetPerPerson: 500m, basePricePerPerson: 100m);
+        var sut = CreateSut(db);
+
+        await sut.StartWorkflowAsync(bookingId);
+        await sut.StartWorkflowAsync(bookingId);
+
+        var requests = db.ApprovalRequests.Where(a => a.BookingId == bookingId).OrderBy(a => a.RequestedAt).ToList();
+        Assert.Equal(2, requests.Count);
+        Assert.Single(requests, a => a.Status == ApprovalStatus.Pending);
+        Assert.Single(requests, a => a.Status == ApprovalStatus.Superseded);
+    }
+
+    [Fact]
     public async Task StartWorkflowAsync_MissingBooking_ReturnsWithoutThrowingOrCreatingRun()
     {
         var db = TestDbContextFactory.Create();
@@ -270,5 +345,216 @@ public class CoordinatorAgentServiceTests
         await sut.StartWorkflowAsync(Guid.NewGuid());
 
         Assert.Empty(db.AgentWorkflowRuns);
+    }
+
+    // Person 2 Integration Tests:
+    // 1. Approved booking with valid GuideId calls AssignGuideAsync
+    [Fact]
+    public async Task StartWorkflowAsync_ApprovedBooking_CallsAssignGuideAsync()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+        var expectedGuideId = Guid.NewGuid();
+
+        var fakeAssignment = new FakeGuideAssignmentService();
+        var guideAgent = new CustomGuideMatchingAgent(new GuideMatchResult(expectedGuideId, 0.9, "Matched"));
+
+        var sut = CreateSut(db, guideAgent: guideAgent, guideAssignmentService: fakeAssignment);
+        await sut.StartWorkflowAsync(bookingId);
+
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.Equal(BookingStatus.Confirmed, booking!.Status);
+        Assert.True(fakeAssignment.WasCalled);
+        Assert.Equal(bookingId, fakeAssignment.LastBookingId);
+        Assert.Equal(expectedGuideId, fakeAssignment.LastGuideId);
+    }
+
+    // 2. Approved booking results in GuideAvailability rows being assigned when using real assignment service
+    [Fact]
+    public async Task StartWorkflowAsync_ApprovedBooking_WithRealAssignmentService_AssignsGuideAvailabilityRows()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+
+        var guide = new Guide
+        {
+            Id = Guid.NewGuid(),
+            Name = "Assigned Guide",
+            Specializations = new[] { "Testing" },
+            Languages = new[] { "English" },
+            ContactInfo = "guide@example.com"
+        };
+        db.Guides.Add(guide);
+        await db.SaveChangesAsync();
+
+        var guideAgent = new CustomGuideMatchingAgent(new GuideMatchResult(guide.Id, 0.9, "Matched"));
+        var realAssignmentService = new GuideAssignmentService(db, NullLogger<GuideAssignmentService>.Instance);
+
+        var sut = CreateSut(db, guideAgent: guideAgent, guideAssignmentService: realAssignmentService);
+        await sut.StartWorkflowAsync(bookingId);
+
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.Equal(BookingStatus.Confirmed, booking!.Status);
+
+        var assignedRows = db.GuideAvailabilities.Where(a => a.GuideId == guide.Id).ToList();
+        Assert.NotEmpty(assignedRows);
+        Assert.All(assignedRows, r =>
+        {
+            Assert.Equal(bookingId, r.AssignedBookingId);
+            Assert.False(r.IsAvailable);
+        });
+    }
+
+    // 3. NeedsManualReview does NOT assign guide
+    [Fact]
+    public async Task StartWorkflowAsync_NeedsManualReview_DoesNotAssignGuide()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+
+        var fakeAssignment = new FakeGuideAssignmentService();
+        var conflictFleetAgent = new ConflictFleetCapacityAgent();
+
+        var sut = CreateSut(db, fleetAgent: conflictFleetAgent, guideAssignmentService: fakeAssignment);
+        await sut.StartWorkflowAsync(bookingId);
+
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.Equal(BookingStatus.NeedsManualReview, booking!.Status);
+        Assert.False(fakeAssignment.WasCalled);
+    }
+
+    // 4. PendingApproval does NOT assign guide
+    [Fact]
+    public async Task StartWorkflowAsync_PendingApproval_DoesNotAssignGuide()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 11, budgetPerPerson: 500m, basePricePerPerson: 100m, maxGroupSize: 50);
+
+        var fakeAssignment = new FakeGuideAssignmentService();
+
+        var sut = CreateSut(db, guideAssignmentService: fakeAssignment);
+        await sut.StartWorkflowAsync(bookingId);
+
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.Equal(BookingStatus.PendingApproval, booking!.Status);
+        Assert.False(fakeAssignment.WasCalled);
+    }
+
+    // 5. Guid.Empty result does not attempt assignment
+    [Fact]
+    public async Task StartWorkflowAsync_EmptyGuideId_DoesNotAttemptAssignment()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+
+        var fakeAssignment = new FakeGuideAssignmentService();
+        var emptyGuideAgent = new CustomGuideMatchingAgent(new GuideMatchResult(Guid.Empty, 0.0, "No guide available"));
+
+        var sut = CreateSut(db, guideAgent: emptyGuideAgent, guideAssignmentService: fakeAssignment);
+        await sut.StartWorkflowAsync(bookingId);
+
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.Equal(BookingStatus.NeedsManualReview, booking!.Status);
+        Assert.False(fakeAssignment.WasCalled);
+    }
+
+    // 6. Assignment failure does not leave booking falsely confirmed
+    [Fact]
+    public async Task StartWorkflowAsync_AssignmentFailure_RoutesBookingToNeedsManualReview()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+
+        var failingAssignment = new FakeGuideAssignmentService { ReturnValue = false };
+        var guideAgent = new CustomGuideMatchingAgent(new GuideMatchResult(Guid.NewGuid(), 0.9, "Matched"));
+
+        var sut = CreateSut(db, guideAgent: guideAgent, guideAssignmentService: failingAssignment);
+        await sut.StartWorkflowAsync(bookingId);
+
+        var booking = await db.Bookings.FindAsync(bookingId);
+        // Booking must not be left Confirmed
+        Assert.Equal(BookingStatus.NeedsManualReview, booking!.Status);
+
+        var run = Assert.Single(db.AgentWorkflowRuns, r => r.BookingId == bookingId);
+        Assert.Equal("Failed", run.Status);
+        Assert.NotNull(run.CompletedAt);
+    }
+
+    private class FakeGuideAssignmentService : IGuideAssignmentService
+    {
+        public bool WasCalled { get; private set; }
+        public Guid LastBookingId { get; private set; }
+        public Guid LastGuideId { get; private set; }
+        public bool ReturnValue { get; set; } = true;
+
+        public Task<bool> AssignGuideAsync(Guid bookingId, Guid guideId, CancellationToken ct = default)
+        {
+            WasCalled = true;
+            LastBookingId = bookingId;
+            LastGuideId = guideId;
+            return Task.FromResult(ReturnValue);
+        }
+
+        public Task<int> ReleaseGuideAsync(Guid bookingId, CancellationToken ct = default) => Task.FromResult(0);
+    }
+
+    private class CustomGuideMatchingAgent : IGuideMatchingAgent
+    {
+        private readonly GuideMatchResult _result;
+
+        public CustomGuideMatchingAgent(GuideMatchResult result) => _result = result;
+
+        public Task<GuideMatchResult> MatchAsync(Guid bookingId, CancellationToken ct = default) =>
+            Task.FromResult(_result);
+    }
+
+    private class ConflictFleetCapacityAgent : IFleetCapacityAgent
+    {
+        public Task<VehicleMatchResult> MatchAsync(Guid bookingId, CancellationToken ct = default) =>
+            Task.FromResult(new VehicleMatchResult(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                AcMatch: true,
+                SeatConfigMatch: true,
+                ConflictCheck: true));
+    }
+
+    private class CoordinatorTestClock : IClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = new(2026, 9, 29, 10, 0, 0, TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task StartWorkflowAsync_WhenApproved_SetsPaymentDueAtUsingInjectedClock()
+    {
+        var db = TestDbContextFactory.Create();
+        var bookingId = SeedBooking(db, groupSize: 2, budgetPerPerson: 150m, basePricePerPerson: 100m);
+        var clock = new CoordinatorTestClock { UtcNow = new DateTimeOffset(2026, 9, 29, 11, 30, 0, TimeSpan.Zero) };
+        var lifecycle = new BookingLifecycleService(clock);
+
+        var sut = new CoordinatorAgentService(
+            db,
+            new PreferenceExtractionAgent(new NullLlmClient(), Options.Create(new LlmOptions()), NullLogger<PreferenceExtractionAgent>.Instance),
+            new MockGuideMatchingAgent(),
+            new MockFleetCapacityAgent(),
+            new MockPricingValidationAgent(db),
+            new FakeGuideAssignmentService(),
+            new ProposalSummaryAgent(new FakeLlmClient { ResultToReturn = DefaultSummary }, Options.Create(new LlmOptions())),
+            NullLogger<CoordinatorAgentService>.Instance,
+            lifecycle,
+            clock);
+
+        await sut.StartWorkflowAsync(bookingId);
+
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.NotNull(booking);
+        Assert.Equal(BookingStatus.Confirmed, booking.Status);
+        Assert.NotNull(booking.PaymentDueAt);
+        Assert.Equal(clock.UtcNow.AddHours(1), booking.PaymentDueAt);
+        Assert.Equal(new DateTimeOffset(2026, 9, 29, 12, 30, 0, TimeSpan.Zero), booking.PaymentDueAt);
+
+        var run = Assert.Single(db.AgentWorkflowRuns, r => r.BookingId == bookingId);
+        Assert.Equal("Completed", run.Status);
+        Assert.Equal(clock.UtcNow, run.CompletedAt);
     }
 }

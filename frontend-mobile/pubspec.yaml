@@ -37,6 +37,9 @@ dependencies:
   http: ^1.6.0
   flutter_secure_storage: ^11.1.1
   provider: ^6.1.5+1
+  file_picker: ^13.1.0
+  url_launcher: ^6.3.2
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
@@ -48,6 +51,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -59,6 +64,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/branding/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -90,3 +98,28 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/branding/icon.png"
+  adaptive_icon_background: "#0F6E63"
+  adaptive_icon_foreground: "assets/branding/icon_foreground.png"
+  web:
+    generate: true
+    image_path: "assets/branding/icon.png"
+    background_color: "#0F6E63"
+    theme_color: "#0F6E63"
+
+flutter_native_splash:
+  color: "#0F6E63"
+  image: assets/branding/logo-mark-dark.png
+  color_dark: "#052624"
+  image_dark: assets/branding/logo-mark-dark.png
+  android_12:
+    color: "#0F6E63"
+    image: assets/branding/icon_foreground.png
+    color_dark: "#052624"
+    image_dark: assets/branding/icon_foreground.png
+  web: true
