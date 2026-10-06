@@ -13,6 +13,11 @@ vi.mock('../../api/assignedTours', () => ({
   getMyAssignedTours: vi.fn(),
 }));
 
+vi.mock('../../api/guides', () => ({
+  getGuides: vi.fn().mockResolvedValue([]),
+  getGuideAvailability: vi.fn().mockResolvedValue([]),
+}));
+
 const mockedGetMyAssignedTours = vi.mocked(getMyAssignedTours);
 
 const tourGuideUser: CurrentUser = {
