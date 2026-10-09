@@ -160,15 +160,42 @@ public class DriversController : ControllerBase
             }
         }
 
-        var driver = new Driver
+        // If a driver was already provisioned or linked by auth service for this user, reuse and update it
+        Driver driver;
+        if (linkedUserId.HasValue)
         {
-            Name = name,
-            LicenseNumber = licenseNumber,
-            ContactInfo = contactInfo,
-            UserId = linkedUserId
-        };
+            var existingLinkedDriver = await _db.Drivers.FirstOrDefaultAsync(d => d.UserId == linkedUserId.Value, ct);
+            if (existingLinkedDriver != null)
+            {
+                existingLinkedDriver.Name = name;
+                existingLinkedDriver.LicenseNumber = licenseNumber;
+                existingLinkedDriver.ContactInfo = contactInfo;
+                driver = existingLinkedDriver;
+            }
+            else
+            {
+                driver = new Driver
+                {
+                    Name = name,
+                    LicenseNumber = licenseNumber,
+                    ContactInfo = contactInfo,
+                    UserId = linkedUserId
+                };
+                _db.Drivers.Add(driver);
+            }
+        }
+        else
+        {
+            driver = new Driver
+            {
+                Name = name,
+                LicenseNumber = licenseNumber,
+                ContactInfo = contactInfo,
+                UserId = null
+            };
+            _db.Drivers.Add(driver);
+        }
 
-        _db.Drivers.Add(driver);
         await _db.SaveChangesAsync(ct);
 
         if (driver.UserId.HasValue)
@@ -262,6 +289,14 @@ public class DriversController : ControllerBase
                     {
                         driver.UserId = authResult.User.Id;
                         driver.User = authResult.User;
+
+                        // If AuthService provisioned an extra fallback Driver entity for this new user, clean it up
+                        var extraCreatedDriver = await _db.Drivers
+                            .FirstOrDefaultAsync(d => d.Id != driver.Id && d.UserId == authResult.User.Id, ct);
+                        if (extraCreatedDriver != null)
+                        {
+                            _db.Drivers.Remove(extraCreatedDriver);
+                        }
                     }
                 }
             }

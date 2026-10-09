@@ -430,7 +430,7 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         var driver = await createRes.Content.ReadFromJsonAsync<DriverDto>(JsonOptions);
         Assert.NotNull(driver);
 
-        // 2. Update driver
+        // 2. Update driver details
         var updatedLicense = $"B-UPD-{Guid.NewGuid():N}"[..15];
         var updateRes = await fleetCoordinatorClient.PutAsJsonAsync($"/api/drivers/{driver.Id}", new UpdateDriverRequest
         {
@@ -444,6 +444,31 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.Equal("Updated Driver", updatedDriver.Name);
         Assert.Equal(updatedLicense, updatedDriver.LicenseNumber);
         Assert.Equal("+94779998888", updatedDriver.ContactInfo);
+
+        // 2b. Update driver with new login account provisioning
+        var newDriverEmail = $"updated-driver-{Guid.NewGuid():N}@trailwise.local";
+        var updateWithAccountRes = await fleetCoordinatorClient.PutAsJsonAsync($"/api/drivers/{driver.Id}", new UpdateDriverRequest
+        {
+            Name = "Updated Driver",
+            LicenseNumber = updatedLicense,
+            ContactInfo = "+94779998888",
+            Email = newDriverEmail,
+            Password = "NewDriverPass123!"
+        });
+        Assert.Equal(HttpStatusCode.OK, updateWithAccountRes.StatusCode);
+        var updatedWithAccount = await updateWithAccountRes.Content.ReadFromJsonAsync<DriverDto>(JsonOptions);
+        Assert.NotNull(updatedWithAccount);
+        Assert.NotNull(updatedWithAccount.UserId);
+        Assert.Equal(newDriverEmail, updatedWithAccount.Email);
+
+        // Verify exactly one driver entity exists for this user (no orphan duplicates created)
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var driversForUser = await db.Drivers.Where(d => d.UserId == updatedWithAccount.UserId).ToListAsync();
+            Assert.Single(driversForUser);
+            Assert.Equal(driver.Id, driversForUser[0].Id);
+        }
 
         // 3. Delete driver
         var deleteRes = await fleetCoordinatorClient.DeleteAsync($"/api/drivers/{driver.Id}");
@@ -756,6 +781,17 @@ public class FleetEndpointsTests : IClassFixture<TrailWiseWebApplicationFactory>
         Assert.NotNull(createdDriver);
         Assert.Equal(driverEmail, createdDriver.Email);
         Assert.NotNull(createdDriver.UserId);
+        Assert.Equal(driverName, createdDriver.Name);
+
+        // Verify that exactly ONE driver record exists in the database for this user/registration
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TrailWiseDbContext>();
+            var driversForUser = await db.Drivers.Where(d => d.UserId == createdDriver.UserId).ToListAsync();
+            Assert.Single(driversForUser);
+            Assert.Equal(createdDriver.Id, driversForUser[0].Id);
+            Assert.Equal(createdDriver.LicenseNumber, driversForUser[0].LicenseNumber);
+        }
 
         // 2. Driver should be able to log in directly using the provisioned credentials
         var client = _factory.CreateClient();
