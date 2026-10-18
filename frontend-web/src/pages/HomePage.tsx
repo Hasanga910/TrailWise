@@ -35,7 +35,7 @@ export function HomePage() {
 
           <p {...rise(300)} className="animate-rise mt-5 text-sm text-white/90">
             <Link to="/explore" className="font-semibold underline underline-offset-4 hover:text-accent-400">
-              Browse all tours
+              Browse alls tours
             </Link>
             {status === 'authenticated' && user && (
               <>

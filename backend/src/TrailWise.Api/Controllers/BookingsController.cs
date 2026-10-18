@@ -1330,9 +1330,9 @@ public class BookingsController : ControllerBase
             errors.Add(new FieldValidationError("endDate", "End date must be after the start date."));
         }
 
-        if (request.BudgetPerPerson <= 0)
+        if (request.BudgetPerPerson <= 100)
         {
-            errors.Add(new FieldValidationError("budgetPerPerson", "Budget per person must be greater than 0."));
+            errors.Add(new FieldValidationError("budgetPerPerson", "Budget per person must be greater than 100."));
         }
 
         if (request.SpecialRequests?.Length > MaxSpecialRequestsLength)

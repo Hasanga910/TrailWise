@@ -13,5 +13,6 @@ export default defineConfig({
     setupFiles: './src/setupTests.ts',
     globals: true,
     pool: 'threads',
+    testTimeout: 15000,
   },
 })

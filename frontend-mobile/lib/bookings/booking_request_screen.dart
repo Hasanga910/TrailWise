@@ -132,7 +132,7 @@ class _BookingRequestScreenState extends State<BookingRequestScreen> {
     if (_endDate == null) {
       errors['endDate'] = 'End date is required';
     }
-    if (budget == null || budget <= 0) {
+    if (budget == null || budget <= 100) {
       errors['budgetPerPerson'] = 'Enter a valid budget';
     }
 
