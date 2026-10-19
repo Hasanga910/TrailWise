@@ -21,6 +21,8 @@ public class PackagesController : ControllerBase
 {
     private const string ManagerRoles = "OperationsManager,Admin";
     private const long MaxPhotoSizeBytes = 5 * 1024 * 1024;
+    private const string PhotoCacheControl = "public, max-age=86400";
+    private const string LegacyPhotoUrlPrefix = "/uploads/packages/";
     private static readonly Dictionary<string, string> AllowedPhotoContentTypes = new()
     {
         ["image/jpeg"] = ".jpg",
@@ -433,10 +435,11 @@ public class PackagesController : ControllerBase
                 title: "This package has existing bookings and cannot be deleted.");
         }
 
-        DeletePhotoFile(package.PhotoUrl);
-
         _db.TourPackages.Remove(package);
         await _db.SaveChangesAsync(ct);
+
+        // The TourPackagePhotos row is removed by the cascade; only a legacy on-disk file needs cleanup.
+        DeletePhotoFile(package.PhotoUrl);
 
         return NoContent();
     }
@@ -467,44 +470,113 @@ public class PackagesController : ControllerBase
             return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Photo must be 5MB or smaller.");
         }
 
-        if (!AllowedPhotoContentTypes.TryGetValue(photo.ContentType, out var extension))
+        if (!AllowedPhotoContentTypes.ContainsKey(photo.ContentType))
         {
             return Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Only JPG, PNG, or WEBP images are allowed.");
         }
 
-        DeletePhotoFile(package.PhotoUrl);
-
-        var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "packages");
-        Directory.CreateDirectory(uploadsDir);
-
-        var fileName = $"{Guid.NewGuid()}{extension}";
-        var filePath = Path.Combine(uploadsDir, fileName);
-
-        await using (var stream = System.IO.File.Create(filePath))
+        byte[] data;
+        await using (var buffer = new MemoryStream((int)photo.Length))
         {
-            await photo.CopyToAsync(stream, ct);
+            await photo.CopyToAsync(buffer, ct);
+            data = buffer.ToArray();
         }
 
-        package.PhotoUrl = $"/uploads/packages/{fileName}";
+        var fileName = Path.GetFileName(photo.FileName);
+        if (fileName is { Length: > 200 })
+        {
+            fileName = fileName[..200];
+        }
+
+        var updatedAt = DateTimeOffset.UtcNow;
+        var stored = await _db.TourPackagePhotos.FindAsync(new object[] { id }, ct);
+        if (stored is null)
+        {
+            stored = new TourPackagePhoto { TourPackageId = id };
+            _db.TourPackagePhotos.Add(stored);
+        }
+
+        stored.Data = data;
+        stored.ContentType = photo.ContentType;
+        stored.FileName = string.IsNullOrWhiteSpace(fileName) ? null : fileName;
+        stored.SizeBytes = data.Length;
+        stored.UpdatedAt = updatedAt;
+
+        var previousPhotoUrl = package.PhotoUrl;
+        package.PhotoUrl = $"/api/packages/{id}/photo?v={updatedAt.UtcTicks}";
         await _db.SaveChangesAsync(ct);
+
+        // Photos used to live on the container disk; clean up a legacy file once the DB copy is saved.
+        DeletePhotoFile(previousPhotoUrl);
 
         return Ok(TourPackageDto.FromEntity(package));
     }
 
-    private void DeletePhotoFile(string? photoUrl)
+    [HttpGet("{id:guid}/photo")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetPhoto(Guid id, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(photoUrl))
+        var stored = await _db.TourPackagePhotos
+            .AsNoTracking()
+            .Where(p => p.TourPackageId == id)
+            .Select(p => new { p.Data, p.ContentType })
+            .FirstOrDefaultAsync(ct);
+
+        if (stored is not null)
         {
-            return;
+            Response.Headers.CacheControl = PhotoCacheControl;
+            return File(stored.Data, stored.ContentType);
         }
 
-        var filePath = Path.Combine(_env.WebRootPath, photoUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-        if (System.IO.File.Exists(filePath))
+        // Fallback for packages whose photo was uploaded before photos moved into the database.
+        var photoUrl = await _db.TourPackages
+            .AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => p.PhotoUrl)
+            .FirstOrDefaultAsync(ct);
+
+        var legacyPath = ResolveLegacyPhotoPath(photoUrl);
+        if (legacyPath is null || !System.IO.File.Exists(legacyPath))
+        {
+            return NotFound();
+        }
+
+        var extension = Path.GetExtension(legacyPath).ToLowerInvariant();
+        var contentType = extension == ".jpeg"
+            ? "image/jpeg"
+            : AllowedPhotoContentTypes.FirstOrDefault(t => t.Value == extension).Key ?? "application/octet-stream";
+
+        Response.Headers.CacheControl = PhotoCacheControl;
+        return PhysicalFile(legacyPath, contentType);
+    }
+
+    private void DeletePhotoFile(string? photoUrl)
+    {
+        var filePath = ResolveLegacyPhotoPath(photoUrl);
+        if (filePath is not null && System.IO.File.Exists(filePath))
         {
             System.IO.File.Delete(filePath);
         }
+    }
+
+    private string? ResolveLegacyPhotoPath(string? photoUrl)
+    {
+        if (string.IsNullOrEmpty(photoUrl)
+            || !photoUrl.StartsWith(LegacyPhotoUrlPrefix, StringComparison.Ordinal)
+            || string.IsNullOrEmpty(_env.WebRootPath))
+        {
+            return null;
+        }
+
+        var uploadsDir = Path.GetFullPath(Path.Combine(_env.WebRootPath, "uploads", "packages"));
+        var relativePath = photoUrl.Split('?')[0].TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var filePath = Path.GetFullPath(Path.Combine(_env.WebRootPath, relativePath));
+
+        return filePath.StartsWith(uploadsDir + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            ? filePath
+            : null;
     }
 
     [HttpPost("{id:guid}/tiers")]
