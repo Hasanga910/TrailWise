@@ -23,6 +23,7 @@ class TrailWiseApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) => MaterialApp(
+          debugShowCheckedModeBanner: false,
           title: 'TrailWise',
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,

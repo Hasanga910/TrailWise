@@ -11,6 +11,7 @@ public class TrailWiseDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<TourPackage> TourPackages => Set<TourPackage>();
+    public DbSet<TourPackagePhoto> TourPackagePhotos => Set<TourPackagePhoto>();
     public DbSet<PackageTier> PackageTiers => Set<PackageTier>();
     public DbSet<PackageLocation> PackageLocations => Set<PackageLocation>();
     public DbSet<Booking> Bookings => Set<Booking>();

@@ -837,6 +837,35 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.ToTable("TourPackages");
                 });
 
+            modelBuilder.Entity("TrailWise.Domain.Entities.TourPackagePhoto", b =>
+                {
+                    b.Property<Guid>("TourPackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SizeBytes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TourPackageId");
+
+                    b.ToTable("TourPackagePhotos", (string)null);
+                });
+
             modelBuilder.Entity("TrailWise.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1173,6 +1202,17 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Navigation("Traveler");
                 });
 
+            modelBuilder.Entity("TrailWise.Domain.Entities.TourPackagePhoto", b =>
+                {
+                    b.HasOne("TrailWise.Domain.Entities.TourPackage", "TourPackage")
+                        .WithOne("Photo")
+                        .HasForeignKey("TrailWise.Domain.Entities.TourPackagePhoto", "TourPackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TourPackage");
+                });
+
             modelBuilder.Entity("TrailWise.Domain.Entities.VehicleAssignment", b =>
                 {
                     b.HasOne("TrailWise.Domain.Entities.Booking", "Booking")
@@ -1249,6 +1289,8 @@ namespace TrailWise.Infrastructure.Persistence.Db
                     b.Navigation("Locations");
 
                     b.Navigation("PackageTiers");
+
+                    b.Navigation("Photo");
                 });
 
             modelBuilder.Entity("TrailWise.Domain.Entities.User", b =>
